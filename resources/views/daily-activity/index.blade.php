@@ -171,7 +171,7 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{{ $activity['created_at'] ? \Carbon\Carbon::parse($activity['created_at'])->format('d M Y') : '-' }}</td>
+                                        <td>{{ $activity['date'] ? \Carbon\Carbon::parse($activity['date'])->format('d M Y') : '-' }}</td>
                                         <td>{{ $activity['title'] ?? '-' }}</td>
                                         <td>
                                             <span class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ $activity['description'] ?? '-' }}">
@@ -317,7 +317,7 @@ function showActivityDetail(activityId) {
             <div class="col-md-6">
                 <h6 class="text-muted mb-3">Informasi Aktivitas</h6>
                 <div class="mb-2">
-                    <strong>Tanggal:</strong> ${formatDate(activity.created_at)}
+                    <strong>Tanggal:</strong> ${formatDate(activity.date)}
                 </div>
                 <div class="mb-2">
                     <strong>Jam Mulai:</strong> ${activity.start_time || '-'}
