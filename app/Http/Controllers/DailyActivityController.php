@@ -12,7 +12,7 @@ class DailyActivityController extends Controller
     {
         try {
             // API endpoint dan token
-            $apiUrl = 'http://absensi.test/api/daily-activities';
+            $apiUrl = 'https://absensi.bprsbtb.co.id/api/daily-activities';
             $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vYWJzZW5zaS50ZXN0L2FwaS9sb2dpbiIsImlhdCI6MTc2MzM1NTM5MSwiZXhwIjoxNzYzMzU4OTkxLCJuYmYiOjE3NjMzNTUzOTEsImp0aSI6InVMaERxUU1POWdBR0RlN0MiLCJzdWIiOiIxIiwicHJ2IjoiMjNiZDVjODk0OWY2MDBhZGIzOWU3MDFjNDAwODcyZGI3YTU5NzZmNyJ9.GctVlE48LNh7RCj_0HgvDdGEuuV7b7vlrNK_NXzl4sE';
 
             // Request ke API
