@@ -153,8 +153,16 @@
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="avatar avatar-sm me-2">
-                                                    @if(isset($activity['employee']['photo_url']) && $activity['employee']['photo_url'])
-                                                        <img src="{{ $activity['employee']['photo_url'] }}" alt="Avatar" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                    @php
+                                                        $photoUrl = null;
+                                                        if (isset($activity['employee']['photo_url']) && $activity['employee']['photo_url']) {
+                                                            $photoUrl = $activity['employee']['photo_url'];
+                                                        } elseif (isset($activity['employee']['photo']) && $activity['employee']['photo']) {
+                                                            $photoUrl = 'https://absensi.bprsbtb.co.id/storage/' . $activity['employee']['photo'];
+                                                        }
+                                                    @endphp
+                                                    @if($photoUrl)
+                                                        <img src="{{ $photoUrl }}" alt="Avatar" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                                                         <div class="avatar-initial bg-label-primary rounded-circle" style="width: 32px; height: 32px; display: none; align-items: center; justify-content: center;">
                                                             {{ substr($activity['employee']['full_name'] ?? 'N', 0, 1) }}
                                                         </div>
@@ -350,20 +358,16 @@ function showActivityDetail(activityId) {
                 ${activity.attachments && activity.attachments.length > 0 ? `
                 <h6 class="text-muted mb-2">Lampiran</h6>
                 <div class="d-flex flex-wrap gap-2">
-                    ${activity.attachment_urls && activity.attachment_urls.length > 0 ?
-                        activity.attachment_urls.map((url, index) => `
-                            <a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    ${activity.attachments.map((attachment, index) => {
+                        // Construct full URL from attachment path
+                        const fileUrl = 'https://absensi.bprsbtb.co.id/storage/' + attachment;
+                        return `
+                            <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
                                 <i class="ti ti-file ti-xs me-1"></i>
                                 File ${index + 1}
                             </a>
-                        `).join('') :
-                        activity.attachments.map((attachment, index) => `
-                            <span class="btn btn-sm btn-outline-secondary" title="File tidak dapat diakses">
-                                <i class="ti ti-file ti-xs me-1"></i>
-                                File ${index + 1}
-                            </span>
-                        `).join('')
-                    }
+                        `;
+                    }).join('')}
                 </div>
                 ` : ''}
             </div>
