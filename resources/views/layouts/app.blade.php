@@ -88,6 +88,11 @@
                         </a>
                     </li>
 
+                    <!-- Module sections (untuk pengembangan selanjutnya) -->
+                    <li class="menu-header small text-uppercase">
+                        <span class="menu-header-text">Modul Upload</span>
+                    </li>
+
                     <!-- Upload Data -->
                     <li class="menu-item {{ request()->is('upload') ? 'active' : '' }}">
                         <a href="/upload" class="menu-link">
@@ -101,54 +106,6 @@
                         <a href="/funding" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-file-upload"></i>
                             <div data-i18n="Upload Tabungan & Deposito">Upload Tabungan & Deposito</div>
-                        </a>
-                    </li>
-
-
-                    <!-- Module sections (untuk pengembangan selanjutnya) -->
-                    <li class="menu-header small text-uppercase">
-                        <span class="menu-header-text">Modul Keuangan</span>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-coin"></i>
-                            <div data-i18n="Funding">Funding</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-credit-card"></i>
-                            <div data-i18n="Lending">Lending</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-chart-line"></i>
-                            <div data-i18n="NPF">NPF</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-wallet"></i>
-                            <div data-i18n="Profit">Profit</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-building-bank"></i>
-                            <div data-i18n="Aset">Aset</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-percentage"></i>
-                            <div data-i18n="Rasio">Rasio Keuangan</div>
                         </a>
                     </li>
                 </ul>

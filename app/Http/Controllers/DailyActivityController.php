@@ -13,7 +13,7 @@ class DailyActivityController extends Controller
         try {
             // API endpoint dan token
             $apiUrl = 'https://absensi.bprsbtb.co.id/api/daily-activities';
-            $token = env('ABSENSI_API_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vYWJzZW5zaS50ZXN0L2FwaS9sb2dpbiIsImlhdCI6MTc2MzM1NTM5MSwiZXhwIjoxNzYzMzU4OTkxLCJuYmYiOjE3NjMzNTUzOTEsImp0aSI6InVMaERxUU1POWdBR0RlN0MiLCJzdWIiOiIxIiwicHJ2IjoiMjNiZDVjODk0OWY2MDBhZGIzOWU3MDFjNDAwODcyZGI3YTU5NzZmNyJ9.GctVlE48LNh7RCj_0HgvDdGEuuV7b7vlrNK_NXzl4sE'); // Default token, ganti dengan token production
+            $token = env('ABSENSI_API_TOKEN');
 
             // Request ke API
             $response = Http::withToken($token)->get($apiUrl);
