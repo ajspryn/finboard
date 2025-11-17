@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Test ApexCharts</title>
+    </head>
+    <body>
+        <h1>Test ApexCharts Loading</h1>
+        <div id="chart"></div>
+
+        <script src="/template/assets/vendor/libs/apex-charts/apexcharts.js"></script>
+        <script>
+            console.log("ApexCharts:", typeof ApexCharts);
+            console.log("ApexCharts object:", ApexCharts);
+
+            if (typeof ApexCharts !== "undefined") {
+                const options = {
+                    series: [
+                        {
+                            name: "Test",
+                            data: [30, 40, 35, 50, 49, 60, 70],
+                        },
+                    ],
+                    chart: {
+                        height: 350,
+                        type: "line",
+                    },
+                    xaxis: {
+                        categories: [
+                            "Jan",
+                            "Feb",
+                            "Mar",
+                            "Apr",
+                            "May",
+                            "Jun",
+                            "Jul",
+                        ],
+                    },
+                };
+
+                const chart = new ApexCharts(
+                    document.querySelector("#chart"),
+                    options
+                );
+                chart.render();
+                console.log("Chart rendered successfully");
+            } else {
+                console.error("ApexCharts NOT loaded!");
+            }
+        </script>
+    </body>
+</html>
