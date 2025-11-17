@@ -38,8 +38,18 @@ class DailyActivityController extends Controller
             $allActivities = [];
         }
 
-        // Filter berdasarkan tanggal (default hari ini)
-        $filterDate = $request->get('date', now()->format('Y-m-d'));
+        // Filter berdasarkan tanggal (default tanggal terakhir yang ada data)
+        $filterDate = $request->get('date', '');
+
+        // Jika tidak ada filter tanggal, gunakan tanggal terakhir yang ada data
+        if (empty($filterDate) && !empty($allActivities)) {
+            $latestDate = collect($allActivities)->max(function ($activity) {
+                return \Carbon\Carbon::parse($activity['date'])->format('Y-m-d');
+            });
+            $filterDate = $latestDate ?: now()->format('Y-m-d');
+        } elseif (empty($filterDate)) {
+            $filterDate = now()->format('Y-m-d');
+        }
         $filterStatus = $request->get('status', '');
         $filterEmployee = $request->get('employee', '');
 
