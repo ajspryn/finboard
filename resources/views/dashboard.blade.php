@@ -89,6 +89,7 @@ function formatNominal($amount) {
     <!-- Row 1: KPI Cards Detail (Funding, Lending, NPF) -->
     <div class="row">
         <!-- Funding Card -->
+        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
         <div class="col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 border-primary border-2">
                 <div class="card-header d-flex justify-content-between bg-label-primary">
@@ -196,8 +197,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- Lending Card -->
+        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
         <div class="col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 border-success border-2">
                 <div class="card-header d-flex justify-content-between bg-label-success">
@@ -305,8 +308,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- NPF Card -->
+        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
         <div class="col-lg-4 col-md-12 col-12 mb-4">
             <div class="card h-100 border-danger border-2">
                 <div class="card-header d-flex justify-content-between bg-label-danger">
@@ -407,9 +412,11 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
+        @endif
     </div>
 
     <!-- Row 5: Funding Charts & Tables -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -438,8 +445,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Row 5.5: Product Trend Charts -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
     <div class="row mb-4">
         <div class="col-xl-6 col-12 mb-4">
             <div class="card">
@@ -484,8 +493,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Row 6: Funding Detail Tables -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
     <div class="row mb-4">
         <div class="col-xl-6 col-12 mb-4">
             <div class="card">
@@ -585,8 +596,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Row 7: Nasabah dengan Tabungan DAN Deposito -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -681,10 +694,103 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    @endif
+
+    <!-- Row 8: Lending Tables -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">💰 Top 50 Nasabah dengan Total Pinjaman Terbesar</h5>
+                        <small class="text-muted">Data Pinjaman Aktif</small>
+                    </div>
+                    <div>
+                        <span class="badge bg-label-warning">{{ number_format($nasabahLending->count()) }} Nasabah</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th>#</th>
+                                    <th>No. CIF</th>
+                                    <th>Nama Nasabah</th>
+                                    <th class="text-center">Jml Pinjaman</th>
+                                    <th class="text-end">Total Pinjaman</th>
+                                    <th class="text-end">Total Bunga</th>
+                                    <th class="text-end">Total Angsuran</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($nasabahLending as $index => $nasabah)
+                                <tr>
+                                    <td><strong>{{ $index + 1 }}</strong></td>
+                                    <td><code>{{ $nasabah->nocif }}</code></td>
+                                    <td>{{ Str::limit($nasabah->nama ?? 'N/A', 30) }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-label-warning">{{ $nasabah->jumlah_pinjaman }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        {{ formatNominal($nasabah->total_pinjaman) }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ formatNominal($nasabah->total_bunga) }}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-warning">
+                                            {{ formatNominal($nasabah->total_angsuran) }}
+                                        </strong>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">Belum ada data</td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                            @if($nasabahLending->count() > 0)
+                            <tfoot class="table-light sticky-bottom bg-white" style="box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>TOTAL (Top 50)</strong></td>
+                                    <td class="text-center">
+                                        <span class="badge bg-warning">{{ number_format($nasabahLending->sum('jumlah_pinjaman')) }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>
+                                            @php $totalPinj = $nasabahLending->sum('total_pinjaman'); @endphp
+                                            {{ formatNominal($totalPinj) }}
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>
+                                            @php $totalBunga = $nasabahLending->sum('total_bunga'); @endphp
+                                            {{ formatNominal($totalBunga) }}
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-warning">
+                                            @php $totalAngsuran = $nasabahLending->sum('total_angsuran'); @endphp
+                                            {{ formatNominal($totalAngsuran) }}
+                                        </strong>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                            @endif
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Row 2: Charts (Monthly Trends & NPF Distribution) -->
     <div class="row">
-        <!-- Monthly Trends Chart -->
+        <!-- Monthly Trends Chart (hanya untuk admin dan pengurus) -->
+        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
         <div class="col-lg-8 mb-4">
             <div class="card">
                 <div class="card-header">
@@ -696,8 +802,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- NPF Distribution Chart -->
+        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
         <div class="col-lg-4 mb-4">
             <div class="card">
                 <div class="card-header">
@@ -709,8 +817,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
+        @endif
     </div>
 
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
     <!-- Row 3: Additional Charts -->
     <div class="row">
         <!-- Kolektibilitas Donut Chart -->
@@ -1153,6 +1263,7 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    @endif
 
 
 <!-- Modal Detail Segmentasi -->

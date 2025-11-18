@@ -7,6 +7,7 @@ use App\Models\Tabungan;
 use App\Models\Deposito;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
@@ -15,6 +16,9 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        // Get current user
+        $user = Auth::user();
+
         // Get filter parameters
         $startDay = $request->input('start_day');
         $endDay = $request->input('end_day');
@@ -301,6 +305,36 @@ class DashboardController extends Controller
             ->get();
 
         $nasabahBothFunding = $allNasabahFunding;
+
+        // Top 50 nasabah dengan pinjaman terbesar
+        $nasabahLending = Pembiayaan::where('period_month', $filterMonth)
+            ->where('period_year', $filterYear)
+            ->when($startDay && $endDay, function ($query) use ($filterYear, $filterMonth, $startDay, $endDay) {
+                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                return $query->whereDate('tgleff', '>=', $startDate)
+                    ->whereDate('tgleff', '<=', $endDate);
+            })
+            ->when($startDay && !$endDay, function ($query) use ($filterYear, $filterMonth, $startDay) {
+                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                return $query->whereDate('tgleff', '>=', $startDate);
+            })
+            ->when(!$startDay && $endDay, function ($query) use ($filterYear, $filterMonth, $endDay) {
+                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                return $query->whereDate('tgleff', '<=', $endDate);
+            })
+            ->select(
+                'nocif',
+                DB::raw('MAX(nama) as nama'),
+                DB::raw('COUNT(*) as jumlah_pinjaman'),
+                DB::raw('SUM(mdlawal) as total_pinjaman'),
+                DB::raw('SUM(mgnawal) as total_bunga'),
+                DB::raw('SUM(osmdlc + osmgnc) as total_angsuran')
+            )
+            ->groupBy('nocif')
+            ->orderByDesc('total_pinjaman')
+            ->limit(50)
+            ->get();
 
         // Lending data (Real dari CSV)
         $lending = [
@@ -622,7 +656,7 @@ class DashboardController extends Controller
         // Trend Kontrak per Bulan (6 bulan terakhir)
         $nasabahTrendData = $this->getNasabahTrendData();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'nasabahStatusData', 'nasabahTrendData', 'fundingTrends', 'fundingDetails', 'nasabahBothFunding'));
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'nasabahStatusData', 'nasabahTrendData', 'fundingTrends', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)

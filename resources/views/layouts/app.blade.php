@@ -34,6 +34,9 @@
     <link rel="stylesheet" href="/template/assets/vendor/libs/typeahead-js/typeahead.css" />
     <link rel="stylesheet" href="/template/assets/vendor/libs/apex-charts/apex-charts.css" />
 
+    <!-- Page CSS -->
+    <link rel="stylesheet" href="/template/assets/vendor/css/pages/page-auth.css" />
+
     @yield('styles')
 
     <!-- Helpers -->
@@ -80,34 +83,59 @@
                         </a>
                     </li>
 
-                    <!-- Daily Activity -->
+                    <!-- Daily Activity (hanya untuk admin dan pengurus) -->
+                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
                     <li class="menu-item {{ request()->is('daily-activity') ? 'active' : '' }}">
                         <a href="/daily-activity" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-calendar-event"></i>
                             <div data-i18n="DailyActivity">Daily Activity Karyawan</div>
                         </a>
                     </li>
+                    @endif
 
-                    <!-- Module sections (untuk pengembangan selanjutnya) -->
+                    <!-- Module sections -->
+                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'funding' || auth()->user()->role === 'lending')
                     <li class="menu-header small text-uppercase">
                         <span class="menu-header-text">Modul Upload</span>
                     </li>
 
-                    <!-- Upload Data -->
+                    <!-- Upload Data (admin dan lending) -->
+                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'lending')
                     <li class="menu-item {{ request()->is('upload') ? 'active' : '' }}">
                         <a href="/upload" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-upload"></i>
                             <div data-i18n="Upload Pembiayaan">Upload Pembiayaan</div>
                         </a>
                     </li>
+                    @endif
 
-                    <!-- Upload Funding -->
+                    <!-- Upload Funding (admin dan funding) -->
+                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'funding')
                     <li class="menu-item {{ request()->is('funding') ? 'active' : '' }}">
                         <a href="/funding" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-file-upload"></i>
                             <div data-i18n="Upload Tabungan & Deposito">Upload Tabungan & Deposito</div>
                         </a>
                     </li>
+                    @endif
+                    @endif
+
+
+                    <!-- User Settings (hanya untuk admin) -->
+                    @if(auth()->user()->role === 'admin')
+
+                    <!-- Settings sections -->
+                    <li class="menu-header small text-uppercase">
+                        <span class="menu-header-text">Pengaturan</span>
+                    </li>
+
+                    <li class="menu-item {{ request()->is('user-settings') ? 'active' : '' }}">
+                        <a href="/user-settings" class="menu-link">
+                            <i class="menu-icon tf-icons ti ti-user-cog"></i>
+                            <div data-i18n="UserSettings">Pengaturan User</div>
+                        </a>
+                    </li>
+                    @endif
                 </ul>
             </aside>
             <!-- / Menu -->
@@ -202,12 +230,12 @@
                                             <div class="d-flex">
                                                 <div class="flex-shrink-0 me-3">
                                                     <div class="avatar avatar-online">
-                                                        <span class="avatar-initial rounded-circle bg-label-primary">A</span>
+                                                        <span class="avatar-initial rounded-circle bg-label-primary">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="flex-grow-1">
-                                                    <span class="fw-medium d-block">Admin</span>
-                                                    <small class="text-muted">Administrator</small>
+                                                    <span class="fw-medium d-block">{{ auth()->user()->name }}</span>
+                                                    <small class="text-muted">{{ auth()->user()->role === 'admin' ? 'Administrator' : (auth()->user()->role === 'pengurus' ? 'Pengurus' : (auth()->user()->role === 'funding' ? 'Funding Manager' : 'Lending Manager')) }}</small>
                                                 </div>
                                             </div>
                                         </a>

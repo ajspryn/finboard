@@ -20,7 +20,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
-        'password',
+        'role',
     ];
 
     /**
@@ -29,7 +29,6 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
-        'password',
         'remember_token',
     ];
 
@@ -42,7 +41,43 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Check if user has admin role
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user has funding role
+     */
+    public function isFunding(): bool
+    {
+        return $this->role === 'funding';
+    }
+
+    /**
+     * Check if user has lending role
+     */
+    public function isLending(): bool
+    {
+        return $this->role === 'lending';
+    }
+
+    /**
+     * Get role display name
+     */
+    public function getRoleDisplayAttribute(): string
+    {
+        return match ($this->role) {
+            'admin' => 'Administrator',
+            'funding' => 'Funding',
+            'lending' => 'Lending',
+            default => 'Unknown'
+        };
     }
 }
