@@ -76,7 +76,7 @@
             <h2>Kode PIN Login</h2>
         </div>
 
-        <p>Halo,</p>
+        <p>Assalamu'alaikum Wr. Wb.</p>
 
         <p>Anda telah meminta kode PIN untuk login ke akun Finboard. Berikut adalah kode PIN Anda:</p>
 

@@ -36,10 +36,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/kecamatan-detail/{kecamatan}', [DashboardController::class, 'getKecamatanDetail'])->name('dashboard.kecamatan.detail');
     Route::get('/dashboard/ao-detail/{nmao}', [DashboardController::class, 'getAODetail'])->name('dashboard.ao.detail');
     Route::get('/dashboard/ao-npf-detail/{nmao}', [DashboardController::class, 'getAONpfDetail'])->name('dashboard.ao.npf.detail');
+    Route::get('/dashboard/ao-funding-detail/{kodeaoh}', [DashboardController::class, 'getAOFundingDetail'])->name('dashboard.ao.funding.detail');
+    Route::get('/dashboard/ao-customer-details/{ao}/{month}/{category}', [DashboardController::class, 'getAOCustomerDetails'])->name('dashboard.ao.customer.details');
     Route::get('/dashboard/nasabah-status-detail/{status}', [DashboardController::class, 'getNasabahStatusDetail'])->name('dashboard.nasabah.status.detail');
     Route::get('/dashboard/trend-kontrak-detail', [DashboardController::class, 'getTrendKontrakDetail'])->name('dashboard.trend.kontrak.detail');
     Route::get('/dashboard/trend-funding-detail', [DashboardController::class, 'getTrendFundingDetail'])->name('dashboard.trend.funding.detail');
     Route::get('/dashboard/trend-product-detail', [DashboardController::class, 'getTrendProductDetail'])->name('dashboard.trend.product.detail');
+    Route::get('/dashboard/customer-details', [DashboardController::class, 'getCustomerDetails'])->name('dashboard.customer.details');
 
     // Daily Activity Routes (Admin and Pengurus only)
     Route::middleware(['role:admin,pengurus'])->group(function () {

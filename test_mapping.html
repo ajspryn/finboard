@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Mapping</title>
+</head>
+<body>
+    <h1>Test Data Mapping</h1>
+    <div id="output"></div>
+
+    <script>
+        // Simulate the data structure
+        const fundingTrendLabels = ['Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'Mei 2025', 'Jun 2025'];
+        const pencairanData = [50, 60, 55, 65, 62, 70];
+        const type = 'nominal';
+
+        // Create allMonths from fundingTrendLabels
+        const allMonths = new Set();
+        fundingTrendLabels.forEach(label => {
+            const parts = label.split(' ');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+            const monthIndex = monthNames.indexOf(parts[0]);
+            if (monthIndex !== -1) {
+                const year = parts[1];
+                const month = (monthIndex + 1).toString().padStart(2, '0');
+                allMonths.add(`${year}-${month}`);
+            }
+        });
+
+        // Sort months chronologically
+        const sortedMonths = Array.from(allMonths).sort((a, b) => {
+            const [yearA, monthA] = a.split('-').map(Number);
+            const [yearB, monthB] = b.split('-').map(Number);
+            if (yearA !== yearB) return yearA - yearB;
+            return monthA - monthB;
+        });
+
+        // Initialize table data structure
+        const tableRows = {};
+        sortedMonths.forEach(monthKey => {
+            const [year, month] = monthKey.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const monthLabel = date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+            tableRows[monthKey] = { month: monthLabel };
+        });
+
+        // Process pencairan data
+        const pencairanSeriesData = [];
+        sortedMonths.forEach((monthKey, index) => {
+            let value = 0;
+
+            // Use direct index mapping since pencairanData is aligned with fundingTrendLabels
+            if (pencairanData[index] !== undefined) {
+                value = pencairanData[index];
+                if (type === 'nominal') {
+                    // Data sudah dalam miliar, convert to actual value for chart
+                    value = value * 1000000000;
+                }
+            }
+
+            pencairanSeriesData.push(value);
+            tableRows[monthKey]['Total Pencairan Deposito'] = value;
+        });
+
+        // Display results
+        let output = '<h2>Results:</h2>';
+        output += '<p>fundingTrendLabels: ' + JSON.stringify(fundingTrendLabels) + '</p>';
+        output += '<p>pencairanData: ' + JSON.stringify(pencairanData) + '</p>';
+        output += '<p>sortedMonths: ' + JSON.stringify(sortedMonths) + '</p>';
+        output += '<p>pencairanSeriesData: ' + JSON.stringify(pencairanSeriesData) + '</p>';
+        output += '<h3>Table Rows:</h3><pre>' + JSON.stringify(tableRows, null, 2) + '</pre>';
+
+        document.getElementById('output').innerHTML = output;
+    </script>
+</body>
+</html>

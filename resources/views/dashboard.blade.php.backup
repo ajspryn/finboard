@@ -81,22 +81,6 @@ function formatNominal($amount) {
     #nasabahTrendChart .apexcharts-data-labels {
         cursor: pointer !important;
     }
-    /* Customer Details Modal Styles */
-    .customer-detail-row:hover {
-        background-color: #f8f9fa !important;
-        cursor: pointer;
-    }
-    .customer-modal .modal-dialog {
-        max-width: 900px;
-    }
-    .clickable-metric {
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .clickable-metric:hover {
-        background-color: rgba(0,123,255,0.1) !important;
-        transform: scale(1.02);
-    }
 </style>
 @endsection
 
@@ -121,7 +105,7 @@ function formatNominal($amount) {
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="d-flex flex-column">
                             <div class="d-flex align-items-center mb-1">
-                                <h2 class="mb-0 me-2 text-primary fw-bold clickable-metric" onclick="showCustomerDetails('current_total_funding', 'nominal')" title="Klik untuk lihat detail nasabah">
+                                <h2 class="mb-0 me-2 text-primary fw-bold">
                                     {{ formatNominal($funding['total']) }}
                                 </h2>
                             </div>
@@ -141,7 +125,7 @@ function formatNominal($amount) {
                         <h6 class="mb-2">Komposisi Dana</h6>
                         <ul class="list-unstyled mb-0">
                             @foreach($funding['composition'] as $type => $percentage)
-                            <li class="d-flex mb-2 pb-1 clickable-metric" onclick="showCustomerDetails('current_{{ strtolower($type) }}', 'nominal')">
+                            <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded bg-label-{{ $type == 'Deposito' ? 'success' : 'info' }}">
                                         <i class="ti ti-{{ $type == 'Deposito' ? 'clock-dollar' : 'piggy-bank' }}"></i>
@@ -194,7 +178,7 @@ function formatNominal($amount) {
 
                     <!-- Pencairan Deposito -->
                     <div class="mt-4 pt-3 border-top">
-                        <div class="d-flex justify-content-between align-items-center clickable-metric" onclick="showCustomerDetails('current_pencairan_deposito', 'nominal')" title="Klik untuk lihat detail nasabah">
+                        <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="mb-1">Pencairan Deposito</h6>
                                 <small class="text-muted">Bulan ini</small>
@@ -431,6 +415,38 @@ function formatNominal($amount) {
         @endif
     </div>
 
+    <!-- Row 5: Funding Charts & Tables -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">📈 Trend Funding</h5>
+                        <small class="text-muted">Tabungan dan Deposito</small>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnFundingTrendNominal" onclick="toggleFundingTrendChart('nominal')">
+                            <i class="ti ti-cash ti-xs me-1"></i> Nominal
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" id="btnFundingTrendJumlah" onclick="toggleFundingTrendChart('jumlah')">
+                            <i class="ti ti-users ti-xs me-1"></i> Jumlah
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+                        <i class="ti ti-info-circle me-1"></i>
+                        <small><strong>Tip:</strong> Klik pada titik data di chart untuk melihat detail funding</small>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <div id="fundingTrendChart" style="cursor: pointer;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Row 5.5: Combined Product Trend Chart -->
     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
     <div class="row mb-4">
@@ -524,7 +540,7 @@ function formatNominal($amount) {
                                 <i class="ti ti-chart-line ti-xs me-1"></i> Chart
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="btnCombinedTrendTable" onclick="toggleCombinedTrendView('table')">
-                                <i class="ti ti-table ti-xs me-1"></i> Table
+                                <i class="ti ti-table ti-xs me-1"></i> Tabel
                             </button>
                         </div>
 
@@ -546,87 +562,6 @@ function formatNominal($amount) {
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                     <div id="combinedTrendChart" style="min-height: 400px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    <!-- Row 4.5: AO Funding Performance -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title mb-0">💰 Performa Funding Account Officer</h5>
-                        <small class="text-muted">Deposito & ABP per AO (klik untuk detail nasabah)</small>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; position: relative;">
-                        <table class="table table-hover mb-0" style="table-layout: fixed; margin-bottom: 0;">
-                            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                <tr>
-                                    <th style="width: 50px; background-color: #f8f9fa;">#</th>
-                                    <th style="width: 200px; background-color: #f8f9fa;">Nama AO</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Deposito</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">ABP</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Cairkan</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Deposito</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal ABP</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Cairkan</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Total Funding</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($aoFundingData as $index => $ao)
-                                <tr class="ao-funding-row" data-ao="{{ $ao['kodeaoh'] }}" style="cursor: pointer;">
-                                    <td><strong>{{ $index + 1 }}</strong></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm me-2">
-                                                <span class="avatar-initial rounded-circle bg-label-success">
-                                                    {{ strtoupper(substr($ao['nmao'], 0, 2)) }}
-                                                </span>
-                                            </div>
-                                            <strong>{{ $ao['nmao'] }}</strong>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-info">{{ number_format($ao['total_deposito']) }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-warning">{{ number_format($ao['total_abp']) }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-danger">{{ number_format($ao['total_cairkan']) }}</span>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-info">
-                                            {{ formatNominal($ao['nominal_deposito']) }}
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-warning">
-                                            {{ formatNominal($ao['nominal_abp']) }}
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-danger">
-                                            {{ formatNominal($ao['nominal_cairkan']) }}
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-primary">
-                                            {{ formatNominal($ao['total_funding']) }}
-                                        </strong>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1024,23 +959,23 @@ function formatNominal($amount) {
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="card-title mb-0">🏆 Performa Account Officer</h5>
+                        <h5 class="card-title mb-0">🏆 Top 5 Performa Account Officer</h5>
                         <small class="text-muted">Berdasarkan Total Outstanding</small>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; position: relative;">
-                        <table class="table table-hover mb-0" style="table-layout: fixed; margin-bottom: 0;">
-                            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
                                 <tr>
-                                    <th style="width: 50px; background-color: #f8f9fa;">#</th>
-                                    <th style="width: 200px; background-color: #f8f9fa;">Nama AO</th>
-                                    <th class="text-center" style="width: 120px; background-color: #f8f9fa;">Jumlah Nasabah</th>
-                                    <th class="text-end" style="width: 150px; background-color: #f8f9fa;">Total Outstanding</th>
-                                    <th class="text-end" style="width: 150px; background-color: #f8f9fa;">Total Plafon</th>
-                                    <th class="text-center" style="width: 100px; background-color: #f8f9fa;">Jumlah NPF</th>
-                                    <th class="text-center" style="width: 100px; background-color: #f8f9fa;">NPF Ratio</th>
-                                    <th style="width: 200px; background-color: #f8f9fa;">Performance</th>
+                                    <th>#</th>
+                                    <th>Nama AO</th>
+                                    <th class="text-center">Jumlah Nasabah</th>
+                                    <th class="text-end">Total Outstanding</th>
+                                    <th class="text-end">Total Plafon</th>
+                                    <th class="text-center">Jumlah NPF</th>
+                                    <th class="text-center">NPF Ratio</th>
+                                    <th style="width: 200px;">Performance</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1240,17 +1175,16 @@ function formatNominal($amount) {
                             <thead>
                                 <tr class="table-light">
                                     <th colspan="2" rowspan="2" class="text-center align-middle">SEGMENTASI</th>
-                                    <th colspan="2" class="text-center bg-success text-white">DISBURSE</th>
                                     <th colspan="2" class="text-center bg-primary text-white">OUTSTANDING</th>
+                                    <th colspan="2" class="text-center bg-success text-white">DISBURSE</th>
                                     <th colspan="5" class="text-center bg-warning text-dark">KOLEKTIBILITAS</th>
-                                    <th rowspan="2" class="text-center align-middle">CIF</th>
                                     <th rowspan="2" class="text-center align-middle">NOA</th>
                                 </tr>
                                 <tr class="table-light">
-                                    <th class="text-end bg-success text-white">DISBURSE</th>
-                                    <th class="text-center bg-success text-white">%</th>
                                     <th class="text-end bg-primary text-white">OUTSTANDING</th>
                                     <th class="text-center bg-primary text-white">%</th>
+                                    <th class="text-end bg-success text-white">DISBURSE</th>
+                                    <th class="text-center bg-success text-white">%</th>
                                     <th class="text-center bg-warning text-dark">KOL 1</th>
                                     <th class="text-center bg-warning text-dark">KOL 2</th>
                                     <th class="text-center bg-warning text-dark">KOL 3</th>
@@ -1270,10 +1204,10 @@ function formatNominal($amount) {
                                     @endif
                                     @if(!$segment['is_total'])
                                         <td>{{ $segment['type'] }}</td>
-                                        <td class="text-end">{{ number_format($segment['disburse'], 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($segment['pct_disburse'], 2) }}%</td>
                                         <td class="text-end">{{ number_format($segment['outstanding'], 0, ',', '.') }}</td>
                                         <td class="text-center">{{ number_format($segment['pct_outstanding'], 2) }}%</td>
+                                        <td class="text-end">{{ number_format($segment['disburse'], 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($segment['pct_disburse'], 2) }}%</td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
                                             onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '1')"
                                             title="Klik untuk melihat detail nasabah KOL 1">
@@ -1284,7 +1218,7 @@ function formatNominal($amount) {
                                                     {{ number_format(($segment['col1_sum'] ?? 0) / 1000000, 0) }}jt
                                                 @endif
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col1'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col1'] ?? 0 }} nasabah</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
                                             onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '2')"
@@ -1296,7 +1230,7 @@ function formatNominal($amount) {
                                                     {{ number_format(($segment['col2_sum'] ?? 0) / 1000000, 0) }}jt
                                                 @endif
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col2'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col2'] ?? 0 }} nasabah</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
                                             onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '3')"
@@ -1308,7 +1242,7 @@ function formatNominal($amount) {
                                                     {{ number_format(($segment['col3_sum'] ?? 0) / 1000000, 0) }}jt
                                                 @endif
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col3'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col3'] ?? 0 }} nasabah</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
                                             onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '4')"
@@ -1320,7 +1254,7 @@ function formatNominal($amount) {
                                                     {{ number_format(($segment['col4_sum'] ?? 0) / 1000000, 0) }}jt
                                                 @endif
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col4'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col4'] ?? 0 }} nasabah</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
                                             onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '5')"
@@ -1332,9 +1266,8 @@ function formatNominal($amount) {
                                                     {{ number_format(($segment['col5_sum'] ?? 0) / 1000000, 0) }}jt
                                                 @endif
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col5'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col5'] ?? 0 }} nasabah</small>
                                         </td>
-                                        <td class="text-center">{{ number_format($segment['cif'] ?? 0) }}</td>
                                         <td class="text-center">{{ number_format($segment['noa']) }}</td>
                                     @else
                                         <td class="text-center"><strong>{{ $segment['type'] }}</strong></td>
@@ -1392,7 +1325,6 @@ function formatNominal($amount) {
                                             </strong></div>
                                             <small class="text-muted" style="font-size: 9px;">{{ $segment['col5'] ?? 0 }} </small>
                                         </td>
-                                        <td class="text-center"><strong>{{ number_format($segment['cif'] ?? 0) }}</strong></td>
                                         <td class="text-center"><strong>{{ number_format($segment['noa']) }}</strong></td>
                                     @endif
                                 </tr>
@@ -1620,32 +1552,6 @@ function formatNominal(amount) {
                 width: 3
             },
             colors: ['#696cff', '#71dd37'],
-            markers: {
-                size: 4,
-                hover: {
-                    size: 6
-                }
-            },
-            dataLabels: {
-                enabled: true,
-                formatter: function(val) {
-                    return 'Rp ' + val.toFixed(1) + 'M';
-                },
-                style: {
-                    fontSize: '10px',
-                    fontWeight: 'bold'
-                },
-                background: {
-                    enabled: true,
-                    foreColor: '#fff',
-                    padding: 4,
-                    borderRadius: 2,
-                    borderWidth: 1,
-                    borderColor: '#fff',
-                    opacity: 0.9
-                },
-                offsetY: -10
-            },
             xaxis: {
                 categories: @json($monthlyTrends['labels'])
             },
@@ -1921,14 +1827,12 @@ function formatNominal(amount) {
                 }],
                 chart: {
                     type: 'line',
-                    height: 400,
+                    height: 350,
                     toolbar: { show: true },
                     zoom: { enabled: true },
                     events: {
-                        markerClick: function(event, chartContext, config) {
-                            console.log('Marker clicked!', config);
-                            const seriesIndex = config.seriesIndex;
-                            const dataPointIndex = config.dataPointIndex;
+                        markerClick: function(event, chartContext, { seriesIndex, dataPointIndex, config }) {
+                            console.log('Marker clicked!', seriesIndex, dataPointIndex);
                             const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
 
                             // Tentukan kategori berdasarkan series
@@ -1956,32 +1860,6 @@ function formatNominal(amount) {
                             console.log('Opening modal from selection:', monthLabel, kategori);
                             // Buka modal detail
                             window.showTrendKontrakDetail(monthLabel, kategori);
-                        },
-                        click: function(event, chartContext, config) {
-                            console.log('Chart clicked!', config);
-                            if (config && config.dataPointIndex !== undefined) {
-                                const seriesIndex = config.seriesIndex;
-                                const dataPointIndex = config.dataPointIndex;
-                                const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
-
-                                // Tentukan kategori berdasarkan series
-                                let kategori = '';
-                                if (seriesIndex === 0) kategori = 'kontrak_baru';
-                                else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
-                                else if (seriesIndex === 2) kategori = 'kontrak_lunas';
-
-                                console.log('Opening modal from click:', monthLabel, kategori);
-                                // Buka modal detail
-                                window.showTrendKontrakDetail(monthLabel, kategori);
-                            }
-                        },
-                        dataPointMouseEnter: function(event, chartContext, config) {
-                            // Make data labels clickable on hover
-                            event.target.style.cursor = 'pointer';
-                        },
-                        dataPointMouseLeave: function(event, chartContext, config) {
-                            // Reset cursor
-                            event.target.style.cursor = 'default';
                         }
                     }
                 },
@@ -2023,8 +1901,7 @@ function formatNominal(amount) {
                             return 'Rp ' + val.toFixed(2) + 'M';
                         }
                         return val;
-                    },
-                    offsetY: -10
+                    }
                 },
                 xaxis: {
                     categories: @json($nasabahTrendData['labels']),
@@ -2076,33 +1953,6 @@ function formatNominal(amount) {
             });
             nasabahTrendChart.render();
             console.log('Nasabah trend chart rendered (type: ' + type + ')');
-
-            // Make data labels clickable after chart is rendered
-            setTimeout(() => {
-                const chartElement = document.querySelector('#nasabahTrendChart');
-                if (chartElement) {
-                    const dataLabels = chartElement.querySelectorAll('.apexcharts-data-labels text');
-                    dataLabels.forEach((label, index) => {
-                        label.style.cursor = 'pointer';
-                        label.addEventListener('click', function() {
-                            // Calculate which data point this label belongs to
-                            const seriesIndex = Math.floor(index / @json($nasabahTrendData['labels']).length);
-                            const dataPointIndex = index % @json($nasabahTrendData['labels']).length;
-                            const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
-
-                            // Tentukan kategori berdasarkan series
-                            let kategori = '';
-                            if (seriesIndex === 0) kategori = 'kontrak_baru';
-                            else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
-                            else if (seriesIndex === 2) kategori = 'kontrak_lunas';
-
-                            console.log('Data label clicked:', monthLabel, kategori);
-                            // Buka modal detail
-                            window.showTrendKontrakDetail(monthLabel, kategori);
-                        });
-                    });
-                }
-            }, 500);
         }
     }
 
@@ -2821,10 +2671,10 @@ function toggleView(view) {
 
 // Initialize Leaflet Map
 function initializeMap() {
-    // Create map dengan fokus pada Jawa Barat
+    // Create map dengan peta flat Indonesia
     const map = L.map('map', {
-        center: [-6.6, 106.8], // Pusat Jawa Barat (Bandung)
-        zoom: 9,
+        center: [-2.5, 118.0], // Pusat Indonesia
+        zoom: 5,
         zoomControl: true,
         attributionControl: false,
         minZoom: 4,
@@ -3212,13 +3062,23 @@ if (fundingTrendEl) {
         ];
     @endphp
 
+    // Global variables for funding trend data
+    const fundingTrendData = @json($fundingTrendData);
+    const fundingTrendLabels = @json($fundingTrendLabels);
+
+    // Global pencairan data for combined trend chart
+    const pencairanTrendData = {
+        nominal: @json($fundingPencairanData),
+        jumlah: @json($fundingPencairanJumlah)
+    };
+
     function createFundingTrendChart(type = 'nominal') {
         if (fundingTrendChart) {
             fundingTrendChart.destroy();
         }
 
         const isNominal = type === 'nominal';
-        const data = @json($fundingTrendData)[type];
+        const data = fundingTrendData[type];
 
         if (fundingTrendEl) {
             fundingTrendChart = new ApexCharts(fundingTrendEl, {
@@ -3243,7 +3103,7 @@ if (fundingTrendEl) {
                     events: {
                         markerClick: function(event, chartContext, { seriesIndex, dataPointIndex, config }) {
                             console.log('Funding marker clicked!', seriesIndex, dataPointIndex);
-                            const monthLabel = @json($fundingTrendLabels)[dataPointIndex];
+                            const monthLabel = fundingTrendLabels[dataPointIndex];
 
                             // Tentukan kategori berdasarkan series
                             let kategori = '';
@@ -3260,7 +3120,7 @@ if (fundingTrendEl) {
                             console.log('Funding data point selected!', config);
                             const monthIndex = config.dataPointIndex;
                             const seriesIndex = config.seriesIndex;
-                            const monthLabel = @json($fundingTrendLabels)[monthIndex];
+                            const monthLabel = fundingTrendLabels[monthIndex];
 
                             // Tentukan kategori berdasarkan series
                             let kategori = '';
@@ -3314,11 +3174,10 @@ if (fundingTrendEl) {
                             return 'Rp ' + val.toFixed(2) + 'M';
                         }
                         return val;
-                    },
-                    offsetY: -10
+                    }
                 },
                 xaxis: {
-                    categories: @json($fundingTrendLabels),
+                    categories: fundingTrendLabels,
                     labels: {
                         style: {
                             fontSize: '12px'
@@ -3468,29 +3327,6 @@ function createTabunganTrendChart(type = 'nominal') {
                         size: 6
                     }
                 },
-                dataLabels: {
-                    enabled: true,
-                    formatter: function(value) {
-                        if (type === 'nominal') {
-                            return formatNominal(value);
-                        }
-                        return value;
-                    },
-                    style: {
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                    },
-                    background: {
-                        enabled: true,
-                        foreColor: '#fff',
-                        padding: 4,
-                        borderRadius: 2,
-                        borderWidth: 1,
-                        borderColor: '#fff',
-                        opacity: 0.9
-                    },
-                    offsetY: -10
-                },
                 xaxis: {
                     categories: categories,
                     title: {
@@ -3601,29 +3437,6 @@ function createDepositoTrendChart(type = 'nominal') {
                         size: 6
                     }
                 },
-                dataLabels: {
-                    enabled: true,
-                    formatter: function(value) {
-                        if (type === 'nominal') {
-                            return formatNominal(value);
-                        }
-                        return value.toString();
-                    },
-                    style: {
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                    },
-                    background: {
-                        enabled: true,
-                        foreColor: '#fff',
-                        padding: 4,
-                        borderRadius: 2,
-                        borderWidth: 1,
-                        borderColor: '#fff',
-                        opacity: 0.9
-                    },
-                    offsetY: -10
-                },
                 xaxis: {
                     categories: categories,
                     title: {
@@ -3706,21 +3519,44 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     const selectedTabunganProducts = Array.from(document.querySelectorAll('#tabunganProductsList input[type="checkbox"]:checked')).map(cb => cb.value);
     const selectedDepositoProducts = Array.from(document.querySelectorAll('#depositoProductsList input[type="checkbox"]:checked')).map(cb => cb.value);
 
+    // Check if user is authenticated
+    if (!@auth) {
+        combinedTrendEl.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-alert-circle ti-lg mb-2"></i><br>Sesi login telah berakhir. Silakan login kembali.</div>';
+        return;
+    }
+
     // Show loading
     combinedTrendEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"></div><br>Loading...</div>';
 
     // Fetch both tabungan and deposito data
     Promise.all([
-        (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
-        (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
-        showTotalPencairanDeposito ? fetch(`/dashboard/trend-product-detail?jenis=pencairan_deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []})
+        (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`).then(r => {
+            if (!r.ok) {
+                console.warn('Tabungan API failed:', r.status, r.statusText);
+                return {data: []};
+            }
+            return r.json();
+        }).catch(err => {
+            console.warn('Tabungan API error:', err);
+            return {data: []};
+        }) : Promise.resolve({data: []}),
+        (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`).then(r => {
+            if (!r.ok) {
+                console.warn('Deposito API failed:', r.status, r.statusText);
+                return {data: []};
+            }
+            return r.json();
+        }).catch(err => {
+            console.warn('Deposito API error:', err);
+            return {data: []};
+        }) : Promise.resolve({data: []})
     ])
-    .then(([tabunganData, depositoData, pencairanData]) => {
+    .then(([tabunganData, depositoData]) => {
         const series = [];
         const categories = [];
-        const tableRows = {};
+        const tableData = [];
 
-        // Collect all unique months from all datasets
+        // Collect all unique months from both datasets
         const allMonths = new Set();
 
         if (tabunganData.data) {
@@ -3739,23 +3575,23 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
             });
         }
 
-        if (pencairanData.data) {
-            pencairanData.data.forEach(product => {
-                Object.keys(product.data).forEach(monthKey => {
-                    allMonths.add(monthKey);
-                });
-            });
-        }
-
         // Sort months chronologically
         const sortedMonths = Array.from(allMonths).sort();
 
-        // Create month labels and initialize table rows
+        // Create month labels
         sortedMonths.forEach(monthKey => {
             const [year, month] = monthKey.split('-');
             const date = new Date(parseInt(year), parseInt(month) - 1, 1);
             const monthLabel = date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
             categories.push(monthLabel);
+        });
+
+        // Initialize table data structure
+        const tableRows = {};
+        sortedMonths.forEach(monthKey => {
+            const [year, month] = monthKey.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const monthLabel = date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
             tableRows[monthKey] = { month: monthLabel };
         });
 
@@ -3858,23 +3694,37 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
         }
 
         // Process pencairan deposito data
-        if (pencairanData.data && showTotalPencairanDeposito) {
-            const totalPencairanData = [];
-            sortedMonths.forEach(monthKey => {
-                let total = 0;
-                pencairanData.data.forEach(product => {
-                    const monthData = product.data[monthKey];
-                    if (monthData) {
-                        total += type === 'nominal' ? monthData.nominal : monthData.jumlah;
-                    }
-                });
-                totalPencairanData.push(total);
-                tableRows[monthKey]['Total Pencairan Deposito'] = total;
+        if (showTotalPencairanDeposito) {
+            // Get pencairan data from global pencairan trend data
+            const pencairanData = pencairanTrendData[type];
+
+            // Check if pencairan data exists
+            if (!pencairanData || !Array.isArray(pencairanData)) {
+                console.warn('Pencairan deposito data not available');
+                // Show error message
+                combinedTrendEl.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-alert-circle ti-lg mb-2"></i><br>Data pencairan deposito tidak tersedia</div>';
+                return;
+            }
+
+            const pencairanSeriesData = [];
+
+            // Map pencairan data to months (data sudah dalam urutan yang benar dari PHP)
+            pencairanData.forEach((value, index) => {
+                let chartValue = value || 0;
+                if (type === 'nominal') {
+                    // Data sudah dalam miliar, convert to actual value for chart
+                    chartValue = chartValue * 1000000000;
+                }
+                pencairanSeriesData.push(chartValue);
+                // We need to map to the correct month key
+                if (sortedMonths[index]) {
+                    tableRows[sortedMonths[index]]['Total Pencairan Deposito'] = chartValue;
+                }
             });
 
             series.push({
                 name: type === 'nominal' ? 'Total Pencairan Deposito' : 'Jumlah Pencairan Deposito',
-                data: totalPencairanData,
+                data: pencairanSeriesData,
                 type: 'line'
             });
         }
@@ -3885,28 +3735,14 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
             return;
         }
 
-        // Validate series data before rendering
-        const validSeries = series.filter(s => s.data && s.data.length > 0);
-        if (validSeries.length === 0) {
-            combinedTrendEl.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-info-circle ti-lg mb-2"></i><br>Tidak ada data yang valid untuk ditampilkan</div>';
-            return;
-        }
-
         // Render based on view type
         if (view === 'table') {
-            try {
-                renderCombinedTrendTable(tableRows, sortedMonths, type);
-            } catch (error) {
-                console.error('Error rendering table:', error);
-                combinedTrendEl.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-alert-circle ti-lg mb-2"></i><br>Gagal merender tabel</div>';
-            }
+            // For now, show chart instead of table
+            renderCombinedTrendChart(series, categories, type);
+            // TODO: Implement table view
+            // renderCombinedTrendTable(tableRows, sortedMonths, type);
         } else {
-            try {
-                renderCombinedTrendChart(validSeries, categories, type);
-            } catch (error) {
-                console.error('Error rendering chart:', error);
-                combinedTrendEl.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-alert-circle ti-lg mb-2"></i><br>Gagal merender chart</div>';
-            }
+            renderCombinedTrendChart(series, categories, type);
         }
     })
     .catch(error => {
@@ -3915,327 +3751,162 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     });
 }
 
-// Function to render combined trend chart
+// Function to render chart
 function renderCombinedTrendChart(series, categories, type) {
-    try {
-        const options = {
-            series: series,
-            chart: {
-                type: 'line',
-                height: 400,
-                toolbar: {
-                    show: true
-                },
-                events: {
-                    markerClick: function(event, chartContext, config) {
-                        console.log('Combined trend marker clicked!', config);
-                        const seriesIndex = config.seriesIndex;
-                        const dataPointIndex = config.dataPointIndex;
-                        const seriesName = series[seriesIndex].name;
-                        const monthLabel = categories[dataPointIndex];
-
-                        // Determine category based on series name
-                        let kategori = '';
-                        if (seriesName.includes('Tabungan')) {
-                            kategori = 'tabungan';
-                        } else if (seriesName.includes('Deposito')) {
-                            kategori = 'deposito';
-                        } else if (seriesName.includes('Pencairan')) {
-                            kategori = 'pencairan_deposito';
-                        }
-
-                        if (kategori) {
-                            console.log('Opening combined trend modal:', monthLabel, kategori);
-                            // Parse month and year from label
-                            const parts = monthLabel.split(' ');
-                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-                            const month = monthNames.indexOf(parts[0]) + 1;
-                            const year = parseInt(parts[1]);
-
-                            window.showTrendFundingDetail(month, year, kategori);
-                        }
-                    },
-                    dataPointSelection: function(event, chartContext, config) {
-                        console.log('Combined trend data point selected!', config);
-                        const seriesIndex = config.seriesIndex;
-                        const dataPointIndex = config.dataPointIndex;
-                        const seriesName = series[seriesIndex].name;
-                        const monthLabel = categories[dataPointIndex];
-
-                        // Determine category based on series name
-                        let kategori = '';
-                        if (seriesName.includes('Tabungan')) {
-                            kategori = 'tabungan';
-                        } else if (seriesName.includes('Deposito')) {
-                            kategori = 'deposito';
-                        } else if (seriesName.includes('Pencairan')) {
-                            kategori = 'pencairan_deposito';
-                        }
-
-                        if (kategori) {
-                            console.log('Opening combined trend modal from selection:', monthLabel, kategori);
-                            // Parse month and year from label
-                            const parts = monthLabel.split(' ');
-                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-                            const month = monthNames.indexOf(parts[0]) + 1;
-                            const year = parseInt(parts[1]);
-
-                            window.showTrendFundingDetail(month, year, kategori);
-                        }
-                    },
-                    click: function(event, chartContext, config) {
-                        console.log('Combined trend chart clicked!', config);
-                        if (config && config.dataPointIndex !== undefined) {
-                            const seriesIndex = config.seriesIndex;
-                            const dataPointIndex = config.dataPointIndex;
-                            const seriesName = series[seriesIndex].name;
-                            const monthLabel = categories[dataPointIndex];
-
-                            // Determine category based on series name
-                            let kategori = '';
-                            if (seriesName.includes('Tabungan')) {
-                                kategori = 'tabungan';
-                            } else if (seriesName.includes('Deposito')) {
-                                kategori = 'deposito';
-                            } else if (seriesName.includes('Pencairan')) {
-                                kategori = 'pencairan_deposito';
-                            }
-
-                            if (kategori) {
-                                console.log('Opening combined trend modal from click:', monthLabel, kategori);
-                                // Parse month and year from label
-                                const parts = monthLabel.split(' ');
-                                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-                                const month = monthNames.indexOf(parts[0]) + 1;
-                                const year = parseInt(parts[1]);
-
-                                window.showTrendFundingDetail(month, year, kategori);
-                            }
-                        }
-                    },
-                    dataPointMouseEnter: function(event, chartContext, config) {
-                        // Make data labels clickable on hover
-                        event.target.style.cursor = 'pointer';
-                    },
-                    dataPointMouseLeave: function(event, chartContext, config) {
-                        // Reset cursor
-                        event.target.style.cursor = 'default';
-                    },
-                    mounted: function() {
-                        // Chart is fully rendered, clear any loading state
-                        console.log('Chart mounted successfully');
-                    },
-                    updated: function() {
-                        // Chart updated successfully
-                        console.log('Chart updated successfully');
-                    },
-                    animationEnd: function() {
-                        console.log('Chart animation ended');
+    const options = {
+        series: series,
+        chart: {
+            type: 'line',
+            height: 400,
+            toolbar: {
+                show: true
+            }
+        },
+        colors: ['#696cff', '#03c3ec', '#fdb528', '#ff5722', '#8592a3', '#71dd37', '#e91e63', '#9c27b0', '#607d8b', '#795548'],
+        stroke: {
+            curve: 'smooth',
+            width: 3
+        },
+        markers: {
+            size: 4,
+            hover: {
+                size: 6
+            }
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: function(value) {
+                if (type === 'nominal') {
+                    if (value >= 1000000000) {
+                        return 'Rp ' + (value / 1000000000).toFixed(2) + ' M';
+                    } else if (value >= 1000000) {
+                        return 'Rp ' + (value / 1000000).toFixed(2) + ' Jt';
+                    } else if (value >= 100000) {
+                        return 'Rp ' + (value / 1000).toFixed(0) + ' Rb';
+                    } else if (value >= 1000) {
+                        return 'Rp ' + (value / 1000).toFixed(1) + ' Rb';
+                    } else {
+                        return 'Rp ' + value.toFixed(0);
                     }
                 }
+                return value + ' rekening';
             },
-            colors: ['#696cff', '#03c3ec', '#fdb528', '#ff5722', '#8592a3', '#71dd37', '#e91e63', '#9c27b0', '#607d8b', '#795548'],
-            stroke: {
-                curve: 'smooth',
-                width: 3
+            style: {
+                fontSize: '10px',
+                fontWeight: 'bold',
+                colors: ['#333']
             },
-            markers: {
-                size: 4,
-                hover: {
-                    size: 6
-                }
-            },
-            dataLabels: {
+            background: {
                 enabled: true,
+                foreColor: '#fff',
+                padding: 4,
+                borderRadius: 2,
+                borderWidth: 1,
+                borderColor: '#fff',
+                opacity: 0.9
+            },
+            offsetY: -10
+        },
+        xaxis: {
+            categories: categories,
+            title: {
+                text: 'Bulan'
+            }
+        },
+        yaxis: {
+            title: {
+                text: type === 'nominal' ? 'Nominal (Rp)' : 'Jumlah Rekening'
+            },
+            labels: {
                 formatter: function(value) {
                     if (type === 'nominal') {
-                        if (value >= 1000000000) {
-                            return 'Rp ' + (value / 1000000000).toFixed(2) + ' M';
-                        } else if (value >= 1000000) {
-                            return 'Rp ' + (value / 1000000).toFixed(2) + ' Jt';
-                        } else if (value >= 100000) {
-                            return 'Rp ' + (value / 1000).toFixed(0) + ' Rb';
-                        } else if (value >= 1000) {
-                            return 'Rp ' + (value / 1000).toFixed(1) + ' Rb';
-                        } else {
-                            return 'Rp ' + value.toFixed(0);
-                        }
+                        return formatNominal(value);
+                    }
+                    return value;
+                }
+            }
+        },
+        tooltip: {
+            y: {
+                formatter: function(value) {
+                    if (type === 'nominal') {
+                        return formatNominal(value);
                     }
                     return value + ' rekening';
-                },
-                style: {
-                        fontSize: '11px',
-                        fontWeight: 'bold'
-                    },
-                    background: {
-                        enabled: true,
-                        borderRadius: 2,
-                        padding: 4,
-                        opacity: 0.9
-                    },
-                offsetY: -10
-            },
-            xaxis: {
-                categories: categories,
-                title: {
-                    text: 'Bulan'
                 }
-            },
-            yaxis: {
-                title: {
-                    text: type === 'nominal' ? 'Nominal (Rp)' : 'Jumlah Rekening'
-                },
-                labels: {
-                    formatter: function(value) {
-                        if (type === 'nominal') {
-                            return formatNominal(value);
-                        }
-                        return value;
-                    }
-                }
-            },
-            tooltip: {
-                y: {
-                    formatter: function(value) {
-                        if (type === 'nominal') {
-                            return formatNominal(value);
-                        }
-                        return value + ' rekening';
-                    }
-                }
-            },
-            legend: {
-                position: 'top',
-                horizontalAlign: 'left'
             }
-        };
-
-        // Destroy existing chart if it exists
-        if (combinedTrendChart) {
-            combinedTrendChart.destroy();
+        },
+        legend: {
+            position: 'top',
+            horizontalAlign: 'left'
         }
+    };
 
-        console.log('Creating new ApexCharts instance with series:', series.length, 'categories:', categories.length);
-        combinedTrendChart = new ApexCharts(combinedTrendEl, options);
-
-        // Clear the loading state before rendering
-        combinedTrendEl.innerHTML = '';
-
-        combinedTrendChart.render();
-
-        // Make data labels clickable after chart is rendered
-        setTimeout(() => {
-            const chartElement = document.querySelector('#combinedTrendChart');
-            if (chartElement) {
-                const dataLabels = chartElement.querySelectorAll('.apexcharts-data-labels text');
-                dataLabels.forEach((label, index) => {
-                    label.style.cursor = 'pointer';
-                    label.addEventListener('click', function() {
-                        // Calculate which data point this label belongs to
-                        const totalSeries = series.length;
-                        const totalCategories = categories.length;
-                        const seriesIndex = Math.floor(index / totalCategories);
-                        const dataPointIndex = index % totalCategories;
-                        const seriesName = series[seriesIndex].name;
-                        const monthLabel = categories[dataPointIndex];
-
-                        // Determine category based on series name
-                        let kategori = '';
-                        if (seriesName.includes('Tabungan')) {
-                            kategori = 'tabungan';
-                        } else if (seriesName.includes('Deposito')) {
-                            kategori = 'deposito';
-                        } else if (seriesName.includes('Pencairan')) {
-                            kategori = 'pencairan_deposito';
-                        }
-
-                        if (kategori) {
-                            console.log('Data label clicked:', monthLabel, kategori);
-                            // Parse month and year from label
-                            const parts = monthLabel.split(' ');
-                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-                            const month = monthNames.indexOf(parts[0]) + 1;
-                            const year = parseInt(parts[1]);
-
-                            window.showTrendFundingDetail(month, year, kategori);
-                        }
-                    });
-                });
-            }
-        }, 500);
-
-        // Clear loading state after a short delay to ensure chart is rendered
-        setTimeout(() => {
-            // Check if the element still has loading content
-            if (combinedTrendEl.innerHTML.includes('spinner-border')) {
-                console.log('Clearing loading state after chart render');
-            }
-        }, 100);
-    } catch (error) {
-        console.error('Error in renderCombinedTrendChart:', error);
-        throw error; // Re-throw to be caught by the calling function
-    }
+    combinedTrendChart = new ApexCharts(combinedTrendEl, options);
+    combinedTrendChart.render();
 }
 
-// Function to render combined trend table
+// Function to render table
+// TODO: Implement table view
+/*
 function renderCombinedTrendTable(tableRows, sortedMonths, type) {
-    try {
-        let html = '<div class="table-responsive"><table class="table table-striped table-hover">';
-        html += '<thead><tr><th>Bulan</th>';
+    let html = '<div class="table-responsive"><table class="table table-striped table-hover">';
 
-        // Get all column names from first row
-        const firstRow = tableRows[sortedMonths[0]];
-        Object.keys(firstRow).forEach(key => {
+    // Table header
+    html += '<thead><tr><th>Bulan</th>';
+
+    // Get all column names from first row
+    const firstRow = tableRows[sortedMonths[0]];
+    Object.keys(firstRow).forEach(key => {
+        if (key !== 'month') {
+            html += '<th class="text-end">' + key + '</th>';
+        }
+    });
+    html += '</tr></thead><tbody>';
+
+    // Table body
+    sortedMonths.forEach(monthKey => {
+        const row = tableRows[monthKey];
+        html += '<tr>';
+        html += '<td><strong>' + row.month + '</strong></td>';
+
+        Object.keys(row).forEach(key => {
             if (key !== 'month') {
-                html += '<th class="text-end">' + key + '</th>';
+                const value = row[key];
+                let displayValue = '';
+                if (type === 'nominal') {
+                    displayValue = formatNominal(value);
+                } else {
+                    displayValue = value.toLocaleString('id-ID');
+                }
+                html += '<td class="text-end">' + displayValue + '</td>';
             }
         });
-        html += '</tr></thead><tbody>';
+        html += '</tr>';
+    });
 
-        // Table body
-        sortedMonths.forEach(monthKey => {
-            const row = tableRows[monthKey];
-            html += '<tr>';
-            html += '<td><strong>' + row.month + '</strong></td>';
-
-            Object.keys(row).forEach(key => {
-                if (key !== 'month') {
-                    const value = row[key];
-                    let displayValue = '';
-                    if (type === 'nominal') {
-                        displayValue = formatNominal(value);
-                    } else {
-                        displayValue = value.toLocaleString('id-ID');
-                    }
-                    html += '<td class="text-end">' + displayValue + '</td>';
-                }
-            });
-            html += '</tr>';
-        });
-
-        html += '</tbody></table></div>';
-        combinedTrendEl.innerHTML = html;
-    } catch (error) {
-        console.error('Error in renderCombinedTrendTable:', error);
-        throw error; // Re-throw to be caught by the calling function
-    }
+    html += '</tbody></table></div>';
+    combinedTrendEl.innerHTML = html;
 }
-
-// Toggle function for combined trend view (chart/table)
-window.toggleCombinedTrendView = function(view) {
-    currentCombinedTrendView = view;
-    document.getElementById('btnCombinedTrendChart').className = view === 'chart' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
-    document.getElementById('btnCombinedTrendTable').className = view === 'table' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
-    createCombinedTrendView(currentCombinedTrendType, view);
-};
-
-// Toggle function for combined trend chart type
+*/// Toggle function for combined trend chart
 window.toggleCombinedTrendChart = function(type) {
     currentCombinedTrendType = type;
+    // Update button states
     document.getElementById('btnCombinedTrendNominal').className = type === 'nominal' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
     document.getElementById('btnCombinedTrendJumlah').className = type === 'jumlah' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+
     createCombinedTrendView(type, currentCombinedTrendView);
-};
+}
+
+// Toggle function for combined trend view
+window.toggleCombinedTrendView = function(view) {
+    currentCombinedTrendView = view;
+    // Update button states
+    document.getElementById('btnCombinedTrendChart').className = view === 'chart' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+    document.getElementById('btnCombinedTrendTable').className = view === 'table' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+
+    createCombinedTrendView(currentCombinedTrendType, view);
+}
 
 // Function to load available products for filtering
 function loadProductFilters() {
@@ -4334,7 +4005,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add event listeners for data filter checkboxes
-    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito', 'filterTotalPencairanDeposito'];
+    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito'];
     filterCheckboxes.forEach(id => {
         const checkbox = document.getElementById(id);
         if (checkbox) {
@@ -4353,758 +4024,114 @@ document.addEventListener('DOMContentLoaded', function() {
     createCombinedTrendView('nominal', 'chart');
 });
 
-// Helper function for formatting nominal in JavaScript
-function formatNominal(amount) {
-    if (amount >= 1000000000) {
-        return 'Rp ' + (amount / 1000000000).toFixed(2) + ' M'; // Miliar
-    } else if (amount >= 1000000) {
-        return 'Rp ' + (amount / 1000000).toFixed(2) + ' Jt'; // Juta
-    } else if (amount >= 100000) {
-        return 'Rp ' + (amount / 1000).toFixed(0) + ' Rb'; // Ratusan Ribu
-    } else if (amount >= 1000) {
-        return 'Rp ' + (amount / 1000).toFixed(1) + ' Rb'; // Ribuan
-    } else {
-        return 'Rp ' + amount.toFixed(0); // Di bawah ribu
-    }
-}
+// Function untuk show detail trend funding
+window.showTrendFundingDetail = function(monthLabel, kategori, type) {
+    console.log('showTrendFundingDetail called with:', {monthLabel, kategori, type});
+    const modal = new bootstrap.Modal(document.getElementById('trendFundingDetailModal'));
+    const modalTitle = document.getElementById('modalTrendFundingTitle');
+    const modalBody = document.getElementById('modalTrendFundingBody');
 
-// Helper function for formatting product codes
-function formatProductCode(code, type) {
-    if (!code) return 'N/A';
-
-    // For tabungan products
-    if (type === 'tabungan') {
-        const tabunganProducts = {
-            '01': 'Tabungan Simpel',
-            '02': 'Tabungan Berjangka',
-            '03': 'Tabungan Pendidikan',
-            '04': 'Tabungan Haji',
-            '05': 'Tabungan Emas',
-            '06': 'Tabungan Valas',
-            '07': 'Tabungan Payroll',
-            '08': 'Tabungan Bisnis',
-            '09': 'Tabungan Premium',
-            '10': 'Tabungan Digital'
-        };
-        return tabunganProducts[code] || `Tabungan ${code}`;
-    }
-
-    // For deposito products
-    if (type === 'deposito') {
-        const depositoProducts = {
-            '01': 'Deposito 1 Bulan',
-            '02': 'Deposito 3 Bulan',
-            '03': 'Deposito 6 Bulan',
-            '04': 'Deposito 12 Bulan',
-            '05': 'Deposito 24 Bulan',
-            '06': 'Deposito Valas',
-            '07': 'Deposito Premium',
-            '08': 'Deposito Bisnis',
-            '09': 'Deposito Online',
-            '10': 'Deposito Khusus'
-        };
-        return depositoProducts[code] || `Deposito ${code}`;
-    }
-
-    return code;
-}
-
-// Customer Details Modal Functions
-function showCustomerDetails(jenis, type) {
-    // Jika jenis dimulai dengan 'current_', gunakan logika trend seperti chart kontrak
-    if (jenis.startsWith('current_')) {
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
-        const currentYear = currentDate.getFullYear();
-
-        let kategori = '';
-        if (jenis === 'current_tabungan') kategori = 'tabungan';
-        else if (jenis === 'current_deposito') kategori = 'deposito';
-        else if (jenis === 'current_pencairan_deposito') kategori = 'pencairan_deposito';
-        else if (jenis === 'current_total_funding') kategori = 'total_funding';
-
-        showTrendFundingDetail(currentMonth, currentYear, kategori);
+    // Parse month and year from label
+    const parts = monthLabel.split(' ');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+    const monthIndex = monthNames.indexOf(parts[0]);
+    if (monthIndex === -1) {
+        console.error('Invalid month name:', parts[0]);
         return;
     }
+    const year = parseInt(parts[1]);
+    const month = (monthIndex + 1).toString().padStart(2, '0');
 
-    // Get modal elements
-    const modal = document.getElementById('customerDetailsModal');
-    const modalTitle = document.getElementById('customerDetailsModalTitle');
-    const modalBody = document.getElementById('customerDetailsModalBody');
+    // Update title
+    let kategoriLabel = '';
+    if (kategori === 'tabungan') kategoriLabel = 'Tabungan';
+    else if (kategori === 'deposito') kategoriLabel = 'Deposito';
+    else if (kategori === 'total_funding') kategoriLabel = 'Total Funding';
+    else if (kategori === 'pencairan_deposito') kategoriLabel = 'Pencairan Deposito';
 
-    // Dispose of any existing modal instance to prevent conflicts
-    const existingModal = bootstrap.Modal.getInstance(modal);
-    if (existingModal) {
-        existingModal.dispose();
-    }
-
-    // Clear any existing backdrop
-    const existingBackdrop = document.querySelector('.modal-backdrop');
-    if (existingBackdrop) {
-        existingBackdrop.remove();
-    }
-
-    // Remove modal-open class from body if it exists
-    document.body.classList.remove('modal-open');
-
-    const modalInstance = new bootstrap.Modal(modal, {
-        backdrop: true,
-        keyboard: true
-    });
-
-    // Set modal title
-    let title = '';
-    switch(jenis) {
-        case 'tabungan':
-            title = 'Detail Nasabah Tabungan';
-            break;
-        case 'deposito':
-            title = 'Detail Nasabah Deposito';
-            break;
-        case 'pencairan_deposito':
-            title = 'Detail Pencairan Deposito';
-            break;
-        case 'total_funding':
-            title = 'Detail Total Funding';
-            break;
-        default:
-            title = 'Detail Nasabah';
-    }
-    modalTitle.textContent = title;
+    modalTitle.textContent = `Detail ${kategoriLabel} - ${monthLabel}`;
 
     // Show loading
-    modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"></div><br>Loading...</div>';
-    modalInstance.show();
+    modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><br>Loading...</div>';
+    modal.show();
 
-    // Add event listener for when modal is hidden to ensure proper cleanup
-    modal.addEventListener('hidden.bs.modal', function() {
-        console.log('Customer details modal hidden, cleaning up...');
-        // Dispose of the modal instance
-        modalInstance.dispose();
-        // Ensure backdrop is removed
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) {
-            backdrop.remove();
-        }
-        // Remove modal-open class from body
-        document.body.classList.remove('modal-open');
-        // Restore body scroll
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-    }, { once: true });
-
-    // Fetch customer data
-    fetch(`/dashboard/customer-details?jenis=${jenis}&type=${type}&limit=100`)
-        .then(response => response.json())
+    // Fetch data
+    fetch(`/dashboard/trend-funding-detail?month=${month}&year=${year}&kategori=${kategori}&type=${type}`)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
-            if (data.customers && data.customers.length > 0) {
-                let html = '<div class="table-responsive">';
-                html += '<table class="table table-striped table-hover">';
+            console.log('Received data:', data);
+            console.log('Data.data exists:', !!data.data);
+            console.log('Data.data length:', data.data ? data.data.length : 'N/A');
+            console.log('Data.total:', data.total);
+
+            let html = '';
+
+            if (data.data && data.data.length > 0) {
+                const isNominal = type === 'nominal';
+                const totalText = isNominal ? formatNominal(data.total) : data.total + ' rekening';
+                html += `<div class="mb-3">
+                    <h6>Total: ${totalText}</h6>
+                    <small class="text-muted">Klik pada rekening untuk detail lebih lanjut</small>
+                </div>`;
+
+                html += '<div class="table-responsive"><table class="table table-sm table-hover">';
                 html += '<thead><tr>';
-                html += '<th>No</th>';
-                html += '<th>Nama Nasabah</th>';
-                html += '<th>No Rekening</th>';
-                html += '<th>Nominal</th>';
-                html += '<th>Periode</th>';
+                if (kategori === 'tabungan') {
+                    html += '<th>No Rekening</th><th>Nama</th><th>Kode Produk</th><th>Saldo</th><th>Tanggal Buka</th>';
+                } else if (kategori === 'deposito') {
+                    html += '<th>No Bilyet</th><th>Nama</th><th>Kode Produk</th><th>Nominal</th><th>Jangka Waktu</th><th>Tanggal Buka</th>';
+                } else if (kategori === 'pencairan_deposito') {
+                    html += '<th>No Bilyet</th><th>Nama</th><th>Nominal</th><th>Tanggal Cair</th>';
+                } else if (kategori === 'total_funding') {
+                    html += '<th>Jenis</th><th>No Rekening/Bilyet</th><th>Nama</th><th>Nominal</th><th>Tanggal</th>';
+                }
                 html += '</tr></thead><tbody>';
 
-                data.customers.forEach((customer, index) => {
-                    html += '<tr class="customer-detail-row">';
-                    html += `<td>${index + 1}</td>`;
-                    html += `<td>${customer.nama}</td>`;
-                    html += `<td>${customer.account}</td>`;
-                    html += `<td>${formatNominal(customer.amount)}</td>`;
-                    html += `<td>${customer.period}</td>`;
+                data.data.forEach(item => {
+                    html += '<tr>';
+                    if (kategori === 'tabungan') {
+                        html += `<td>${item.norek}</td>`;
+                        html += `<td>${item.nama}</td>`;
+                        html += `<td>${formatProductCode(item.kodeprd, 'tabungan')}</td>`;
+                        html += `<td>${formatNominal(item.sahirrp)}</td>`;
+                        html += `<td>${item.tgleff}</td>`;
+                    } else if (kategori === 'deposito') {
+                        html += `<td>${item.nobilyet}</td>`;
+                        html += `<td>${item.nama}</td>`;
+                        html += `<td>${formatProductCode(item.kdprd, 'deposito')}</td>`;
+                        html += `<td>${formatNominal(item.nomrp)}</td>`;
+                        html += `<td>${item.jw} bulan</td>`;
+                        html += `<td>${item.tglbuka}</td>`;
+                    } else if (kategori === 'pencairan_deposito') {
+                        html += `<td>${item.nobilyet}</td>`;
+                        html += `<td>${item.nama}</td>`;
+                        html += `<td>${formatNominal(item.nomrp)}</td>`;
+                        html += '<td>' + (item.tglcair || 'N/A') + '</td>';
+                    } else if (kategori === 'total_funding') {
+                        html += '<td>' + item.jenis + '</td>';
+                        html += '<td>' + item.no_rek + '</td>';
+                        html += '<td>' + item.nama + '</td>';
+                        html += '<td>' + formatNominal(item.nominal) + '</td>';
+                        html += '<td>' + item.tanggal + '</td>';
+                    }
                     html += '</tr>';
                 });
 
-                html += '</tbody></table>';
-                html += `<div class="mt-3 text-muted">Menampilkan ${data.total} nasabah teratas</div>`;
-                html += '</div>';
-                modalBody.innerHTML = html;
+                html += '</tbody></table></div>';
             } else {
-                modalBody.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-info-circle ti-lg mb-2"></i><br>Tidak ada data nasabah</div>';
+                html += '<div class="alert alert-warning"><i class="ti ti-info-circle"></i> Tidak ada data untuk kategori ini</div>';
             }
+
+            modalBody.innerHTML = html;
         })
         .catch(error => {
-            console.error('Error loading customer details:', error);
-            modalBody.innerHTML = `
-                <div class="alert alert-danger d-flex justify-content-between align-items-center">
-                    <div><i class="ti ti-alert-circle me-2"></i>Gagal memuat data nasabah: ${error.message}</div>
-                    <button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('customerDetailsModal')).hide()" aria-label="Close"></button>
-                </div>
-            `;
+            modalBody.innerHTML = '<div class="alert alert-danger"><i class="ti ti-alert-circle"></i> Gagal memuat data: ' + error.message + '</div>';
+            console.error('Error:', error);
         });
 }
 </script>
-
-<!-- Customer Details Modal -->
-<div class="modal fade customer-modal" id="customerDetailsModal" tabindex="-1" aria-labelledby="customerDetailsModalTitle" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="customerDetailsModalTitle">Detail Nasabah</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="customerDetailsModalBody">
-                <!-- Content will be loaded here -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-    <script>
-    // Global modal cleanup function
-    function cleanupModal() {
-        console.log('Running global modal cleanup...');
-        // Dispose of any existing modal instances
-        const modal = document.getElementById('customerDetailsModal');
-        if (modal) {
-            const existingModal = bootstrap.Modal.getInstance(modal);
-            if (existingModal) {
-                existingModal.dispose();
-            }
-        }
-
-        // Clear any existing backdrop
-        const existingBackdrop = document.querySelector('.modal-backdrop');
-        if (existingBackdrop) {
-            existingBackdrop.remove();
-        }
-
-        // Remove modal-open class from body
-        document.body.classList.remove('modal-open');
-
-        // Restore body scroll
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-
-        console.log('Modal cleanup completed');
-    }
-
-    // Add global modal cleanup on page load/unload
-    window.addEventListener('beforeunload', cleanupModal);
-    window.addEventListener('unload', cleanupModal);
-    // Function untuk show detail trend funding (seperti showTrendKontrakDetail)
-    window.showTrendFundingDetail = function(month, year, kategori) {
-        // Get modal elements
-        const modal = document.getElementById('customerDetailsModal');
-        const modalTitle = document.getElementById('customerDetailsModalTitle');
-        const modalBody = document.getElementById('customerDetailsModalBody');
-
-        // Dispose of any existing modal instance to prevent conflicts
-        const existingModal = bootstrap.Modal.getInstance(modal);
-        if (existingModal) {
-            existingModal.dispose();
-        }
-
-        // Clear any existing backdrop
-        const existingBackdrop = document.querySelector('.modal-backdrop');
-        if (existingBackdrop) {
-            existingBackdrop.remove();
-        }
-
-        // Remove modal-open class from body if it exists
-        document.body.classList.remove('modal-open');
-
-        const modalInstance = new bootstrap.Modal(modal, {
-            backdrop: true,
-            keyboard: true
-        });
-
-        // Update title
-        let kategoriLabel = '';
-        if (kategori === 'tabungan') kategoriLabel = 'Tabungan';
-        else if (kategori === 'deposito') kategoriLabel = 'Deposito';
-        else if (kategori === 'pencairan_deposito') kategoriLabel = 'Pencairan Deposito';
-
-        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-                           'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        const monthLabel = monthNames[month - 1] + ' ' + year;
-
-        modalTitle.innerHTML = '<i class="ti ti-wallet"></i> Detail ' + kategoriLabel + ' - ' + monthLabel;
-
-        // Show loading
-        modalBody.innerHTML = `
-            <div class="text-center p-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        `;
-
-        modalInstance.show();
-
-        // Add event listener for when modal is hidden to ensure proper cleanup
-        modal.addEventListener('hidden.bs.modal', function() {
-            console.log('Trend funding detail modal hidden, cleaning up...');
-            // Dispose of the modal instance
-            modalInstance.dispose();
-            // Ensure backdrop is removed
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-                backdrop.remove();
-            }
-            // Remove modal-open class from body
-            document.body.classList.remove('modal-open');
-            // Restore body scroll
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-        }, { once: true });
-
-        // Fetch detail data
-        fetch(`/dashboard/trend-funding-detail?month=${month}&year=${year}&kategori=${kategori}`)
-            .then(response => response.json())
-            .then(data => {
-                let html = '<div class="container-fluid">';
-
-                // Summary
-                html += '<div class="row mb-3">';
-                html += '<div class="col-12">';
-                html += '<div class="alert alert-primary d-flex align-items-center" role="alert">';
-                html += '<i class="ti ti-info-circle me-2"></i>';
-                html += '<div>';
-                html += '<strong>' + kategoriLabel + ' - ' + monthLabel + '</strong><br>';
-                html += '<small>Total: ' + data.summary.total_nasabah.toLocaleString('id-ID') + ' nasabah | ';
-                html += 'Nominal: Rp ' + (data.summary.total_nominal / 1000000000).toFixed(2) + ' Miliar</small>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                // Table
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-hover">';
-                html += '<thead class="table-light">';
-                html += '<tr>';
-                html += '<th>No</th><th>No. Rekening</th><th>Nama Nasabah</th><th>CIF</th><th>Nominal</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
-
-                if (data.nasabah && data.nasabah.length > 0) {
-                    data.nasabah.forEach((item, index) => {
-                        html += '<tr>';
-                        html += '<td>' + (index + 1) + '</td>';
-                        html += '<td><small>' + item.account + '</small></td>';
-                        html += '<td><small>' + item.nama + '</small></td>';
-                        html += '<td><small>' + (item.nocif || '-') + '</small></td>';
-                        html += '<td class="text-end"><small>Rp ' + (item.nominal / 1000000).toFixed(1) + ' Jt</small></td>';
-                        html += '</tr>';
-                    });
-                } else {
-                    html += '<tr><td colspan="5" class="text-center">Tidak ada data</td></tr>';
-                }
-
-                html += '</tbody></table>';
-                html += '</div>';
-
-                modalBody.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error fetching funding detail:', error);
-                modalBody.innerHTML = `
-                    <div class="alert alert-danger d-flex justify-content-between align-items-center">
-                        <div>Terjadi kesalahan saat memuat data detail funding: ${error.message}</div>
-                        <button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('customerDetailsModal')).hide()" aria-label="Close"></button>
-                    </div>
-                `;
-            });
-    }
-
-    // Function to format nominal values consistently with PHP formatNominal function
-    function formatNominalJS(amount) {
-        if (amount >= 1000000000) {
-            return 'Rp ' + (amount / 1000000000).toFixed(2) + ' M'; // Miliar
-        } else if (amount >= 1000000) {
-            return 'Rp ' + (amount / 1000000).toFixed(2) + ' Jt'; // Juta
-        } else if (amount >= 100000) {
-            return 'Rp ' + (amount / 1000).toFixed(0) + ' Rb'; // Ratusan Ribu
-        } else if (amount >= 1000) {
-            return 'Rp ' + (amount / 1000).toFixed(1) + ' Rb'; // Ribuan
-        } else {
-            return 'Rp ' + amount.toFixed(0); // Di bawah ribu
-        }
-    }
-
-    // Function to show AO Customer Details for specific month and category
-    window.showAOCustomerDetails = function(ao, month, category) {
-        console.log('Opening AO customer details for ao:', ao, 'month:', month, 'category:', category);
-
-        // Get modal elements
-        const modal = document.getElementById('customerDetailsModal');
-        const modalTitle = document.getElementById('customerDetailsModalTitle');
-        const modalBody = document.getElementById('customerDetailsModalBody');
-
-        if (!modal) {
-            console.error('Modal element not found');
-            return;
-        }
-
-        // Dispose of any existing modal instance to prevent conflicts
-        const existingModal = bootstrap.Modal.getInstance(modal);
-        if (existingModal) {
-            existingModal.dispose();
-        }
-
-        // Clear any existing backdrop
-        const existingBackdrop = document.querySelector('.modal-backdrop');
-        if (existingBackdrop) {
-            existingBackdrop.remove();
-        }
-
-        // Remove modal-open class from body if it exists
-        document.body.classList.remove('modal-open');
-
-        // Determine category label
-        let categoryLabel = '';
-        if (category === 'deposito') categoryLabel = 'Deposito';
-        else if (category === 'abp') categoryLabel = 'ABP';
-        else if (category === 'pencairan') categoryLabel = 'Pencairan';
-        else if (category === 'total') categoryLabel = 'Total Funding';
-
-        // Determine month label
-        let monthLabel = '';
-        if (month === 'all') {
-            monthLabel = 'Seluruh Tahun ' + new Date().getFullYear();
-        } else {
-            const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-                               'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            monthLabel = monthNames[parseInt(month) - 1] + ' ' + new Date().getFullYear();
-        }
-
-        // Update title
-        modalTitle.innerHTML = '<i class="ti ti-users"></i> Detail Nasabah ' + categoryLabel + ' - ' + monthLabel + ' (AO: ' + ao + ')';
-
-        // Show loading
-        modalBody.innerHTML = `
-            <div class="text-center p-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Memuat data nasabah...</p>
-            </div>
-        `;
-
-        // Initialize and show modal
-        const bsModal = new bootstrap.Modal(modal, {
-            backdrop: true, // Allow closing by clicking outside
-            keyboard: true  // Allow closing with escape key
-        });
-        bsModal.show();
-
-        // Add event listener for when modal is hidden to ensure proper cleanup
-        modal.addEventListener('hidden.bs.modal', function() {
-            console.log('Modal hidden, cleaning up...');
-            // Dispose of the modal instance
-            bsModal.dispose();
-            // Ensure backdrop is removed
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-                backdrop.remove();
-            }
-            // Remove modal-open class from body
-            document.body.classList.remove('modal-open');
-            // Restore body scroll
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-        }, { once: true }); // Use once: true to avoid multiple listeners
-
-        // Fetch customer details
-        fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}`)
-            .then(response => {
-                console.log('Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok: ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Received customer data:', data);
-
-                let html = '<div class="container-fluid">';
-
-                // Summary
-                html += '<div class="row mb-3">';
-                html += '<div class="col-12">';
-                html += '<div class="alert alert-info d-flex align-items-center" role="alert">';
-                html += '<i class="ti ti-info-circle me-2"></i>';
-                html += '<div>';
-                html += '<strong>' + categoryLabel + ' - ' + monthLabel + '</strong><br>';
-                html += '<small>AO: ' + (data.ao_name || ao) + ' | Total: ' + data.customers.length + ' rekening | ';
-                html += 'Nominal: ' + formatNominalJS(data.total_nominal) + '</small>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                // Customer table
-                html += '<div class="row">';
-                html += '<div class="col-12">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-striped table-hover">';
-                html += '<thead class="table-dark">';
-                html += '<tr>';
-                html += '<th style="width: 50px;">No</th>';
-                html += '<th style="width: 120px;">No. Bilyet</th>';
-                html += '<th>Nama Nasabah</th>';
-                html += '<th style="width: 120px;">Nominal</th>';
-                html += '<th style="width: 100px;">Tgl Buka</th>';
-                html += '<th style="width: 100px;">Jatuh Tempo</th>';
-                html += '<th style="width: 80px;">Status</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
-
-                if (data.customers && data.customers.length > 0) {
-                    data.customers.forEach((customer, index) => {
-                        const statusClass = customer.is_cairkan ? 'text-danger' : 'text-success';
-                        const statusText = customer.status;
-                        html += '<tr>';
-                        html += '<td>' + (index + 1) + '</td>';
-                        html += '<td><small>' + (customer.nobilyet || '-') + '</small></td>';
-                        html += '<td><small>' + (customer.nama || '-') + '</small></td>';
-                        html += '<td class="text-end"><small>' + (customer.nomrp_formatted || 'Rp 0') + '</small></td>';
-                        html += '<td><small>' + (customer.tglbuka || '-') + '</small></td>';
-                        html += '<td><small>' + (customer.tgljtempo || '-') + '</small></td>';
-                        html += '<td><small class="' + statusClass + '">' + statusText + '</small></td>';
-                        html += '</tr>';
-                    });
-                } else {
-                    html += '<tr><td colspan="7" class="text-center">Tidak ada data nasabah</td></tr>';
-                }
-
-                html += '</tbody></table>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                modalBody.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error fetching AO customer details:', error);
-                modalBody.innerHTML = `
-                    <div class="alert alert-danger d-flex justify-content-between align-items-center">
-                        <div>Terjadi kesalahan saat memuat data nasabah: ${error.message}</div>
-                        <button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('customerDetailsModal')).hide()" aria-label="Close"></button>
-                    </div>
-                `;
-            });
-    }
-    window.showAOFundingDetail = function(kodeaoh) {
-        console.log('showAOFundingDetail called with kodeaoh:', kodeaoh);
-
-        // Get modal elements
-        const modal = document.getElementById('customerDetailsModal');
-        const modalTitle = document.getElementById('customerDetailsModalTitle');
-        const modalBody = document.getElementById('customerDetailsModalBody');
-
-        if (!modal) {
-            console.error('Modal element not found');
-            return;
-        }
-
-        // Dispose of any existing modal instance to prevent conflicts
-        const existingModal = bootstrap.Modal.getInstance(modal);
-        if (existingModal) {
-            existingModal.dispose();
-        }
-
-        // Clear any existing backdrop
-        const existingBackdrop = document.querySelector('.modal-backdrop');
-        if (existingBackdrop) {
-            existingBackdrop.remove();
-        }
-
-        // Remove modal-open class from body if it exists
-        document.body.classList.remove('modal-open');
-
-        // Update title
-        modalTitle.innerHTML = '<i class="ti ti-calendar"></i> Detail Funding AO per Bulan: ' + kodeaoh;
-
-        // Show loading
-        modalBody.innerHTML = `
-            <div class="text-center p-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Memuat data...</p>
-            </div>
-        `;
-
-        // Initialize and show modal
-        const bsModal = new bootstrap.Modal(modal, {
-            backdrop: true, // Allow closing by clicking outside
-            keyboard: true  // Allow closing with escape key
-        });
-        bsModal.show();
-
-        // Add event listener for when modal is hidden to ensure proper cleanup
-        modal.addEventListener('hidden.bs.modal', function() {
-            console.log('Funding detail modal hidden, cleaning up...');
-            // Dispose of the modal instance
-            bsModal.dispose();
-            // Ensure backdrop is removed
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-                backdrop.remove();
-            }
-            // Remove modal-open class from body
-            document.body.classList.remove('modal-open');
-            // Restore body scroll
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-        }, { once: true }); // Use once: true to avoid multiple listeners
-
-        // Fetch AO funding detail data
-        fetch(`/dashboard/ao-funding-detail/${encodeURIComponent(kodeaoh)}`)
-            .then(response => {
-                console.log('Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok: ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Received data:', data);
-
-                let html = '<div class="container-fluid">';
-
-                // Summary
-                html += '<div class="row mb-3">';
-                html += '<div class="col-12">';
-                html += '<div class="alert alert-primary d-flex align-items-center" role="alert">';
-                html += '<i class="ti ti-info-circle me-2"></i>';
-                html += '<div>';
-                html += '<strong>' + (data.ao_name || data.ao_code) + ' (' + data.ao_code + ')</strong><br>';
-                html += '<small>Tahun: ' + data.year + ' | Total Deposito: ' + (data.totals.deposito_count || 0).toLocaleString('id-ID') + ' | ';
-                html += 'Total ABP: ' + (data.totals.abp_count || 0).toLocaleString('id-ID') + ' | ';
-                html += 'Total Pencairan: ' + (data.totals.pencairan_count || 0).toLocaleString('id-ID') + '<br>';
-                html += 'Total Nominal: Rp ' + ((data.totals.total_nominal || 0) / 1000000000).toFixed(2) + ' Miliar</small>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                // Monthly Table
-                html += '<div class="row">';
-                html += '<div class="col-12">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-striped table-hover">';
-                html += '<thead class="table-dark">';
-                html += '<tr>';
-                html += '<th class="text-center">Bulan</th>';
-                html += '<th class="text-center">Deposito</th>';
-                html += '<th class="text-center">ABP</th>';
-                html += '<th class="text-center">Pencairan</th>';
-                html += '<th class="text-center">Total</th>';
-                html += '</tr>';
-                html += '<tr>';
-                html += '<th class="text-center">Nominal / Jumlah</th>';
-                html += '<th class="text-center">Rp / rekening</th>';
-                html += '<th class="text-center">Rp / rekening</th>';
-                html += '<th class="text-center">Rp / rekening</th>';
-                html += '<th class="text-center">Rp / rekening</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
-
-                if (data.monthly_data && data.monthly_data.length > 0) {
-                    data.monthly_data.forEach((monthData, index) => {
-                        html += '<tr>';
-                        html += '<td class="text-center fw-bold">' + monthData.month_name + '</td>';
-
-                        // Deposito
-                        html += '<td class="text-center ao-detail-cell" data-month="' + monthData.month + '" data-category="deposito" data-ao="' + data.ao_code + '" style="cursor: pointer;">';
-                        html += '<div>' + formatNominalJS(monthData.deposito.nominal) + '</div>';
-                        html += '<small class="text-muted">' + monthData.deposito.count + ' rekening</small>';
-                        html += '</td>';
-
-                        // ABP
-                        html += '<td class="text-center ao-detail-cell" data-month="' + monthData.month + '" data-category="abp" data-ao="' + data.ao_code + '" style="cursor: pointer;">';
-                        html += '<div>' + formatNominalJS(monthData.abp.nominal) + '</div>';
-                        html += '<small class="text-muted">' + monthData.abp.count + ' rekening</small>';
-                        html += '</td>';
-
-                        // Pencairan
-                        html += '<td class="text-center ao-detail-cell" data-month="' + monthData.month + '" data-category="pencairan" data-ao="' + data.ao_code + '" style="cursor: pointer;">';
-                        html += '<div class="text-danger">' + formatNominalJS(monthData.pencairan.nominal) + '</div>';
-                        html += '<small class="text-muted text-danger">' + monthData.pencairan.count + ' rekening</small>';
-                        html += '</td>';
-
-                        // Total
-                        html += '<td class="text-center ao-detail-cell" data-month="' + monthData.month + '" data-category="total" data-ao="' + data.ao_code + '" style="cursor: pointer;">';
-                        html += '<div>' + formatNominalJS(monthData.total.nominal) + '</div>';
-                        html += '<small class="text-muted">' + monthData.total.count + ' rekening</small>';
-                        html += '</td>';                        html += '</tr>';
-                    });
-
-                } else {
-                    html += '<tr><td colspan="5" class="text-center">Tidak ada data funding</td></tr>';
-                }
-
-                html += '</tbody></table>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                modalBody.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error fetching AO funding detail:', error);
-                modalBody.innerHTML = `
-                    <div class="alert alert-danger d-flex justify-content-between align-items-center">
-                        <div>Terjadi kesalahan saat memuat data detail funding AO: ${error.message}</div>
-                        <button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('customerDetailsModal')).hide()" aria-label="Close"></button>
-                    </div>
-                `;
-                // Allow modal to be closed on error
-                bsModal._config.backdrop = true;
-                bsModal._config.keyboard = true;
-            });
-    }
-
-    // Add click handler for AO funding rows
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, attaching AO funding row click handlers');
-        document.addEventListener('click', function(e) {
-            console.log('Click event detected, target:', e.target);
-
-            // Handle AO funding table rows
-            if (e.target.closest('.ao-funding-row')) {
-                console.log('AO funding row clicked');
-                e.preventDefault();
-                const row = e.target.closest('.ao-funding-row');
-                const kodeaoh = row.getAttribute('data-ao');
-                console.log('AO funding row clicked, kodeaoh:', kodeaoh);
-
-                if (kodeaoh) {
-                    showAOFundingDetail(kodeaoh);
-                } else {
-                    console.error('No data-ao attribute found on clicked row');
-                }
-            }
-
-            // Handle AO detail cells
-            if (e.target.closest('.ao-detail-cell')) {
-                console.log('AO detail cell clicked');
-                e.preventDefault();
-                const cell = e.target.closest('.ao-detail-cell');
-                const month = cell.getAttribute('data-month');
-                const category = cell.getAttribute('data-category');
-                const ao = cell.getAttribute('data-ao');
-                console.log('AO detail cell clicked, month:', month, 'category:', category, 'ao:', ao);
-
-                if (month && category && ao) {
-                    showAOCustomerDetails(ao, month, category);
-                } else {
-                    console.error('Missing data attributes on clicked cell');
-                }
-            }
-        });
-    });
-    </script>
-
 @endsection
 

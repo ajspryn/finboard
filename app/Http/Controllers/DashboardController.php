@@ -617,7 +617,7 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Top 5 AO Performance
+        // Top AO Performance (All AOs)
         $topAOData = (clone $query)
             ->select(
                 'nmao',
@@ -631,7 +631,6 @@ class DashboardController extends Controller
             ->where('nmao', '!=', '')
             ->groupBy('nmao')
             ->orderBy('total_outstanding', 'desc')
-            ->limit(5)
             ->get()
             ->map(function ($item) {
                 $npfRatio = $item->total_outstanding > 0
@@ -650,13 +649,106 @@ class DashboardController extends Controller
                 ];
             });
 
+        // AO Funding Performance - Only Depositos
+        $currentDate = now()->format('Y-m-d');
+
+        // Query depositos grouped by AO with categorization
+        $depositoByAO = DB::table('depositos')
+            ->selectRaw("
+                kodeaoh,
+                SUM(CASE WHEN kdprd = '31' THEN 1 ELSE 0 END) as total_deposito,
+                SUM(CASE WHEN kdprd = '41' THEN 1 ELSE 0 END) as total_abp,
+                SUM(CASE WHEN kdprd = '31' THEN nomrp ELSE 0 END) as nominal_deposito,
+                SUM(CASE WHEN kdprd = '41' THEN nomrp ELSE 0 END) as nominal_abp,
+                SUM(CASE WHEN tgljtempo < '{$currentDate}' THEN 1 ELSE 0 END) as total_cairkan,
+                SUM(CASE WHEN tgljtempo < '{$currentDate}' THEN nomrp ELSE 0 END) as nominal_cairkan
+            ")
+            ->where('period_month', $filterMonth)
+            ->where('period_year', $filterYear)
+            ->where('stsrec', 'A')
+            ->whereNotNull('kodeaoh')
+            ->where('kodeaoh', '!=', '')
+            ->groupBy('kodeaoh')
+            ->get()
+            ->keyBy('kodeaoh');
+
+        // AO mapping
+        $aoMapping = [
+            '017' => 'AGUS SETIAWAN',
+            '018' => 'ADITYA FATAHILLAH MUHARAM',
+            '020' => 'TAUFAN NUGRAHA',
+            '021' => 'SURYA SEPTIANNANDA',
+            '022' => 'FACHRI EKA PUTRA',
+            '023' => 'RIZKI NIRMALA',
+            '024' => 'GUNANTO',
+            '025' => 'SANDI M ILHAM',
+            '026' => 'FEISHAL JUAENI',
+            '027' => 'ZAINAL ARIFIN',
+            '028' => 'RIVI NUGRAHA',
+            '029' => 'YOHAN EKA PUTRA',
+            '030' => 'YUSRON WIJAYA',
+            '031' => 'SABIQ KHUSNAIDI',
+            '032' => 'YUNITA HERDIANA',
+            '033' => 'YUSI IRMAYANTI',
+            '034' => 'LARIZA AFRIANTI',
+            '035' => 'DEVI NURLIANTO',
+            '036' => 'FAUZIA NURUL AFINAH',
+            '037' => 'ENDANG SITI MULYANI',
+            '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
+            '039' => 'BALQIS CITRA SULISTYANA',
+            '11' => 'DERRY NUR MUHAMMAD',
+            '12' => 'FATTAH YASIN',
+            'GR01' => 'AO GRAMINDO 01',
+            'GR02' => 'AO GRAMINDO 02',
+            'GR03' => 'AO GRAMINDO 03',
+            'GR04' => 'AO GRAMINDO 04',
+            'GR05' => 'AO GRAMINDO 05',
+            'GR06' => 'AO BTB-GRAMIN 06',
+            'GR07' => 'AO BTB-GRAMIN 07',
+            'GR08' => 'AO BTB-GRAMIN 08',
+            'GR09' => 'AO BTB-GRAMIN 09',
+            'GR10' => 'AO BTB-GRAMIN 10',
+            'GR11' => 'AO BTB-GRAMIN 11',
+            'GR12' => 'AO BTB-GRAMIN 12',
+            'GR13' => 'AO BTB-GRAMIN 13',
+            'GR14' => 'AO BTB-GRAMIN 14',
+            'GR15' => 'AO BTB-GRAMIN 15',
+            'GR16' => 'AO BTB-GRAMIN 16',
+            'GR17' => 'AO BTB-GRAMIN 17',
+            'SDI' => 'SDI'
+        ];
+
+        // Build aoFundingData with deposito categorization
+        $aoFundingData = collect();
+        foreach ($depositoByAO as $kodeaoh => $data) {
+            $aoName = $aoMapping[$kodeaoh] ?? $kodeaoh;
+            $totalDeposits = ($data->total_deposito ?? 0) + ($data->total_abp ?? 0);
+            $totalNominal = ($data->nominal_deposito ?? 0) + ($data->nominal_abp ?? 0);
+
+            $aoFundingData->push([
+                'kodeaoh' => $kodeaoh,
+                'nmao' => $aoName,
+                'total_deposito' => $data->total_deposito ?? 0,
+                'total_abp' => $data->total_abp ?? 0,
+                'nominal_deposito' => $data->nominal_deposito ?? 0,
+                'nominal_abp' => $data->nominal_abp ?? 0,
+                'total_cairkan' => $data->total_cairkan ?? 0,
+                'nominal_cairkan' => $data->nominal_cairkan ?? 0,
+                'total_nasabah' => $totalDeposits,
+                'total_funding' => $totalNominal
+            ]);
+        }
+
+        // Sort by total funding descending
+        $aoFundingData = $aoFundingData->sortByDesc('total_funding')->values();
+
         // Grafik Kontrak Baru vs Lunas vs Pelunasan Cepat
         $nasabahStatusData = $this->getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear);
 
         // Trend Kontrak per Bulan (6 bulan terakhir)
         $nasabahTrendData = $this->getNasabahTrendData();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'nasabahStatusData', 'nasabahTrendData', 'fundingTrends', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingTrends', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -1043,12 +1135,14 @@ class DashboardController extends Controller
                     ->where('period_year', $year)
                     ->select('notab as norek', 'fnama as nama', 'sahirrp', 'tgltrnakh as tgleff', 'kodeprd')
                     ->orderBy('sahirrp', 'desc')
+                    ->limit(100) // Limit to prevent encoding issues
                     ->get();
                 $total = $data->sum('sahirrp');
             } else {
                 $data = Tabungan::where('period_month', $month)
                     ->where('period_year', $year)
                     ->select('notab as norek', 'fnama as nama', 'sahirrp', 'tgltrnakh as tgleff', 'kodeprd')
+                    ->limit(100)
                     ->get();
                 $total = $data->count();
             }
@@ -1058,12 +1152,14 @@ class DashboardController extends Controller
                     ->where('period_year', $year)
                     ->select('nobilyet', 'nama', 'nomrp', 'jkwaktu as jw', 'tglbuka', 'kdprd')
                     ->orderBy('nomrp', 'desc')
+                    ->limit(100)
                     ->get();
                 $total = $data->sum('nomrp');
             } else {
                 $data = Deposito::where('period_month', $month)
                     ->where('period_year', $year)
                     ->select('nobilyet', 'nama', 'nomrp', 'jkwaktu as jw', 'tglbuka', 'kdprd')
+                    ->limit(100)
                     ->get();
                 $total = $data->count();
             }
@@ -1071,12 +1167,14 @@ class DashboardController extends Controller
             // Combine tabungan and deposito
             $tabunganData = Tabungan::where('period_month', $month)
                 ->where('period_year', $year)
-                ->selectRaw("'Tabungan' as jenis, norek as no_rek, nama, sahirrp as nominal, tgleff as tanggal")
+                ->selectRaw("'Tabungan' as jenis, notab as no_rek, fnama as nama, sahirrp as nominal, tgltrnakh as tanggal")
+                ->limit(50)
                 ->get();
 
             $depositoData = Deposito::where('period_month', $month)
                 ->where('period_year', $year)
                 ->selectRaw("'Deposito' as jenis, nobilyet as no_rek, nama, nomrp as nominal, tglbuka as tanggal")
+                ->limit(50)
                 ->get();
 
             $data = $tabunganData->concat($depositoData);
@@ -1194,6 +1292,58 @@ class DashboardController extends Controller
                 $groupedData[$kdprd]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
                     'jumlah' => (int) $result->total_rekening
+                ];
+            }
+
+            $data = array_values($groupedData);
+        } elseif ($jenis === 'pencairan_deposito') {
+            // Get pencairan deposito data - deposits that existed in previous period but not in current period
+            // This matches the logic used in the main funding trend chart
+            $query = DB::table(DB::raw('(
+                SELECT DISTINCT period_year, period_month
+                FROM depositos
+                ORDER BY period_year DESC, period_month DESC
+                LIMIT 12
+            ) as periods'))
+                ->select('period_year', 'period_month')
+                ->orderBy('period_year', 'desc')
+                ->orderBy('period_month', 'desc')
+                ->get();
+
+            $groupedData = [];
+            foreach ($query as $period) {
+                $currentYear = $period->period_year;
+                $currentMonth = $period->period_month;
+
+                // Calculate previous period
+                $prevMonth = $currentMonth == '01' ? '12' : str_pad($currentMonth - 1, 2, '0', STR_PAD_LEFT);
+                $prevYear = $currentMonth == '01' ? $currentYear - 1 : $currentYear;
+
+                // Query pencairan deposito for this period (deposits from previous period that don't exist in current period)
+                $pencairan = DB::table('depositos as prev')
+                    ->leftJoin('depositos as curr', function ($join) use ($currentMonth, $currentYear) {
+                        $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                            ->where('curr.period_month', $currentMonth)
+                            ->where('curr.period_year', $currentYear);
+                    })
+                    ->where('prev.period_month', $prevMonth)
+                    ->where('prev.period_year', $prevYear)
+                    ->whereNull('curr.nobilyet')
+                    ->select(
+                        DB::raw('COUNT(*) as jumlah'),
+                        DB::raw('SUM(prev.nomrp) as total')
+                    )
+                    ->first();
+
+                $monthKey = $currentYear . '-' . str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                $groupedData[$monthKey] = [
+                    'kdprd' => 'PENCAIRAN', // Use a fixed product code for pencairan
+                    'data' => [
+                        $monthKey => [
+                            'nominal' => (float) ($pencairan->total ?? 0),
+                            'jumlah' => (int) ($pencairan->jumlah ?? 0)
+                        ]
+                    ]
                 ];
             }
 
@@ -1867,6 +2017,7 @@ class DashboardController extends Controller
         $grandTotalOutstanding = 0;
         $grandTotalDisburse = 0;
         $grandNoa = 0;
+        $grandCif = 0;
 
         // Process segmentasi berdasarkan struktur yang baru
         foreach ($segmentStructure as $category => $segments) {
@@ -1876,7 +2027,7 @@ class DashboardController extends Controller
             foreach ($segments as $segment) {
                 // Aggregate data untuk semua kode dalam segment ini
                 $result = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])
-                    ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa")
+                    ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa, COUNT(DISTINCT nocif) as cif")
                     ->first();
 
                 // Count and sum by collectibility
@@ -1895,11 +2046,13 @@ class DashboardController extends Controller
                 $outstanding = $result->outstanding ?? 0;
                 $disburse = $result->disburse ?? 0;
                 $noa = $result->noa ?? 0;
+                $cif = $result->cif ?? 0;
 
                 if ($outstanding > 0 || $disburse > 0 || $noa > 0) {
                     $grandTotalOutstanding += $outstanding;
                     $grandTotalDisburse += $disburse;
                     $grandNoa += $noa;
+                    $grandCif += $cif;
 
                     $categoryData[] = [
                         'category' => $category,
@@ -1907,6 +2060,7 @@ class DashboardController extends Controller
                         'outstanding' => $outstanding,
                         'pct_outstanding' => 0,
                         'noa' => $noa,
+                        'cif' => $cif,
                         'disburse' => $disburse,
                         'pct_disburse' => 0,
                         'col1' => $col1Count,
@@ -1937,7 +2091,7 @@ class DashboardController extends Controller
         $lainResult = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)
             ->whereNotNull('kdgroupdeb')
             ->where('kdgroupdeb', '!=', '')
-            ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa")
+            ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa, COUNT(DISTINCT nocif) as cif")
             ->first();
 
         $lainCol1Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '1')->count();
@@ -1955,11 +2109,13 @@ class DashboardController extends Controller
         $lainOutstanding = $lainResult->outstanding ?? 0;
         $lainDisburse = $lainResult->disburse ?? 0;
         $lainNoa = $lainResult->noa ?? 0;
+        $lainCif = $lainResult->cif ?? 0;
 
         if ($lainOutstanding > 0 || $lainDisburse > 0 || $lainNoa > 0) {
             $grandTotalOutstanding += $lainOutstanding;
             $grandTotalDisburse += $lainDisburse;
             $grandNoa += $lainNoa;
+            $grandCif += $lainCif;
 
             $data[] = [
                 'category' => 'LAIN-LAIN',
@@ -1967,6 +2123,7 @@ class DashboardController extends Controller
                 'outstanding' => $lainOutstanding,
                 'pct_outstanding' => 0,
                 'noa' => $lainNoa,
+                'cif' => $lainCif,
                 'disburse' => $lainDisburse,
                 'pct_disburse' => 0,
                 'col1' => $lainCol1Count,
@@ -2004,6 +2161,7 @@ class DashboardController extends Controller
             'outstanding' => $grandTotalOutstanding,
             'pct_outstanding' => 100,
             'noa' => $grandNoa,
+            'cif' => $grandCif,
             'disburse' => $grandTotalDisburse,
             'pct_disburse' => 100,
             'col1' => $totalCol1Count,
@@ -2172,6 +2330,422 @@ class DashboardController extends Controller
             'title' => $title,
             'total' => $data->count(),
             'data' => $formattedData
+        ]);
+    }
+
+    /**
+     * Get customer details for a specific metric
+     */
+    public function getCustomerDetails(Request $request)
+    {
+        $jenis = $request->input('jenis'); // tabungan, deposito, pencairan_deposito
+        $type = $request->input('type', 'nominal'); // nominal or jumlah
+        $limit = $request->input('limit', 100); // Default 100 customers
+
+        $customers = [];
+
+        if ($jenis === 'tabungan') {
+            // Get top customers by tabungan amount
+            $customers = DB::table('tabungans')
+                ->select(
+                    'fnama',
+                    'notab',
+                    'sahirrp',
+                    'period_year',
+                    'period_month'
+                )
+                ->orderBy('sahirrp', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($customer) {
+                    return [
+                        'nama' => $customer->fnama,
+                        'account' => $customer->notab,
+                        'amount' => (float) $customer->sahirrp,
+                        'type' => 'Tabungan',
+                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                    ];
+                });
+        } elseif ($jenis === 'deposito') {
+            // Get top customers by deposito amount
+            $customers = DB::table('depositos')
+                ->select(
+                    'nama',
+                    'nobilyet',
+                    'nomrp',
+                    'period_year',
+                    'period_month'
+                )
+                ->orderBy('nomrp', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($customer) {
+                    return [
+                        'nama' => $customer->nama,
+                        'account' => $customer->nobilyet,
+                        'amount' => (float) $customer->nomrp,
+                        'type' => 'Deposito',
+                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                    ];
+                });
+        } elseif ($jenis === 'pencairan_deposito') {
+            // Get customers who had deposito pencairan (deposits that disappeared)
+            // This is more complex - we need to find deposits that existed in previous month but not current
+            $customers = DB::table('depositos as prev')
+                ->leftJoin('depositos as curr', function ($join) {
+                    $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                        ->whereRaw('curr.period_year * 12 + curr.period_month = prev.period_year * 12 + prev.period_month + 1');
+                })
+                ->whereNull('curr.nobilyet')
+                ->select(
+                    'prev.nama',
+                    'prev.nobilyet',
+                    'prev.nomrp',
+                    'prev.period_year',
+                    'prev.period_month'
+                )
+                ->orderBy('prev.nomrp', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($customer) {
+                    return [
+                        'nama' => $customer->nama,
+                        'account' => $customer->nobilyet,
+                        'amount' => (float) $customer->nomrp,
+                        'type' => 'Pencairan Deposito',
+                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                    ];
+                });
+        }
+
+        return response()->json([
+            'jenis' => $jenis,
+            'type' => $type,
+            'total' => count($customers),
+            'customers' => $customers
+        ]);
+    }
+
+    /**
+     * Get AO Funding Detail - shows monthly deposito/abp/pencairan summary for a specific AO
+     */
+    public function getAOFundingDetail(Request $request, $kodeaoh)
+    {
+        $currentYear = date('Y');
+
+        // AO mapping
+        $aoMapping = [
+            '017' => 'AGUS SETIAWAN',
+            '018' => 'ADITYA FATAHILLAH MUHARAM',
+            '020' => 'TAUFAN NUGRAHA',
+            '021' => 'SURYA SEPTIANNANDA',
+            '022' => 'FACHRI EKA PUTRA',
+            '023' => 'RIZKI NIRMALA',
+            '024' => 'GUNANTO',
+            '025' => 'SANDI M ILHAM',
+            '026' => 'FEISHAL JUAENI',
+            '027' => 'ZAINAL ARIFIN',
+            '028' => 'RIVI NUGRAHA',
+            '029' => 'YOHAN EKA PUTRA',
+            '030' => 'YUSRON WIJAYA',
+            '031' => 'SABIQ KHUSNAIDI',
+            '032' => 'YUNITA HERDIANA',
+            '033' => 'YUSI IRMAYANTI',
+            '034' => 'LARIZA AFRIANTI',
+            '035' => 'DEVI NURLIANTO',
+            '036' => 'FAUZIA NURUL AFINAH',
+            '037' => 'ENDANG SITI MULYANI',
+            '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
+            '039' => 'BALQIS CITRA SULISTYANA',
+            '11' => 'DERRY NUR MUHAMMAD',
+            '12' => 'FATTAH YASIN',
+            'GR01' => 'AO GRAMINDO 01',
+            'GR02' => 'AO GRAMINDO 02',
+            'GR03' => 'AO GRAMINDO 03',
+            'GR04' => 'AO GRAMINDO 04',
+            'GR05' => 'AO GRAMINDO 05',
+            'GR06' => 'AO BTB-GRAMIN 06',
+            'GR07' => 'AO BTB-GRAMIN 07',
+            'GR08' => 'AO BTB-GRAMIN 08',
+            'GR09' => 'AO BTB-GRAMIN 09',
+            'GR10' => 'AO BTB-GRAMIN 10',
+            'GR11' => 'AO BTB-GRAMIN 11',
+            'GR12' => 'AO BTB-GRAMIN 12',
+            'GR13' => 'AO BTB-GRAMIN 13',
+            'GR14' => 'AO BTB-GRAMIN 14',
+            'GR15' => 'AO BTB-GRAMIN 15',
+            'GR16' => 'AO BTB-GRAMIN 16',
+            'GR17' => 'AO BTB-GRAMIN 17',
+            'SDI' => 'SDI'
+        ];
+
+        $aoName = $aoMapping[$kodeaoh] ?? $kodeaoh;
+
+        // Get monthly data for current year
+        $monthlyData = [];
+        for ($month = 1; $month <= 12; $month++) {
+            $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+
+            // Get deposito data for this month - depositos that exist in this period AND were opened in this month
+            $depositos = DB::table('depositos')
+                ->where('kodeaoh', $kodeaoh)
+                ->where('period_month', $monthStr)
+                ->where('period_year', $currentYear)
+                ->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
+                ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear])
+                ->where('stsrec', 'A')
+                ->get();
+
+            // Categorize depositos
+            $depositoRegular = $depositos->where('kdprd', '31');
+            $depositoAbp = $depositos->where('kdprd', '41');
+
+            // Calculate pencairan (depositos that existed in this month but not in next month)
+            // But only if next month has data - otherwise pencairan = 0
+            $nextMonth = $month == 12 ? 1 : $month + 1;
+            $nextYear = $month == 12 ? $currentYear + 1 : $currentYear;
+            $nextMonthStr = str_pad($nextMonth, 2, '0', STR_PAD_LEFT);
+
+            $nextMonthHasData = DB::table('depositos')
+                ->where('kodeaoh', $kodeaoh)
+                ->where('period_month', $nextMonthStr)
+                ->where('period_year', $nextYear)
+                ->where('stsrec', 'A')
+                ->exists();
+
+            if ($nextMonthHasData) {
+                $depositoCairkan = DB::table('depositos as curr')
+                    ->leftJoin('depositos as next', function ($join) use ($nextMonthStr, $nextYear) {
+                        $join->on('curr.nobilyet', '=', 'next.nobilyet')
+                            ->where('next.period_month', $nextMonthStr)
+                            ->where('next.period_year', $nextYear)
+                            ->where('next.stsrec', 'A');
+                    })
+                    ->where('curr.kodeaoh', $kodeaoh)
+                    ->where('curr.period_month', $monthStr)
+                    ->where('curr.period_year', $currentYear)
+                    ->where('curr.stsrec', 'A')
+                    ->whereNull('next.nobilyet') // Tidak ada di bulan berikutnya
+                    ->select('curr.nomrp')
+                    ->get();
+            } else {
+                // No data for next month, so no pencairan can be calculated
+                $depositoCairkan = collect();
+            }
+
+            $monthlyData[] = [
+                'month' => $month,
+                'month_name' => date('F', mktime(0, 0, 0, $month, 1)),
+                'deposito' => [
+                    'count' => $depositoRegular->count(),
+                    'nominal' => $depositoRegular->sum('nomrp')
+                ],
+                'abp' => [
+                    'count' => $depositoAbp->count(),
+                    'nominal' => $depositoAbp->sum('nomrp')
+                ],
+                'pencairan' => [
+                    'count' => $depositoCairkan->count(),
+                    'nominal' => $depositoCairkan->sum('nomrp')
+                ],
+                'total' => [
+                    'count' => $depositos->count(),
+                    'nominal' => $depositos->sum('nomrp')
+                ]
+            ];
+        }
+
+        // Calculate totals - sum of all depositos opened throughout the year
+        $allOpenedDepositos = DB::table('depositos')
+            ->where('kodeaoh', $kodeaoh)
+            ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear])
+            ->where('stsrec', 'A')
+            ->get();
+
+        $depositoRegularTotal = $allOpenedDepositos->where('kdprd', '31');
+        $depositoAbpTotal = $allOpenedDepositos->where('kdprd', '41');
+
+        $totals = [
+            'deposito_count' => $depositoRegularTotal->count(),
+            'deposito_nominal' => $depositoRegularTotal->sum('nomrp'),
+            'abp_count' => $depositoAbpTotal->count(),
+            'abp_nominal' => $depositoAbpTotal->sum('nomrp'),
+            'pencairan_count' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'count')),
+            'pencairan_nominal' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'nominal')),
+            'total_count' => $allOpenedDepositos->count(),
+            'total_nominal' => $allOpenedDepositos->sum('nomrp')
+        ];
+
+        return response()->json([
+            'ao_code' => $kodeaoh,
+            'ao_name' => $aoName,
+            'year' => $currentYear,
+            'monthly_data' => $monthlyData,
+            'totals' => $totals
+        ]);
+    }
+
+    public function getAOCustomerDetails(Request $request, $ao, $month, $category)
+    {
+        $currentYear = date('Y');
+
+        // AO mapping
+        $aoMapping = [
+            '017' => 'AGUS SETIAWAN',
+            '018' => 'ADITYA FATAHILLAH MUHARAM',
+            '020' => 'TAUFAN NUGRAHA',
+            '021' => 'SURYA SEPTIANNANDA',
+            '022' => 'FACHRI EKA PUTRA',
+            '023' => 'RIZKI NIRMALA',
+            '024' => 'GUNANTO',
+            '025' => 'SANDI M ILHAM',
+            '026' => 'FEISHAL JUAENI',
+            '027' => 'ZAINAL ARIFIN',
+            '028' => 'RIVI NUGRAHA',
+            '029' => 'YOHAN EKA PUTRA',
+            '030' => 'YUSRON WIJAYA',
+            '031' => 'SABIQ KHUSNAIDI',
+            '032' => 'YUNITA HERDIANA',
+            '033' => 'YUSI IRMAYANTI',
+            '034' => 'LARIZA AFRIANTI',
+            '035' => 'DEVI NURLIANTO',
+            '036' => 'FAUZIA NURUL AFINAH',
+            '037' => 'ENDANG SITI MULYANI',
+            '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
+            '039' => 'BALQIS CITRA SULISTYANA',
+            '11' => 'DERRY NUR MUHAMMAD',
+            '12' => 'FATTAH YASIN',
+            'GR01' => 'AO GRAMINDO 01',
+            'GR02' => 'AO GRAMINDO 02',
+            'GR03' => 'AO GRAMINDO 03',
+            'GR04' => 'AO GRAMINDO 04',
+            'GR05' => 'AO GRAMINDO 05',
+            'GR06' => 'AO BTB-GRAMIN 06',
+            'GR07' => 'AO BTB-GRAMIN 07',
+            'GR08' => 'AO BTB-GRAMIN 08',
+            'GR09' => 'AO BTB-GRAMIN 09',
+            'GR10' => 'AO BTB-GRAMIN 10',
+            'GR11' => 'AO BTB-GRAMIN 11',
+            'GR12' => 'AO BTB-GRAMIN 12',
+            'GR13' => 'AO BTB-GRAMIN 13',
+            'GR14' => 'AO BTB-GRAMIN 14',
+            'GR15' => 'AO BTB-GRAMIN 15',
+            'GR16' => 'AO BTB-GRAMIN 16',
+            'GR17' => 'AO BTB-GRAMIN 17',
+            'SDI' => 'SDI'
+        ];
+
+        $aoName = $aoMapping[$ao] ?? $ao;
+
+        // Build query based on month
+        $query = DB::table('depositos')
+            ->where('kodeaoh', $ao)
+            ->where('stsrec', 'A');
+
+        if ($month !== 'all') {
+            $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+            // Filter by opening date (tglbuka) for monthly details
+            $query->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
+                ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear]);
+        } else {
+            // For "all" months, show all depositos for the year
+            $query->where('period_year', $currentYear);
+        }
+
+        // Filter by category
+        switch ($category) {
+            case 'deposito':
+                $query->where('kdprd', '31');
+                break;
+            case 'abp':
+                $query->where('kdprd', '41');
+                break;
+            case 'pencairan':
+                // Depositos that were acquired in this month but have been withdrawn
+                if ($month === 'all') {
+                    // For "all months", we can't calculate pencairan meaningfully
+                    // Return empty result
+                    return response()->json([
+                        'ao' => $ao,
+                        'ao_name' => $aoName,
+                        'month' => $month,
+                        'category' => $category,
+                        'year' => $currentYear,
+                        'customers' => [],
+                        'total_nominal' => 0,
+                        'total_nominal_formatted' => 'Rp 0',
+                        'count' => 0
+                    ]);
+                }
+
+                $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+                // Get depositos acquired in this month that no longer exist in current period
+                $cairkanBilyets = DB::table('depositos as acquired')
+                    ->leftJoin('depositos as current', function ($join) use ($currentYear) {
+                        $join->on('acquired.nobilyet', '=', 'current.nobilyet')
+                            ->where('current.period_year', $currentYear)
+                            ->where('current.stsrec', 'A');
+                    })
+                    ->where('acquired.kodeaoh', $ao)
+                    ->whereRaw("strftime('%m', acquired.tglbuka) = ?", [$monthStr])
+                    ->whereRaw("strftime('%Y', acquired.tglbuka) = ?", [$currentYear])
+                    ->where('acquired.stsrec', 'A')
+                    ->whereNull('current.nobilyet') // No longer exists in current period
+                    ->pluck('acquired.nobilyet');
+
+                $query->whereIn('nobilyet', $cairkanBilyets);
+                break;
+            case 'total':
+                // No additional filter for total
+                break;
+            default:
+                return response()->json(['error' => 'Invalid category'], 400);
+        }
+
+        // Get customers - ensure no duplicates
+        $customers = $query->select([
+            'nobilyet',
+            'nama',
+            'nomrp',
+            'tglbuka',
+            'tgljtempo',
+            'kdprd',
+            'stsrec'
+        ])
+            ->distinct() // Prevent duplicates
+            ->orderBy('nomrp', 'desc')
+            ->get();
+
+        // Format data
+        $formattedCustomers = $customers->map(function ($customer) use ($category) {
+            $currentDate = now()->format('Y-m-d');
+            $isCairkan = $category === 'pencairan' || $customer->tgljtempo < $currentDate;
+
+            return [
+                'nobilyet' => $customer->nobilyet,
+                'nama' => $customer->nama,
+                'nomrp' => $customer->nomrp,
+                'nomrp_formatted' => 'Rp ' . number_format($customer->nomrp, 0, ',', '.'),
+                'tglbuka' => $customer->tglbuka ? date('d/m/Y', strtotime($customer->tglbuka)) : '-',
+                'tgljtempo' => $customer->tgljtempo ? date('d/m/Y', strtotime($customer->tgljtempo)) : '-',
+                'kdprd' => $customer->kdprd,
+                'status' => $isCairkan ? 'Cairkan' : 'Aktif',
+                'is_cairkan' => $isCairkan
+            ];
+        });
+
+        $totalNominal = $customers->sum('nomrp');
+
+        return response()->json([
+            'ao' => $ao,
+            'ao_name' => $aoName,
+            'month' => $month,
+            'category' => $category,
+            'year' => $currentYear,
+            'customers' => $formattedCustomers,
+            'total_nominal' => $totalNominal,
+            'total_nominal_formatted' => 'Rp ' . number_format($totalNominal, 0, ',', '.'),
+            'count' => $customers->count()
         ]);
     }
 }
