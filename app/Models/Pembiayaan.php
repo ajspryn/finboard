@@ -55,7 +55,6 @@ class Pembiayaan extends Model
         'kdsektor',
         'kdsub',
         'plafon',
-        'linkage',
     ];
 
     protected $casts = [
@@ -72,6 +71,5 @@ class Pembiayaan extends Model
         'angsmdl' => 'decimal:2',
         'angsmgn' => 'decimal:2',
         'plafon' => 'decimal:2',
-        'linkage' => 'decimal:2',
     ];
 }

@@ -16,7 +16,6 @@ class Tabungan extends Model
         'saldoblok',
         'tax',
         'avgeom',
-        'linkage',
         'stsrec',
         'stsrest',
         'stspep',

@@ -288,7 +288,6 @@ class FundingController extends Controller
                         'tax' => $this->parseNumeric($data['tax'] ?? 0),
                         'tgltrnakh' => $tgltrnakh,
                         'avgeom' => $this->parseNumeric($data['avgeom'] ?? 0),
-                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
                         'stspep' => $data['stspep'] ?? null,
                         'kdrisk' => $data['kdrisk'] ?? null,
                         'noid' => $data['noid'] ?? null,
@@ -343,7 +342,6 @@ class FundingController extends Controller
                         'tax' => $this->parseNumeric($data['tax'] ?? 0),
                         'bnghtg' => $this->parseNumeric($data['bnghtg'] ?? 0),
                         'nisbahrp' => $this->parseNumeric($data['nisbahrp'] ?? 0),
-                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
                         'stspep' => $data['stspep'] ?? null,
                         'tgllhr' => $tgllhr,
                         'nmibu' => $data['nmibu'] ?? null,
@@ -367,7 +365,6 @@ class FundingController extends Controller
                         'prsnisbah' => $this->parseNumeric($data['prsnisbah'] ?? 0),
                         'plafon' => $this->parseNumeric($data['plafon'] ?? 0),
                         'osmdlc' => $this->parseNumeric($data['os'] ?? 0),
-                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
                         'period_month' => $month,
                         'period_year' => $year,
                     ];
