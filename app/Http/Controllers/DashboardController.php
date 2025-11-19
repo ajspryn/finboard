@@ -1282,7 +1282,6 @@ class DashboardController extends Controller
                 'period_year',
                 'period_month',
                 DB::raw('SUM(sahirrp) as total_nominal'),
-                DB::raw('SUM(linkage) as total_linkage'),
                 DB::raw('COUNT(*) as total_rekening')
             )
                 ->whereNotNull('kodeprd')
@@ -1307,7 +1306,6 @@ class DashboardController extends Controller
                 $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
                 $groupedData[$kodeprd]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
-                    'linkage' => (float) $result->total_linkage,
                     'jumlah' => (int) $result->total_rekening
                 ];
             }
@@ -1320,7 +1318,6 @@ class DashboardController extends Controller
                 'period_year',
                 'period_month',
                 DB::raw('SUM(nomrp) as total_nominal'),
-                DB::raw('SUM(linkage) as total_linkage'),
                 DB::raw('COUNT(*) as total_rekening')
             )
                 ->whereNotNull('kdprd')
@@ -1345,7 +1342,6 @@ class DashboardController extends Controller
                 $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
                 $groupedData[$kdprd]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
-                    'linkage' => (float) $result->total_linkage,
                     'jumlah' => (int) $result->total_rekening
                 ];
             }
@@ -1358,7 +1354,6 @@ class DashboardController extends Controller
                 'period_year',
                 'period_month',
                 DB::raw('SUM(plafon) as total_nominal'),
-                DB::raw('SUM(linkage) as total_linkage'),
                 DB::raw('COUNT(*) as total_rekening')
             )
                 ->whereNotNull('kelompok')
@@ -1383,7 +1378,6 @@ class DashboardController extends Controller
                 $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
                 $groupedData[$kelompok]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
-                    'linkage' => (float) $result->total_linkage,
                     'jumlah' => (int) $result->total_rekening
                 ];
             }
