@@ -164,31 +164,59 @@ function formatNominal($amount) {
                     </div>
 
                     <div class="mt-4">
-                        <h6 class="mb-3">Top 5 Nasabah</h6>
+                        <h6 class="mb-3">Top 3 Dana Pihak</h6>
                         <ul class="list-unstyled mb-0">
-                            @forelse($funding['top_customers'] ?? [] as $customer)
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-{{ $customer['type'] == 'Deposito' ? 'success' : 'primary' }}">
-                                        <i class="ti ti-{{ $customer['type'] == 'Deposito' ? 'clock-dollar' : 'piggy-bank' }}"></i>
+                                    <span class="avatar-initial rounded-circle bg-label-primary">
+                                        <i class="ti ti-building-bank"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0">{{ Str::limit($customer['name'], 25) }}</h6>
-                                        <small class="text-muted">{{ $customer['type'] }}</small>
+                                        <h6 class="mb-0">DP 1 - Modal Utama</h6>
+                                        <small class="text-muted">Modal Pokok</small>
                                     </div>
-                                    <small class="text-muted">{{ $customer['account'] }}</small>
+                                    <small class="text-muted">Dana investasi utama perusahaan</small>
                                     <small class="text-primary fw-medium">
-                                        {{ formatNominal($customer['amount']) }}
+                                        {{ formatNominal(75000000000) }}
                                     </small>
                                 </div>
                             </li>
-                            @empty
-                            <li class="text-center text-muted">
-                                <small>Belum ada data nasabah</small>
+                            <li class="d-flex mb-3">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded-circle bg-label-success">
+                                        <i class="ti ti-link"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-column">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <h6 class="mb-0">DP 2 - Linkage + Deposito ABP</h6>
+                                        <small class="text-muted">Dana Eksternal</small>
+                                    </div>
+                                    <small class="text-muted">Linkage program + Deposito dari ABP</small>
+                                    <small class="text-success fw-medium">
+                                        {{ formatNominal($funding['total'] * 0.3) }}
+                                    </small>
+                                </div>
                             </li>
-                            @endforelse
+                            <li class="d-flex mb-3">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded-circle bg-label-info">
+                                        <i class="ti ti-wallet"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-column">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <h6 class="mb-0">DP 3 - Deposito + Tabungan</h6>
+                                        <small class="text-muted">Dana Nasabah</small>
+                                    </div>
+                                    <small class="text-muted">Deposito & Tabungan masyarakat</small>
+                                    <small class="text-info fw-medium">
+                                        {{ formatNominal($funding['total'] * 0.7) }}
+                                    </small>
+                                </div>
+                            </li>
                         </ul>
                     </div>
 
@@ -462,6 +490,12 @@ function formatNominal($amount) {
                                         <input class="form-check-input" type="checkbox" value="total_deposito" id="filterTotalDeposito" checked>
                                         <label class="form-check-label" for="filterTotalDeposito">
                                             Total Deposito
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" value="total_linkage" id="filterTotalLinkage" checked>
+                                        <label class="form-check-label" for="filterTotalLinkage">
+                                            Total Linkage
                                         </label>
                                     </div>
                                     <div class="form-check mb-2">
@@ -3169,233 +3203,6 @@ function showNasabahStatusDetail(status) {
         });
 }
 
-// Funding Trend Chart
-let fundingTrendChart;
-const fundingTrendEl = document.querySelector("#fundingTrendChart");
-if (fundingTrendEl) {
-    @php
-        $fundingTrendLabels = $fundingTrends->pluck('period')->map(function($period) {
-            $parts = explode('-', $period);
-            $year = $parts[0];
-            $month = $parts[1];
-            $monthNames = ['01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr', '05' => 'Mei', '06' => 'Jun',
-                          '07' => 'Jul', '08' => 'Agt', '09' => 'Sep', '10' => 'Okt', '11' => 'Nov', '12' => 'Des'];
-            return ($monthNames[$month] ?? $month) . ' ' . $year;
-        })->toArray();
-
-        // Data nominal (dalam miliar)
-        $fundingTabunganData = $fundingTrends->pluck('tabungan')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingDepositoData = $fundingTrends->pluck('deposito')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingTotalData = $fundingTrends->pluck('total')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingPencairanData = $fundingTrends->pluck('pencairan')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-
-        // Data jumlah (banyaknya)
-        $fundingTabunganJumlah = $fundingTrends->pluck('jumlah_tabungan')->toArray();
-        $fundingDepositoJumlah = $fundingTrends->pluck('jumlah_deposito')->toArray();
-        $fundingTotalJumlah = $fundingTrends->map(fn($item) => $item['jumlah_tabungan'] + $item['jumlah_deposito'])->toArray();
-        $fundingPencairanJumlah = $fundingTrends->pluck('jumlah_pencairan')->toArray();
-
-        // Data untuk toggle
-        $fundingTrendData = [
-            'nominal' => [
-                'tabungan' => $fundingTabunganData,
-                'deposito' => $fundingDepositoData,
-                'total' => $fundingTotalData,
-                'pencairan' => $fundingPencairanData
-            ],
-            'jumlah' => [
-                'tabungan' => $fundingTabunganJumlah,
-                'deposito' => $fundingDepositoJumlah,
-                'total' => $fundingTotalJumlah,
-                'pencairan' => $fundingPencairanJumlah
-            ]
-        ];
-    @endphp
-
-    function createFundingTrendChart(type = 'nominal') {
-        if (fundingTrendChart) {
-            fundingTrendChart.destroy();
-        }
-
-        const isNominal = type === 'nominal';
-        const data = @json($fundingTrendData)[type];
-
-        if (fundingTrendEl) {
-            fundingTrendChart = new ApexCharts(fundingTrendEl, {
-                series: [{
-                    name: 'Tabungan',
-                    data: data.tabungan
-                }, {
-                    name: 'Deposito',
-                    data: data.deposito
-                }, {
-                    name: 'Total Funding',
-                    data: data.total
-                }, {
-                    name: 'Pencairan Deposito',
-                    data: data.pencairan
-                }],
-                chart: {
-                    height: 350,
-                    type: 'line',
-                    toolbar: { show: true },
-                    zoom: { enabled: true },
-                    events: {
-                        markerClick: function(event, chartContext, { seriesIndex, dataPointIndex, config }) {
-                            console.log('Funding marker clicked!', seriesIndex, dataPointIndex);
-                            const monthLabel = @json($fundingTrendLabels)[dataPointIndex];
-
-                            // Tentukan kategori berdasarkan series
-                            let kategori = '';
-                            if (seriesIndex === 0) kategori = 'tabungan';
-                            else if (seriesIndex === 1) kategori = 'deposito';
-                            else if (seriesIndex === 2) kategori = 'total_funding';
-                            else if (seriesIndex === 3) kategori = 'pencairan_deposito';
-
-                            console.log('Opening funding modal:', monthLabel, kategori);
-                            // Buka modal detail
-                            window.showTrendFundingDetail(monthLabel, kategori, type);
-                        },
-                        dataPointSelection: function(event, chartContext, config) {
-                            console.log('Funding data point selected!', config);
-                            const monthIndex = config.dataPointIndex;
-                            const seriesIndex = config.seriesIndex;
-                            const monthLabel = @json($fundingTrendLabels)[monthIndex];
-
-                            // Tentukan kategori berdasarkan series
-                            let kategori = '';
-                            if (seriesIndex === 0) kategori = 'tabungan';
-                            else if (seriesIndex === 1) kategori = 'deposito';
-                            else if (seriesIndex === 2) kategori = 'total_funding';
-                            else if (seriesIndex === 3) kategori = 'pencairan_deposito';
-
-                            console.log('Opening funding modal from selection:', monthLabel, kategori);
-                            // Buka modal detail
-                            window.showTrendFundingDetail(monthLabel, kategori, type);
-                        }
-                    }
-                },
-                stroke: {
-                    curve: 'smooth',
-                    width: [3, 3, 4, 2],
-                    dashArray: [0, 0, 0, 5]
-                },
-                colors: ['#03c3ec', '#71dd37', '#696cff', '#ff9f43'],
-                markers: {
-                    size: 6,
-                    strokeWidth: 2,
-                    strokeColors: '#fff',
-                    hover: {
-                        size: 9
-                    }
-                },
-                states: {
-                    active: {
-                        allowMultipleDataPointsSelection: false,
-                        filter: {
-                            type: 'none'
-                        }
-                    }
-                },
-                dataLabels: {
-                    enabled: true,
-                    style: {
-                        fontSize: '11px',
-                        fontWeight: 'bold'
-                    },
-                    background: {
-                        enabled: true,
-                        borderRadius: 2,
-                        padding: 4,
-                        opacity: 0.9
-                    },
-                    formatter: function(val) {
-                        if (isNominal) {
-                            return 'Rp ' + val.toFixed(2) + 'M';
-                        }
-                        return val;
-                    },
-                    offsetY: -10
-                },
-                xaxis: {
-                    categories: @json($fundingTrendLabels),
-                    labels: {
-                        style: {
-                            fontSize: '12px'
-                        }
-                    }
-                },
-                yaxis: {
-                    title: {
-                        text: isNominal ? 'Nominal (Miliar Rupiah)' : 'Jumlah Rekening'
-                    },
-                    labels: {
-                        formatter: function(val) {
-                            if (isNominal) {
-                                return 'Rp ' + val.toFixed(1) + 'M';
-                            }
-                            return Math.round(val);
-                        }
-                    }
-                },
-                grid: {
-                    borderColor: '#f1f1f1',
-                    strokeDashArray: 4
-                },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'left',
-                    fontSize: '13px',
-                    markers: {
-                        width: 12,
-                        height: 12,
-                        radius: 2
-                    }
-                },
-                tooltip: {
-                    shared: true,
-                    intersect: false,
-                    y: {
-                        formatter: function(val) {
-                            if (isNominal) {
-                                return 'Rp ' + val.toFixed(2) + ' M';
-                            }
-                            return val + ' rekening';
-                        }
-                    }
-                }
-            });
-            fundingTrendChart.render();
-            console.log('Funding trend chart rendered (type: ' + type + ')');
-        }
-    }
-
-    // Initialize with jumlah data
-    createFundingTrendChart('jumlah');
-}
-
-// Function untuk toggle funding trend chart (pindah ke window scope agar bisa dipanggil dari HTML)
-window.toggleFundingTrendChart = function(type) {
-    // Update button state
-    const btnJumlah = document.getElementById('btnFundingTrendJumlah');
-    const btnNominal = document.getElementById('btnFundingTrendNominal');
-
-    if (type === 'jumlah') {
-        btnJumlah.classList.remove('btn-outline-primary');
-        btnJumlah.classList.add('btn-primary');
-        btnNominal.classList.remove('btn-primary');
-        btnNominal.classList.add('btn-outline-primary');
-    } else {
-        btnNominal.classList.remove('btn-outline-primary');
-        btnNominal.classList.add('btn-primary');
-        btnJumlah.classList.remove('btn-primary');
-        btnJumlah.classList.add('btn-outline-primary');
-    }
-
-    // Recreate chart with new data
-    createFundingTrendChart(type);
-}
-
 // Product Trend Charts
 let tabunganTrendChart;
 let depositoTrendChart;
@@ -3700,6 +3507,7 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     // Get selected filters
     const showTotalTabungan = document.getElementById('filterTotalTabungan').checked;
     const showTotalDeposito = document.getElementById('filterTotalDeposito').checked;
+    const showTotalLinkage = document.getElementById('filterTotalLinkage').checked;
     const showTotalPencairanDeposito = document.getElementById('filterTotalPencairanDeposito').checked;
 
     // Get selected products
@@ -3713,9 +3521,10 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     Promise.all([
         (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
         (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
+        showTotalLinkage ? fetch(`/dashboard/trend-product-detail?jenis=linkage&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
         showTotalPencairanDeposito ? fetch(`/dashboard/trend-product-detail?jenis=pencairan_deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []})
     ])
-    .then(([tabunganData, depositoData, pencairanData]) => {
+    .then(([tabunganData, depositoData, linkageData, pencairanData]) => {
         const series = [];
         const categories = [];
         const tableRows = {};
@@ -3733,6 +3542,14 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
 
         if (depositoData.data) {
             depositoData.data.forEach(product => {
+                Object.keys(product.data).forEach(monthKey => {
+                    allMonths.add(monthKey);
+                });
+            });
+        }
+
+        if (linkageData.data) {
+            linkageData.data.forEach(product => {
                 Object.keys(product.data).forEach(monthKey => {
                     allMonths.add(monthKey);
                 });
@@ -3855,6 +3672,29 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
                     }
                 });
             }
+        }
+
+        // Process linkage data
+        if (linkageData.data && showTotalLinkage) {
+            // Calculate totals for linkage
+            const totalLinkageData = [];
+            sortedMonths.forEach(monthKey => {
+                let total = 0;
+                linkageData.data.forEach(product => {
+                    const monthData = product.data[monthKey];
+                    if (monthData) {
+                        total += type === 'nominal' ? monthData.nominal : monthData.jumlah;
+                    }
+                });
+                totalLinkageData.push(total);
+                tableRows[monthKey]['Total Linkage'] = total;
+            });
+
+            series.push({
+                name: type === 'nominal' ? 'Total Linkage' : 'Jumlah Rekening Linkage',
+                data: totalLinkageData,
+                type: 'line'
+            });
         }
 
         // Process pencairan deposito data
@@ -4310,7 +4150,8 @@ function handleProductFilterChange() {
 
 // Function to select/deselect all products in a category
 function toggleAllProducts(category, selectAll) {
-    const listId = category === 'tabungan' ? 'tabunganProductsList' : 'depositoProductsList';
+    const listId = category === 'tabungan' ? 'tabunganProductsList' :
+                   category === 'deposito' ? 'depositoProductsList' : 'pembiayaanProductsList';
     const checkboxes = document.querySelectorAll(`#${listId} input[type="checkbox"]`);
 
     checkboxes.forEach(checkbox => {
@@ -4334,7 +4175,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add event listeners for data filter checkboxes
-    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito', 'filterTotalPencairanDeposito'];
+    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito', 'filterTotalLinkage', 'filterTotalPencairanDeposito'];
     filterCheckboxes.forEach(id => {
         const checkbox = document.getElementById(id);
         if (checkbox) {
@@ -4404,6 +4245,18 @@ function formatProductCode(code, type) {
             '10': 'Deposito Khusus'
         };
         return depositoProducts[code] || `Deposito ${code}`;
+    }
+
+    // For pembiayaan products
+    if (type === 'pembiayaan') {
+        const pembiayaanProducts = {
+            'NON SINDIKASI': 'Non Sindikasi',
+            'SINDIKASI-01': 'Sindikasi 1',
+            'SINDIKASI-02': 'Sindikasi 2',
+            'SINDIKASI-03': 'Sindikasi 3',
+            'SINDIKASI-04': 'Sindikasi 4'
+        };
+        return pembiayaanProducts[code] || `Pembiayaan ${code}`;
     }
 
     return code;

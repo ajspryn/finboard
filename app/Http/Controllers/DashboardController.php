@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pembiayaan;
 use App\Models\Tabungan;
 use App\Models\Deposito;
+use App\Models\Linkage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -145,39 +146,6 @@ class DashboardController extends Controller
         $tabunganPct = $totalFunding > 0 ? round(($totalTabungan / $totalFunding) * 100, 1) : 0;
         $depositoPct = $totalFunding > 0 ? round(($totalDeposito / $totalFunding) * 100, 1) : 0;
 
-        // Get top 5 customers (gabungan dari tabungan dan deposito) - dengan filter
-        $topTabungan = (clone $tabunganQuery)
-            ->orderBy('sahirrp', 'desc')
-            ->limit(5)
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'name' => $item->fnama ?? 'N/A',
-                    'account' => $item->notab,
-                    'amount' => $item->sahirrp,
-                    'type' => 'Tabungan'
-                ];
-            });
-
-        $topDeposito = (clone $depositoQuery)
-            ->orderBy('nomrp', 'desc')
-            ->limit(5)
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'name' => $item->nama ?? 'N/A',
-                    'account' => $item->nodep,
-                    'amount' => $item->nomrp,
-                    'type' => 'Deposito'
-                ];
-            });
-
-        // Gabungkan dan sort by amount, ambil top 5
-        $topCustomers = $topTabungan->concat($topDeposito)
-            ->sortByDesc('amount')
-            ->take(5)
-            ->values();
-
         $funding = [
             'total' => $totalFunding,
             'growth' => round($fundingGrowth, 2),
@@ -194,72 +162,11 @@ class DashboardController extends Controller
                 'Deposito' => $countDeposito,
                 'Total' => $countTabungan + $countDeposito
             ],
-            'top_customers' => $topCustomers,
             'pencairan' => [
                 'jumlah' => $jumlahPencairan,
                 'total' => $totalPencairan
             ]
         ];
-
-        // Funding Trends - 6 bulan terakhir
-        $fundingTrends = DB::table(DB::raw('(
-            SELECT period_year, period_month, "Tabungan" as jenis, SUM(sahirrp) as total, COUNT(*) as jumlah
-            FROM tabungans
-            GROUP BY period_year, period_month
-            UNION ALL
-            SELECT period_year, period_month, "Deposito" as jenis, SUM(nomrp) as total, COUNT(*) as jumlah
-            FROM depositos
-            GROUP BY period_year, period_month
-        ) as combined'))
-            ->select('period_year', 'period_month', 'jenis', 'total', 'jumlah')
-            ->orderByRaw('period_year DESC, period_month DESC')
-            ->limit(36) // 6 bulan x 2 jenis x 3 untuk safety
-            ->get()
-            ->groupBy(function ($item) {
-                return $item->period_year . '-' . $item->period_month;
-            })
-            ->map(function ($items) {
-                $tabungan = $items->where('jenis', 'Tabungan')->first();
-                $deposito = $items->where('jenis', 'Deposito')->first();
-
-                // Hitung pencairan deposito untuk periode ini
-                $currentYear = $items->first()->period_year;
-                $currentMonth = $items->first()->period_month;
-
-                // Periode sebelumnya
-                $prevMonth = $currentMonth == '01' ? '12' : str_pad($currentMonth - 1, 2, '0', STR_PAD_LEFT);
-                $prevYear = $currentMonth == '01' ? $currentYear - 1 : $currentYear;
-
-                // Query pencairan deposito untuk periode ini
-                $pencairan = DB::table('depositos as prev')
-                    ->leftJoin('depositos as curr', function ($join) use ($currentMonth, $currentYear) {
-                        $join->on('prev.nobilyet', '=', 'curr.nobilyet')
-                            ->where('curr.period_month', $currentMonth)
-                            ->where('curr.period_year', $currentYear);
-                    })
-                    ->where('prev.period_month', $prevMonth)
-                    ->where('prev.period_year', $prevYear)
-                    ->whereNull('curr.nobilyet')
-                    ->select(
-                        DB::raw('COUNT(*) as jumlah'),
-                        DB::raw('SUM(prev.nomrp) as total')
-                    )
-                    ->first();
-
-                return [
-                    'period' => $currentYear . '-' . str_pad($currentMonth, 2, '0', STR_PAD_LEFT),
-                    'tabungan' => $tabungan ? $tabungan->total : 0,
-                    'deposito' => $deposito ? $deposito->total : 0,
-                    'total' => ($tabungan ? $tabungan->total : 0) + ($deposito ? $deposito->total : 0),
-                    'jumlah_tabungan' => $tabungan ? $tabungan->jumlah : 0,
-                    'jumlah_deposito' => $deposito ? $deposito->jumlah : 0,
-                    'pencairan' => $pencairan->total ?? 0,
-                    'jumlah_pencairan' => $pencairan->jumlah ?? 0,
-                ];
-            })
-            ->sortBy('period')
-            ->take(6)
-            ->values();
 
         // Funding Detail Table - Current Period (dengan filter)
         $fundingDetails = [
@@ -748,7 +655,7 @@ class DashboardController extends Controller
         // Trend Kontrak per Bulan (6 bulan terakhir)
         $nasabahTrendData = $this->getNasabahTrendData();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingTrends', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -1208,9 +1115,71 @@ class DashboardController extends Controller
             } else {
                 $total = $data->count();
             }
+        } elseif (str_starts_with($kategori, 'linkage_')) {
+            // Handle linkage categories
+            $sumberDana = null;
+            if ($kategori === 'linkage_dana1') $sumberDana = 'Dana Pihak 1';
+            elseif ($kategori === 'linkage_dana2') $sumberDana = 'Dana Pihak 2';
+            elseif ($kategori === 'linkage_dana3') $sumberDana = 'Dana Pihak 3';
+
+            if ($sumberDana) {
+                // Specific dana pihak
+                $data = Linkage::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
+                    ->orderBy('plafon', 'desc')
+                    ->limit(100)
+                    ->get();
+            } elseif ($kategori === 'linkage_total') {
+                // All linkage data
+                $data = Linkage::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
+                    ->orderBy('plafon', 'desc')
+                    ->limit(100)
+                    ->get();
+            } else {
+                // Specific linkage type (tabungan, deposito, pembiayaan)
+                $linkageType = str_replace('linkage_', '', $kategori);
+                if ($linkageType === 'tabungan') {
+                    $data = Tabungan::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->where('linkage', '>', 0)
+                        ->select('notab as norek', 'fnama as nama', 'linkage as nominal', 'tgltrnakh as tgleff', 'kodeprd')
+                        ->orderBy('linkage', 'desc')
+                        ->limit(100)
+                        ->get();
+                } elseif ($linkageType === 'deposito') {
+                    $data = Deposito::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->where('linkage', '>', 0)
+                        ->select('nobilyet as norek', 'nama', 'linkage as nominal', 'tgleff', 'kdprd')
+                        ->orderBy('linkage', 'desc')
+                        ->limit(100)
+                        ->get();
+                } elseif ($linkageType === 'pembiayaan') {
+                    $data = Pembiayaan::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->where('linkage', '>', 0)
+                        ->select('nokontrak as norek', 'nama', 'linkage as nominal', 'tgleff', 'kelompok', 'jnsakad')
+                        ->orderBy('linkage', 'desc')
+                        ->limit(100)
+                        ->get();
+                }
+            }
+
+            if ($type === 'nominal') {
+                $total = $data->sum('nominal') ?? $data->sum('plafon') ?? 0;
+            } else {
+                $total = $data->count();
+            }
         }
 
         return response()->json([
+            'summary' => [
+                'total_nasabah' => $type === 'nominal' ? $data->count() : $data->count(),
+                'total_nominal' => $total
+            ],
             'data' => $data->toArray(),
             'total' => $total,
             'type' => $type
@@ -1231,6 +1200,7 @@ class DashboardController extends Controller
                 'period_year',
                 'period_month',
                 DB::raw('SUM(sahirrp) as total_nominal'),
+                DB::raw('SUM(linkage) as total_linkage'),
                 DB::raw('COUNT(*) as total_rekening')
             )
                 ->whereNotNull('kodeprd')
@@ -1255,6 +1225,7 @@ class DashboardController extends Controller
                 $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
                 $groupedData[$kodeprd]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
+                    'linkage' => (float) $result->total_linkage,
                     'jumlah' => (int) $result->total_rekening
                 ];
             }
@@ -1267,6 +1238,7 @@ class DashboardController extends Controller
                 'period_year',
                 'period_month',
                 DB::raw('SUM(nomrp) as total_nominal'),
+                DB::raw('SUM(linkage) as total_linkage'),
                 DB::raw('COUNT(*) as total_rekening')
             )
                 ->whereNotNull('kdprd')
@@ -1290,6 +1262,81 @@ class DashboardController extends Controller
 
                 $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
                 $groupedData[$kdprd]['data'][$monthKey] = [
+                    'nominal' => (float) $result->total_nominal,
+                    'linkage' => (float) $result->total_linkage,
+                    'jumlah' => (int) $result->total_rekening
+                ];
+            }
+
+            $data = array_values($groupedData);
+        } elseif ($jenis === 'pembiayaan') {
+            // Get pembiayaan data grouped by kelompok and period
+            $query = Pembiayaan::select(
+                'kelompok',
+                'period_year',
+                'period_month',
+                DB::raw('SUM(plafon) as total_nominal'),
+                DB::raw('SUM(linkage) as total_linkage'),
+                DB::raw('COUNT(*) as total_rekening')
+            )
+                ->whereNotNull('kelompok')
+                ->where('kelompok', '!=', '')
+                ->groupBy('kelompok', 'period_year', 'period_month')
+                ->orderBy('period_year', 'desc')
+                ->orderBy('period_month', 'desc');
+
+            $results = $query->get();
+
+            // Group by kelompok
+            $groupedData = [];
+            foreach ($results as $result) {
+                $kelompok = $result->kelompok;
+                if (!isset($groupedData[$kelompok])) {
+                    $groupedData[$kelompok] = [
+                        'kelompok' => $kelompok,
+                        'data' => []
+                    ];
+                }
+
+                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                $groupedData[$kelompok]['data'][$monthKey] = [
+                    'nominal' => (float) $result->total_nominal,
+                    'linkage' => (float) $result->total_linkage,
+                    'jumlah' => (int) $result->total_rekening
+                ];
+            }
+
+            $data = array_values($groupedData);
+        } elseif ($jenis === 'linkage') {
+            // Get linkage data grouped by kelompok and period
+            $query = Linkage::select(
+                'kelompok',
+                'period_year',
+                'period_month',
+                DB::raw('SUM(plafon) as total_nominal'),
+                DB::raw('COUNT(*) as total_rekening')
+            )
+                ->whereNotNull('kelompok')
+                ->where('kelompok', '!=', '')
+                ->groupBy('kelompok', 'period_year', 'period_month')
+                ->orderBy('period_year', 'desc')
+                ->orderBy('period_month', 'desc');
+
+            $results = $query->get();
+
+            // Group by kelompok
+            $groupedData = [];
+            foreach ($results as $result) {
+                $kelompok = $result->kelompok;
+                if (!isset($groupedData[$kelompok])) {
+                    $groupedData[$kelompok] = [
+                        'kelompok' => $kelompok,
+                        'data' => []
+                    ];
+                }
+
+                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                $groupedData[$kelompok]['data'][$monthKey] = [
                     'nominal' => (float) $result->total_nominal,
                     'jumlah' => (int) $result->total_rekening
                 ];

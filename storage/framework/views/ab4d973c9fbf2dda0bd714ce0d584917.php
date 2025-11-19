@@ -164,32 +164,62 @@ function formatNominal($amount) {
                     </div>
 
                     <div class="mt-4">
-                        <h6 class="mb-3">Top 5 Nasabah</h6>
+                        <h6 class="mb-3">Top 3 Dana Pihak</h6>
                         <ul class="list-unstyled mb-0">
-                            <?php $__empty_1 = true; $__currentLoopData = $funding['top_customers'] ?? []; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-<?php echo e($customer['type'] == 'Deposito' ? 'success' : 'primary'); ?>">
-                                        <i class="ti ti-<?php echo e($customer['type'] == 'Deposito' ? 'clock-dollar' : 'piggy-bank'); ?>"></i>
+                                    <span class="avatar-initial rounded-circle bg-label-primary">
+                                        <i class="ti ti-building-bank"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0"><?php echo e(Str::limit($customer['name'], 25)); ?></h6>
-                                        <small class="text-muted"><?php echo e($customer['type']); ?></small>
+                                        <h6 class="mb-0">DP 1 - Modal Utama</h6>
+                                        <small class="text-muted">Modal Pokok</small>
                                     </div>
-                                    <small class="text-muted"><?php echo e($customer['account']); ?></small>
+                                    <small class="text-muted">Dana investasi utama perusahaan</small>
                                     <small class="text-primary fw-medium">
-                                        <?php echo e(formatNominal($customer['amount'])); ?>
+                                        <?php echo e(formatNominal(75000000000)); ?>
 
                                     </small>
                                 </div>
                             </li>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                            <li class="text-center text-muted">
-                                <small>Belum ada data nasabah</small>
+                            <li class="d-flex mb-3">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded-circle bg-label-success">
+                                        <i class="ti ti-link"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-column">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <h6 class="mb-0">DP 2 - Linkage + Deposito ABP</h6>
+                                        <small class="text-muted">Dana Eksternal</small>
+                                    </div>
+                                    <small class="text-muted">Linkage program + Deposito dari ABP</small>
+                                    <small class="text-success fw-medium">
+                                        <?php echo e(formatNominal($funding['total'] * 0.3)); ?>
+
+                                    </small>
+                                </div>
                             </li>
-                            <?php endif; ?>
+                            <li class="d-flex mb-3">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded-circle bg-label-info">
+                                        <i class="ti ti-wallet"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-column">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <h6 class="mb-0">DP 3 - Deposito + Tabungan</h6>
+                                        <small class="text-muted">Dana Nasabah</small>
+                                    </div>
+                                    <small class="text-muted">Deposito & Tabungan masyarakat</small>
+                                    <small class="text-info fw-medium">
+                                        <?php echo e(formatNominal($funding['total'] * 0.7)); ?>
+
+                                    </small>
+                                </div>
+                            </li>
                         </ul>
                     </div>
 
@@ -476,6 +506,12 @@ function formatNominal($amount) {
                                         </label>
                                     </div>
                                     <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" value="total_linkage" id="filterTotalLinkage" checked>
+                                        <label class="form-check-label" for="filterTotalLinkage">
+                                            Total Linkage
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" value="total_pencairan_deposito" id="filterTotalPencairanDeposito">
                                         <label class="form-check-label" for="filterTotalPencairanDeposito">
                                             Total Pencairan Deposito
@@ -557,6 +593,92 @@ function formatNominal($amount) {
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                     <div id="combinedTrendChart" style="min-height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Row 4.5: AO Funding Performance -->
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">💰 Performa Funding Account Officer</h5>
+                        <small class="text-muted">Deposito & ABP per AO (klik untuk detail nasabah)</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; position: relative;">
+                        <table class="table table-hover mb-0" style="table-layout: fixed; margin-bottom: 0;">
+                            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <tr>
+                                    <th style="width: 50px; background-color: #f8f9fa;">#</th>
+                                    <th style="width: 200px; background-color: #f8f9fa;">Nama AO</th>
+                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Deposito</th>
+                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">ABP</th>
+                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Cairkan</th>
+                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Deposito</th>
+                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal ABP</th>
+                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Cairkan</th>
+                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Total Funding</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php $__currentLoopData = $aoFundingData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $ao): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr class="ao-funding-row" data-ao="<?php echo e($ao['kodeaoh']); ?>" style="cursor: pointer;">
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar avatar-sm me-2">
+                                                <span class="avatar-initial rounded-circle bg-label-success">
+                                                    <?php echo e(strtoupper(substr($ao['nmao'], 0, 2))); ?>
+
+                                                </span>
+                                            </div>
+                                            <strong><?php echo e($ao['nmao']); ?></strong>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-label-info"><?php echo e(number_format($ao['total_deposito'])); ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-label-warning"><?php echo e(number_format($ao['total_abp'])); ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-label-danger"><?php echo e(number_format($ao['total_cairkan'])); ?></span>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-info">
+                                            <?php echo e(formatNominal($ao['nominal_deposito'])); ?>
+
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-warning">
+                                            <?php echo e(formatNominal($ao['nominal_abp'])); ?>
+
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-danger">
+                                            <?php echo e(formatNominal($ao['nominal_cairkan'])); ?>
+
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-primary">
+                                            <?php echo e(formatNominal($ao['total_funding'])); ?>
+
+                                        </strong>
+                                    </td>
+                                </tr>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1059,92 +1181,6 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-
-    <!-- Row 4.5: AO Funding Performance -->
-    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title mb-0">💰 Performa Funding Account Officer</h5>
-                        <small class="text-muted">Deposito & ABP per AO (klik untuk detail nasabah)</small>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; position: relative;">
-                        <table class="table table-hover mb-0" style="table-layout: fixed; margin-bottom: 0;">
-                            <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                <tr>
-                                    <th style="width: 50px; background-color: #f8f9fa;">#</th>
-                                    <th style="width: 200px; background-color: #f8f9fa;">Nama AO</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Deposito</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">ABP</th>
-                                    <th class="text-center" style="width: 80px; background-color: #f8f9fa;">Cairkan</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Deposito</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal ABP</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Nominal Cairkan</th>
-                                    <th class="text-end" style="width: 120px; background-color: #f8f9fa;">Total Funding</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php $__currentLoopData = $aoFundingData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $ao): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <tr class="ao-funding-row" data-ao="<?php echo e($ao['kodeaoh']); ?>" style="cursor: pointer;">
-                                    <td><strong><?php echo e($index + 1); ?></strong></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm me-2">
-                                                <span class="avatar-initial rounded-circle bg-label-success">
-                                                    <?php echo e(strtoupper(substr($ao['nmao'], 0, 2))); ?>
-
-                                                </span>
-                                            </div>
-                                            <strong><?php echo e($ao['nmao']); ?></strong>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-info"><?php echo e(number_format($ao['total_deposito'])); ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-warning"><?php echo e(number_format($ao['total_abp'])); ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-label-danger"><?php echo e(number_format($ao['total_cairkan'])); ?></span>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-info">
-                                            <?php echo e(formatNominal($ao['nominal_deposito'])); ?>
-
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-warning">
-                                            <?php echo e(formatNominal($ao['nominal_abp'])); ?>
-
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-danger">
-                                            <?php echo e(formatNominal($ao['nominal_cairkan'])); ?>
-
-                                        </strong>
-                                    </td>
-                                    <td class="text-end">
-                                        <strong class="text-primary">
-                                            <?php echo e(formatNominal($ao['total_funding'])); ?>
-
-                                        </strong>
-                                    </td>
-                                </tr>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <!-- Row 5: Peta Sebaran Nasabah per Kecamatan -->
     <div class="row">
@@ -3204,233 +3240,6 @@ function showNasabahStatusDetail(status) {
         });
 }
 
-// Funding Trend Chart
-let fundingTrendChart;
-const fundingTrendEl = document.querySelector("#fundingTrendChart");
-if (fundingTrendEl) {
-    <?php
-        $fundingTrendLabels = $fundingTrends->pluck('period')->map(function($period) {
-            $parts = explode('-', $period);
-            $year = $parts[0];
-            $month = $parts[1];
-            $monthNames = ['01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr', '05' => 'Mei', '06' => 'Jun',
-                          '07' => 'Jul', '08' => 'Agt', '09' => 'Sep', '10' => 'Okt', '11' => 'Nov', '12' => 'Des'];
-            return ($monthNames[$month] ?? $month) . ' ' . $year;
-        })->toArray();
-
-        // Data nominal (dalam miliar)
-        $fundingTabunganData = $fundingTrends->pluck('tabungan')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingDepositoData = $fundingTrends->pluck('deposito')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingTotalData = $fundingTrends->pluck('total')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-        $fundingPencairanData = $fundingTrends->pluck('pencairan')->map(fn($v) => round($v / 1000000000, 2))->toArray();
-
-        // Data jumlah (banyaknya)
-        $fundingTabunganJumlah = $fundingTrends->pluck('jumlah_tabungan')->toArray();
-        $fundingDepositoJumlah = $fundingTrends->pluck('jumlah_deposito')->toArray();
-        $fundingTotalJumlah = $fundingTrends->map(fn($item) => $item['jumlah_tabungan'] + $item['jumlah_deposito'])->toArray();
-        $fundingPencairanJumlah = $fundingTrends->pluck('jumlah_pencairan')->toArray();
-
-        // Data untuk toggle
-        $fundingTrendData = [
-            'nominal' => [
-                'tabungan' => $fundingTabunganData,
-                'deposito' => $fundingDepositoData,
-                'total' => $fundingTotalData,
-                'pencairan' => $fundingPencairanData
-            ],
-            'jumlah' => [
-                'tabungan' => $fundingTabunganJumlah,
-                'deposito' => $fundingDepositoJumlah,
-                'total' => $fundingTotalJumlah,
-                'pencairan' => $fundingPencairanJumlah
-            ]
-        ];
-    ?>
-
-    function createFundingTrendChart(type = 'nominal') {
-        if (fundingTrendChart) {
-            fundingTrendChart.destroy();
-        }
-
-        const isNominal = type === 'nominal';
-        const data = <?php echo json_encode($fundingTrendData, 15, 512) ?>[type];
-
-        if (fundingTrendEl) {
-            fundingTrendChart = new ApexCharts(fundingTrendEl, {
-                series: [{
-                    name: 'Tabungan',
-                    data: data.tabungan
-                }, {
-                    name: 'Deposito',
-                    data: data.deposito
-                }, {
-                    name: 'Total Funding',
-                    data: data.total
-                }, {
-                    name: 'Pencairan Deposito',
-                    data: data.pencairan
-                }],
-                chart: {
-                    height: 350,
-                    type: 'line',
-                    toolbar: { show: true },
-                    zoom: { enabled: true },
-                    events: {
-                        markerClick: function(event, chartContext, { seriesIndex, dataPointIndex, config }) {
-                            console.log('Funding marker clicked!', seriesIndex, dataPointIndex);
-                            const monthLabel = <?php echo json_encode($fundingTrendLabels, 15, 512) ?>[dataPointIndex];
-
-                            // Tentukan kategori berdasarkan series
-                            let kategori = '';
-                            if (seriesIndex === 0) kategori = 'tabungan';
-                            else if (seriesIndex === 1) kategori = 'deposito';
-                            else if (seriesIndex === 2) kategori = 'total_funding';
-                            else if (seriesIndex === 3) kategori = 'pencairan_deposito';
-
-                            console.log('Opening funding modal:', monthLabel, kategori);
-                            // Buka modal detail
-                            window.showTrendFundingDetail(monthLabel, kategori, type);
-                        },
-                        dataPointSelection: function(event, chartContext, config) {
-                            console.log('Funding data point selected!', config);
-                            const monthIndex = config.dataPointIndex;
-                            const seriesIndex = config.seriesIndex;
-                            const monthLabel = <?php echo json_encode($fundingTrendLabels, 15, 512) ?>[monthIndex];
-
-                            // Tentukan kategori berdasarkan series
-                            let kategori = '';
-                            if (seriesIndex === 0) kategori = 'tabungan';
-                            else if (seriesIndex === 1) kategori = 'deposito';
-                            else if (seriesIndex === 2) kategori = 'total_funding';
-                            else if (seriesIndex === 3) kategori = 'pencairan_deposito';
-
-                            console.log('Opening funding modal from selection:', monthLabel, kategori);
-                            // Buka modal detail
-                            window.showTrendFundingDetail(monthLabel, kategori, type);
-                        }
-                    }
-                },
-                stroke: {
-                    curve: 'smooth',
-                    width: [3, 3, 4, 2],
-                    dashArray: [0, 0, 0, 5]
-                },
-                colors: ['#03c3ec', '#71dd37', '#696cff', '#ff9f43'],
-                markers: {
-                    size: 6,
-                    strokeWidth: 2,
-                    strokeColors: '#fff',
-                    hover: {
-                        size: 9
-                    }
-                },
-                states: {
-                    active: {
-                        allowMultipleDataPointsSelection: false,
-                        filter: {
-                            type: 'none'
-                        }
-                    }
-                },
-                dataLabels: {
-                    enabled: true,
-                    style: {
-                        fontSize: '11px',
-                        fontWeight: 'bold'
-                    },
-                    background: {
-                        enabled: true,
-                        borderRadius: 2,
-                        padding: 4,
-                        opacity: 0.9
-                    },
-                    formatter: function(val) {
-                        if (isNominal) {
-                            return 'Rp ' + val.toFixed(2) + 'M';
-                        }
-                        return val;
-                    },
-                    offsetY: -10
-                },
-                xaxis: {
-                    categories: <?php echo json_encode($fundingTrendLabels, 15, 512) ?>,
-                    labels: {
-                        style: {
-                            fontSize: '12px'
-                        }
-                    }
-                },
-                yaxis: {
-                    title: {
-                        text: isNominal ? 'Nominal (Miliar Rupiah)' : 'Jumlah Rekening'
-                    },
-                    labels: {
-                        formatter: function(val) {
-                            if (isNominal) {
-                                return 'Rp ' + val.toFixed(1) + 'M';
-                            }
-                            return Math.round(val);
-                        }
-                    }
-                },
-                grid: {
-                    borderColor: '#f1f1f1',
-                    strokeDashArray: 4
-                },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'left',
-                    fontSize: '13px',
-                    markers: {
-                        width: 12,
-                        height: 12,
-                        radius: 2
-                    }
-                },
-                tooltip: {
-                    shared: true,
-                    intersect: false,
-                    y: {
-                        formatter: function(val) {
-                            if (isNominal) {
-                                return 'Rp ' + val.toFixed(2) + ' M';
-                            }
-                            return val + ' rekening';
-                        }
-                    }
-                }
-            });
-            fundingTrendChart.render();
-            console.log('Funding trend chart rendered (type: ' + type + ')');
-        }
-    }
-
-    // Initialize with jumlah data
-    createFundingTrendChart('jumlah');
-}
-
-// Function untuk toggle funding trend chart (pindah ke window scope agar bisa dipanggil dari HTML)
-window.toggleFundingTrendChart = function(type) {
-    // Update button state
-    const btnJumlah = document.getElementById('btnFundingTrendJumlah');
-    const btnNominal = document.getElementById('btnFundingTrendNominal');
-
-    if (type === 'jumlah') {
-        btnJumlah.classList.remove('btn-outline-primary');
-        btnJumlah.classList.add('btn-primary');
-        btnNominal.classList.remove('btn-primary');
-        btnNominal.classList.add('btn-outline-primary');
-    } else {
-        btnNominal.classList.remove('btn-outline-primary');
-        btnNominal.classList.add('btn-primary');
-        btnJumlah.classList.remove('btn-primary');
-        btnJumlah.classList.add('btn-outline-primary');
-    }
-
-    // Recreate chart with new data
-    createFundingTrendChart(type);
-}
-
 // Product Trend Charts
 let tabunganTrendChart;
 let depositoTrendChart;
@@ -3735,6 +3544,7 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     // Get selected filters
     const showTotalTabungan = document.getElementById('filterTotalTabungan').checked;
     const showTotalDeposito = document.getElementById('filterTotalDeposito').checked;
+    const showTotalLinkage = document.getElementById('filterTotalLinkage').checked;
     const showTotalPencairanDeposito = document.getElementById('filterTotalPencairanDeposito').checked;
 
     // Get selected products
@@ -3748,9 +3558,10 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
     Promise.all([
         (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
         (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
+        showTotalLinkage ? fetch(`/dashboard/trend-product-detail?jenis=linkage&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
         showTotalPencairanDeposito ? fetch(`/dashboard/trend-product-detail?jenis=pencairan_deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []})
     ])
-    .then(([tabunganData, depositoData, pencairanData]) => {
+    .then(([tabunganData, depositoData, linkageData, pencairanData]) => {
         const series = [];
         const categories = [];
         const tableRows = {};
@@ -3768,6 +3579,14 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
 
         if (depositoData.data) {
             depositoData.data.forEach(product => {
+                Object.keys(product.data).forEach(monthKey => {
+                    allMonths.add(monthKey);
+                });
+            });
+        }
+
+        if (linkageData.data) {
+            linkageData.data.forEach(product => {
                 Object.keys(product.data).forEach(monthKey => {
                     allMonths.add(monthKey);
                 });
@@ -3890,6 +3709,29 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
                     }
                 });
             }
+        }
+
+        // Process linkage data
+        if (linkageData.data && showTotalLinkage) {
+            // Calculate totals for linkage
+            const totalLinkageData = [];
+            sortedMonths.forEach(monthKey => {
+                let total = 0;
+                linkageData.data.forEach(product => {
+                    const monthData = product.data[monthKey];
+                    if (monthData) {
+                        total += type === 'nominal' ? monthData.nominal : monthData.jumlah;
+                    }
+                });
+                totalLinkageData.push(total);
+                tableRows[monthKey]['Total Linkage'] = total;
+            });
+
+            series.push({
+                name: type === 'nominal' ? 'Total Linkage' : 'Jumlah Rekening Linkage',
+                data: totalLinkageData,
+                type: 'line'
+            });
         }
 
         // Process pencairan deposito data
@@ -4345,7 +4187,8 @@ function handleProductFilterChange() {
 
 // Function to select/deselect all products in a category
 function toggleAllProducts(category, selectAll) {
-    const listId = category === 'tabungan' ? 'tabunganProductsList' : 'depositoProductsList';
+    const listId = category === 'tabungan' ? 'tabunganProductsList' :
+                   category === 'deposito' ? 'depositoProductsList' : 'pembiayaanProductsList';
     const checkboxes = document.querySelectorAll(`#${listId} input[type="checkbox"]`);
 
     checkboxes.forEach(checkbox => {
@@ -4369,7 +4212,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add event listeners for data filter checkboxes
-    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito', 'filterTotalPencairanDeposito'];
+    const filterCheckboxes = ['filterTotalTabungan', 'filterTotalDeposito', 'filterTotalLinkage', 'filterTotalPencairanDeposito'];
     filterCheckboxes.forEach(id => {
         const checkbox = document.getElementById(id);
         if (checkbox) {
@@ -4439,6 +4282,18 @@ function formatProductCode(code, type) {
             '10': 'Deposito Khusus'
         };
         return depositoProducts[code] || `Deposito ${code}`;
+    }
+
+    // For pembiayaan products
+    if (type === 'pembiayaan') {
+        const pembiayaanProducts = {
+            'NON SINDIKASI': 'Non Sindikasi',
+            'SINDIKASI-01': 'Sindikasi 1',
+            'SINDIKASI-02': 'Sindikasi 2',
+            'SINDIKASI-03': 'Sindikasi 3',
+            'SINDIKASI-04': 'Sindikasi 4'
+        };
+        return pembiayaanProducts[code] || `Pembiayaan ${code}`;
     }
 
     return code;

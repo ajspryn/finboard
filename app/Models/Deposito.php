@@ -15,6 +15,7 @@ class Deposito extends Model
         'tax',
         'bnghtg',
         'nisbahrp',
+        'linkage',
         'nisbah',
         'spread',
         'equivrate',

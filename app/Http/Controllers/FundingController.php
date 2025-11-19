@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Tabungan;
 use App\Models\Deposito;
+use App\Models\Pembiayaan;
+use App\Models\Linkage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,19 +14,77 @@ class FundingController extends Controller
 {
     public function index()
     {
-        // Get last upload from both tables
+        // Get last upload from all tables
         $lastUploadTabungan = Tabungan::max('updated_at');
         $lastUploadDeposito = Deposito::max('updated_at');
-        $lastUpload = max($lastUploadTabungan, $lastUploadDeposito);
+        $lastUploadLinkage = Linkage::max('updated_at');
+        $lastUpload = max($lastUploadTabungan, $lastUploadDeposito, $lastUploadLinkage);
 
         // Get total data
         $totalTabungan = Tabungan::count();
         $totalDeposito = Deposito::count();
-        $totalData = $totalTabungan + $totalDeposito;
+        $totalLinkage = Linkage::count();
+        $totalData = $totalTabungan + $totalDeposito + $totalLinkage;
 
         // Get sum saldo
         $totalSaldoTabungan = Tabungan::sum('sahirrp');
         $totalSaldoDeposito = Deposito::sum('nomrp');
+        $totalSaldoLinkage = Linkage::sum('os');
+
+        // Get upload history with periods
+        $uploadHistory = collect();
+
+        // Get distinct periods from tabungan
+        $tabunganPeriods = Tabungan::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(sahirrp) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
+            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+            ->get()
+            ->map(function ($item) {
+                return (object)[
+                    'jenis' => 'TABUNGAN',
+                    'year' => $item->year,
+                    'month' => $item->month,
+                    'count' => $item->count,
+                    'total_saldo' => $item->total_saldo,
+                    'last_upload' => $item->last_upload
+                ];
+            });
+
+        // Get distinct periods from deposito
+        $depositoPeriods = Deposito::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(nomrp) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
+            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+            ->get()
+            ->map(function ($item) {
+                return (object)[
+                    'jenis' => 'DEPOSITO',
+                    'year' => $item->year,
+                    'month' => $item->month,
+                    'count' => $item->count,
+                    'total_saldo' => $item->total_saldo,
+                    'last_upload' => $item->last_upload
+                ];
+            });
+
+        // Get distinct periods from linkage
+        $linkagePeriods = Linkage::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(os) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
+            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+            ->get()
+            ->map(function ($item) {
+                return (object)[
+                    'jenis' => 'LINKAGE',
+                    'year' => $item->year,
+                    'month' => $item->month,
+                    'count' => $item->count,
+                    'total_saldo' => $item->total_saldo,
+                    'last_upload' => $item->last_upload
+                ];
+            });
+
+        $uploadHistory = $tabunganPeriods->merge($depositoPeriods)->merge($linkagePeriods)->sortByDesc(function ($item) {
+            return $item->year * 100 + $item->month;
+        })->take(10); // Show last 10 uploads
 
         // Build stats manually
         $stats = collect([
@@ -37,10 +97,15 @@ class FundingController extends Controller
                 'jenis' => 'DEPOSITO',
                 'jumlah' => $totalDeposito,
                 'total_saldo' => $totalSaldoDeposito
+            ],
+            (object)[
+                'jenis' => 'LINKAGE',
+                'jumlah' => $totalLinkage,
+                'total_saldo' => $totalSaldoLinkage
             ]
         ]);
 
-        return view('funding.index', compact('lastUpload', 'totalData', 'stats'));
+        return view('funding.index', compact('lastUpload', 'totalData', 'stats', 'uploadHistory'));
     }
 
     public function upload(Request $request)
@@ -50,6 +115,7 @@ class FundingController extends Controller
             'year' => 'required|digits:4|integer|min:2020|max:2030',
             'csv_tabungan' => 'required|file|mimes:csv,txt|max:10240',
             'csv_deposito' => 'required|file|mimes:csv,txt|max:10240',
+            'csv_linkage' => 'required|file|mimes:csv,txt|max:10240',
         ]);
 
         try {
@@ -72,7 +138,11 @@ class FundingController extends Controller
                 ->where('period_year', $year)
                 ->delete();
 
-            Log::info("Deleted existing data for period {$year}-{$month}: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}");
+            $deletedLinkage = Linkage::where('period_month', $month)
+                ->where('period_year', $year)
+                ->delete();
+
+            Log::info("Deleted existing data for period {$year}-{$month}: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}, Linkage: {$deletedLinkage}");
 
             // Process Tabungan
             $resultTabungan = $this->processCSV($request->file('csv_tabungan'), $month, $year, 'TABUNGAN');
@@ -88,14 +158,22 @@ class FundingController extends Controller
             $totalErrors += $resultDeposito['errors'];
             $allErrorDetails = array_merge($allErrorDetails, $resultDeposito['errorDetails']);
 
+            // Process Linkage
+            $resultLinkage = $this->processCSV($request->file('csv_linkage'), $month, $year, 'LINKAGE');
+            $totalImported += $resultLinkage['imported'];
+            $totalUpdated += $resultLinkage['updated'];
+            $totalErrors += $resultLinkage['errors'];
+            $allErrorDetails = array_merge($allErrorDetails, $resultLinkage['errorDetails']);
+
             DB::commit();
 
             $message = "Import berhasil untuk periode {$year}-{$month}!\n\n";
-            if ($deletedTabungan > 0 || $deletedDeposito > 0) {
-                $message .= "🗑️  Data lama dihapus: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}\n\n";
+            if ($deletedTabungan > 0 || $deletedDeposito > 0 || $deletedLinkage > 0) {
+                $message .= "🗑️  Data lama dihapus: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}, Linkage: {$deletedLinkage}\n\n";
             }
             $message .= "📊 TABUNGAN: Imported: {$resultTabungan['imported']}, Updated: {$resultTabungan['updated']}, Errors: {$resultTabungan['errors']}\n";
             $message .= "📊 DEPOSITO: Imported: {$resultDeposito['imported']}, Updated: {$resultDeposito['updated']}, Errors: {$resultDeposito['errors']}\n";
+            $message .= "📊 LINKAGE: Imported: {$resultLinkage['imported']}, Updated: {$resultLinkage['updated']}, Errors: {$resultLinkage['errors']}\n";
             $message .= "📈 TOTAL: Imported: {$totalImported}, Updated: {$totalUpdated}, Errors: {$totalErrors}";
 
             if ($totalErrors > 0 && count($allErrorDetails) > 0) {
@@ -110,7 +188,9 @@ class FundingController extends Controller
         }
     }
 
-    private function processCSV($file, $month, $year, $jenis)
+
+
+    private function processCSV($file, $month, $year, $jenis, $sumberDana = null)
     {
         $path = $file->getRealPath();
         $handle = fopen($path, 'r');
@@ -167,6 +247,20 @@ class FundingController extends Controller
                     continue;
                 }
                 $norek = trim($data['nodep']);
+            } elseif ($jenis === 'PEMBIAYAAN') {
+                if (empty($data['nokontrak']) || trim($data['nokontrak']) === '') {
+                    $errors++;
+                    $errorDetails[] = "{$jenis} Baris {$lineNumber}: Nomor kontrak kosong";
+                    continue;
+                }
+                $norek = trim($data['nokontrak']);
+            } elseif ($jenis === 'LINKAGE') {
+                if (empty($data['nokontrak']) || trim($data['nokontrak']) === '') {
+                    $errors++;
+                    $errorDetails[] = "{$jenis} Baris {$lineNumber}: Nomor kontrak kosong";
+                    continue;
+                }
+                $norek = trim($data['nokontrak']);
             }
 
             try {
@@ -194,6 +288,7 @@ class FundingController extends Controller
                         'tax' => $this->parseNumeric($data['tax'] ?? 0),
                         'tgltrnakh' => $tgltrnakh,
                         'avgeom' => $this->parseNumeric($data['avgeom'] ?? 0),
+                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
                         'stspep' => $data['stspep'] ?? null,
                         'kdrisk' => $data['kdrisk'] ?? null,
                         'noid' => $data['noid'] ?? null,
@@ -248,6 +343,7 @@ class FundingController extends Controller
                         'tax' => $this->parseNumeric($data['tax'] ?? 0),
                         'bnghtg' => $this->parseNumeric($data['bnghtg'] ?? 0),
                         'nisbahrp' => $this->parseNumeric($data['nisbahrp'] ?? 0),
+                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
                         'stspep' => $data['stspep'] ?? null,
                         'tgllhr' => $tgllhr,
                         'nmibu' => $data['nmibu'] ?? null,
@@ -258,12 +354,55 @@ class FundingController extends Controller
                     ];
                 }
 
+                // Data spesifik untuk PEMBIAYAAN
+                if ($jenis === 'PEMBIAYAAN') {
+                    $fundingData = [
+                        'nokontrak' => $norek,
+                        'nocif' => $data['nocif'] ?? null,
+                        'nama' => $data['nama'] ?? null,
+                        'tgleff' => $tgleff,
+                        'tglexp' => $this->parseDate($data['tgljt'] ?? null),
+                        'kelompok' => $data['kelompok'] ?? null,
+                        'jnsakad' => $data['jnsakad'] ?? null,
+                        'prsnisbah' => $this->parseNumeric($data['prsnisbah'] ?? 0),
+                        'plafon' => $this->parseNumeric($data['plafon'] ?? 0),
+                        'osmdlc' => $this->parseNumeric($data['os'] ?? 0),
+                        'linkage' => $this->parseNumeric($data['linkage'] ?? 0),
+                        'period_month' => $month,
+                        'period_year' => $year,
+                    ];
+                }
+
+                // Data spesifik untuk LINKAGE
+                if ($jenis === 'LINKAGE') {
+                    $fundingData = [
+                        'nokontrak' => $norek,
+                        'nocif' => $data['nocif'] ?? null,
+                        'nama' => $data['nama'] ?? null,
+                        'tgleff' => $tgleff,
+                        'tgljt' => $this->parseDate($data['tgljt'] ?? null),
+                        'kelompok' => $data['kelompok'] ?? null,
+                        'jnsakad' => $data['jnsakad'] ?? null,
+                        'prsnisbah' => $this->parseNumeric($data['prsnisbah'] ?? 0),
+                        'plafon' => $this->parseNumeric($data['plafon'] ?? 0),
+                        'os' => $this->parseNumeric($data['os'] ?? 0),
+                        'period_month' => $month,
+                        'period_year' => $year,
+                    ];
+                }
+
                 // Save ke tabel yang sesuai
                 if ($jenis === 'TABUNGAN') {
                     Tabungan::create($fundingData);
                     $imported++;
-                } else {
+                } elseif ($jenis === 'DEPOSITO') {
                     Deposito::create($fundingData);
+                    $imported++;
+                } elseif ($jenis === 'PEMBIAYAAN') {
+                    Pembiayaan::create($fundingData);
+                    $imported++;
+                } elseif ($jenis === 'LINKAGE') {
+                    Linkage::create($fundingData);
                     $imported++;
                 }
             } catch (\Exception $e) {

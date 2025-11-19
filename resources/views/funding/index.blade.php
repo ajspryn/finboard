@@ -168,6 +168,77 @@
     </div>
     @endif
 
+    <!-- Upload History Table -->
+    @if($uploadHistory->count() > 0)
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="ti ti-history me-2"></i>Riwayat Upload Data Funding
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Periode</th>
+                                    <th>Jenis</th>
+                                    <th class="text-center">Jumlah Rekening</th>
+                                    <th class="text-end">Total Saldo</th>
+                                    <th class="text-center">Tanggal Upload</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($uploadHistory as $upload)
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar avatar-sm me-2">
+                                                <span class="avatar-initial rounded bg-label-primary">
+                                                    <i class="ti ti-calendar ti-sm"></i>
+                                                </span>
+                                            </div>
+                                            <strong>{{ str_pad($upload->month, 2, '0', STR_PAD_LEFT) }}-{{ $upload->year }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar avatar-sm me-2">
+                                                <span class="avatar-initial rounded bg-label-{{ $upload->jenis === 'TABUNGAN' ? 'info' : 'success' }}">
+                                                    <i class="ti ti-{{ $upload->jenis === 'TABUNGAN' ? 'piggy-bank' : 'clock-dollar' }} ti-sm"></i>
+                                                </span>
+                                            </div>
+                                            <strong>{{ $upload->jenis }}</strong>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary">{{ number_format($upload->count) }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>Rp {{ number_format($upload->total_saldo / 1000000000, 2) }} M</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <small class="text-muted">{{ \Carbon\Carbon::parse($upload->last_upload)->format('d/m/Y H:i') }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">
+                                            <i class="ti ti-check ti-xs me-1"></i>Berhasil
+                                        </span>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Upload Form -->
     <div class="row">
         <div class="col-12">
@@ -278,10 +349,39 @@
                             </div>
                         </div>
 
+                        <!-- Upload Linkage -->
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="ti ti-link me-1"></i>File CSV Linkage
+                            </label>
+                            <div class="upload-area" id="uploadAreaLinkage">
+                                <div class="upload-icon">
+                                    <i class="ti ti-cloud-upload"></i>
+                                </div>
+                                <h5>Upload CSV Linkage</h5>
+                                <p class="text-muted mb-3">Drag & drop atau klik untuk memilih file</p>
+                                <input type="file" name="csv_linkage" id="csvLinkage" accept=".csv" class="d-none" required>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('csvLinkage').click()">
+                                    <i class="ti ti-folder-open me-1"></i>Pilih File Linkage
+                                </button>
+                                <p class="text-muted small mt-3 mb-0">Format: CSV | Maksimal 10MB</p>
+                            </div>
+
+                            <div id="fileInfoLinkage" class="mt-3" style="display: none;">
+                                <div class="alert alert-info d-flex align-items-center">
+                                    <i class="ti ti-file-text ti-lg me-3"></i>
+                                    <div>
+                                        <strong>File Linkage:</strong> <span id="fileNameLinkage"></span><br>
+                                        <small>Ukuran: <span id="fileSizeLinkage"></span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Submit Button -->
                         <div class="text-center" id="submitButton" style="display: none;">
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="ti ti-upload me-1"></i>Upload Kedua File
+                                <i class="ti ti-upload me-1"></i>Upload Tiga File Funding
                             </button>
                         </div>
                     </form>
@@ -293,7 +393,7 @@
                         <ul class="list-unstyled">
                             <li class="mb-2">
                                 <i class="ti ti-check text-success me-2"></i>
-                                Upload 2 file CSV: <strong>Tabungan</strong> dan <strong>Deposito</strong>
+                                Upload 3 file CSV: <strong>Tabungan</strong>, <strong>Deposito</strong>, dan <strong>Linkage</strong>
                             </li>
                             <li class="mb-2">
                                 <i class="ti ti-check text-success me-2"></i>
@@ -314,6 +414,12 @@
                                 <strong>Header CSV Deposito:</strong>
                                 <br>
                                 <code class="small">nodep,nocif,nobilyet,nama,nomrp,stsrec,kdprd,jkwaktu,jnsjkwaktu,tglbuka,tgleff,tgljtempo,aro,nisbah,spread,equivrate,komitrate,ststrn,kdwil,kodeaoh,kodeaop,noacbng,tambahnom,noid,alamat,kota,telprmh,hp,stskait,golcustbi,kelurahan,kecamatan,kdpos,kdrisk,tax,bnghtg,nisbahrp,stspep,tgllhr,nmibu,ketsandi,namapt</code>
+                            </li>
+                            <li class="mb-3">
+                                <i class="ti ti-check text-success me-2"></i>
+                                <strong>Header CSV Linkage:</strong>
+                                <br>
+                                <code class="small">nokontrak,nocif,nama,tgleff,tgljt,kelompok,jnsakad,prsnisbah,plafon,os</code>
                             </li>
                             <li class="mb-2">
                                 <i class="ti ti-check text-success me-2"></i>
@@ -359,11 +465,18 @@
     const fileNameDeposito = document.getElementById('fileNameDeposito');
     const fileSizeDeposito = document.getElementById('fileSizeDeposito');
 
+    // Linkage file handling
+    const uploadAreaLinkage = document.getElementById('uploadAreaLinkage');
+    const csvLinkage = document.getElementById('csvLinkage');
+    const fileInfoLinkage = document.getElementById('fileInfoLinkage');
+    const fileNameLinkage = document.getElementById('fileNameLinkage');
+    const fileSizeLinkage = document.getElementById('fileSizeLinkage');
+
     const submitButton = document.getElementById('submitButton');
 
-    // Check if both files are selected
-    function checkBothFiles() {
-        if (csvTabungan.files.length > 0 && csvDeposito.files.length > 0) {
+    // Check if all three files are selected
+    function checkAllFiles() {
+        if (csvTabungan.files.length > 0 && csvDeposito.files.length > 0 && csvLinkage.files.length > 0) {
             submitButton.style.display = 'block';
         } else {
             submitButton.style.display = 'none';
@@ -380,7 +493,7 @@
     // Tabungan: File selected
     csvTabungan.addEventListener('change', (e) => {
         handleFile(e.target.files[0], 'Tabungan');
-        checkBothFiles();
+        checkAllFiles();
     });
 
     // Tabungan: Drag & Drop
@@ -403,7 +516,7 @@
             dataTransfer.items.add(file);
             csvTabungan.files = dataTransfer.files;
             handleFile(file, 'Tabungan');
-            checkBothFiles();
+            checkAllFiles();
         } else {
             alert('Hanya file CSV yang diperbolehkan!');
         }
@@ -419,7 +532,7 @@
     // Deposito: File selected
     csvDeposito.addEventListener('change', (e) => {
         handleFile(e.target.files[0], 'Deposito');
-        checkBothFiles();
+        checkAllFiles();
     });
 
     // Deposito: Drag & Drop
@@ -442,7 +555,46 @@
             dataTransfer.items.add(file);
             csvDeposito.files = dataTransfer.files;
             handleFile(file, 'Deposito');
-            checkBothFiles();
+            checkAllFiles();
+        } else {
+            alert('Hanya file CSV yang diperbolehkan!');
+        }
+    });
+
+    // Linkage: Click to upload
+    uploadAreaLinkage.addEventListener('click', (e) => {
+        if (e.target !== csvLinkage) {
+            csvLinkage.click();
+        }
+    });
+
+    // Linkage: File selected
+    csvLinkage.addEventListener('change', (e) => {
+        handleFile(e.target.files[0], 'Linkage');
+        checkAllFiles();
+    });
+
+    // Linkage: Drag & Drop
+    uploadAreaLinkage.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadAreaLinkage.classList.add('dragover');
+    });
+
+    uploadAreaLinkage.addEventListener('dragleave', () => {
+        uploadAreaLinkage.classList.remove('dragover');
+    });
+
+    uploadAreaLinkage.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadAreaLinkage.classList.remove('dragover');
+
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith('.csv')) {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            csvLinkage.files = dataTransfer.files;
+            handleFile(file, 'Linkage');
+            checkAllFiles();
         } else {
             alert('Hanya file CSV yang diperbolehkan!');
         }
@@ -458,6 +610,14 @@
                 fileNameDeposito.textContent = file.name;
                 fileSizeDeposito.textContent = formatFileSize(file.size);
                 fileInfoDeposito.style.display = 'block';
+            } else if (type === 'Pembiayaan') {
+                fileNamePembiayaan.textContent = file.name;
+                fileSizePembiayaan.textContent = formatFileSize(file.size);
+                fileInfoPembiayaan.style.display = 'block';
+            } else if (type === 'Linkage') {
+                fileNameLinkage.textContent = file.name;
+                fileSizeLinkage.textContent = formatFileSize(file.size);
+                fileInfoLinkage.style.display = 'block';
             }
         }
     }
