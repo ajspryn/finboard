@@ -142,6 +142,23 @@ class DashboardController extends Controller
         $jumlahPencairan = $depositoCairkan->jumlah_pencairan ?? 0;
         $totalPencairan = $depositoCairkan->total_pencairan ?? 0;
 
+        // Calculate pencairan growth from previous month
+        $prevPrevMonth = $prevMonth == '01' ? '12' : str_pad($prevMonth - 1, 2, '0', STR_PAD_LEFT);
+        $prevPrevYear = $prevMonth == '01' ? $prevYear - 1 : $prevYear;
+
+        $prevPencairan = DB::table('depositos as prev_prev')
+            ->leftJoin('depositos as prev_curr', function ($join) use ($prevMonth, $prevYear) {
+                $join->on('prev_prev.nobilyet', '=', 'prev_curr.nobilyet')
+                    ->where('prev_curr.period_month', $prevMonth)
+                    ->where('prev_curr.period_year', $prevYear);
+            })
+            ->where('prev_prev.period_month', $prevPrevMonth)
+            ->where('prev_prev.period_year', $prevPrevYear)
+            ->whereNull('prev_curr.nobilyet')
+            ->sum('prev_prev.nomrp');
+
+        $pencairanGrowth = $prevPencairan > 0 ? (($totalPencairan - $prevPencairan) / $prevPencairan) * 100 : 0;
+
         // Calculate percentage composition
         $tabunganPct = $totalFunding > 0 ? round(($totalTabungan / $totalFunding) * 100, 1) : 0;
         $depositoPct = $totalFunding > 0 ? round(($totalDeposito / $totalFunding) * 100, 1) : 0;
@@ -164,7 +181,8 @@ class DashboardController extends Controller
             ],
             'pencairan' => [
                 'jumlah' => $jumlahPencairan,
-                'total' => $totalPencairan
+                'total' => $totalPencairan,
+                'growth' => round($pencairanGrowth, 2)
             ]
         ];
 
@@ -446,23 +464,28 @@ class DashboardController extends Controller
                 return $item;
             });
 
-        // Segmentasi distribution for pie chart
+        // Segmentasi distribution for pie chart - group by main categories only
         $segmentasiDistribution = [
             'labels' => [],
             'values' => []
         ];
 
+        // Group data by category for chart
+        $categoryTotals = [];
         foreach ($segmentasiData as $segment) {
             if (!$segment['is_total'] && $segment['outstanding'] > 0) {
-                // Gunakan category untuk main category, atau gabungkan category + type untuk detail
-                $label = $segment['category'];
-                if ($segment['type'] && $segment['type'] !== '') {
-                    $label = $segment['type'];
+                $category = $segment['category'];
+                if (!isset($categoryTotals[$category])) {
+                    $categoryTotals[$category] = 0;
                 }
-
-                $segmentasiDistribution['labels'][] = $label;
-                $segmentasiDistribution['values'][] = round($segment['outstanding'] / 1000000000, 2); // Konversi ke miliar
+                $categoryTotals[$category] += $segment['outstanding'];
             }
+        }
+
+        // Add to chart data
+        foreach ($categoryTotals as $category => $totalOutstanding) {
+            $segmentasiDistribution['labels'][] = $category;
+            $segmentasiDistribution['values'][] = round($totalOutstanding / 1000000000, 2); // Konversi ke miliar
         }
 
         // Kolektibilitas Distribution for pie chart
@@ -559,6 +582,26 @@ class DashboardController extends Controller
         // AO Funding Performance - Only Depositos
         $currentDate = now()->format('Y-m-d');
 
+        // Calculate pencairan deposito per AO (deposito yang hilang dari bulan sebelumnya)
+        $prevMonth = $filterMonth == '01' ? '12' : str_pad($filterMonth - 1, 2, '0', STR_PAD_LEFT);
+        $prevYear = $filterMonth == '01' ? $filterYear - 1 : $filterYear;
+
+        $pencairanByAO = DB::table('depositos as prev')
+            ->leftJoin('depositos as curr', function ($join) use ($filterMonth, $filterYear) {
+                $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                    ->where('curr.period_month', $filterMonth)
+                    ->where('curr.period_year', $filterYear);
+            })
+            ->where('prev.period_month', $prevMonth)
+            ->where('prev.period_year', $prevYear)
+            ->whereNull('curr.nobilyet')
+            ->selectRaw('prev.kodeaoh, COUNT(*) as total_cairkan, SUM(prev.nomrp) as nominal_cairkan')
+            ->whereNotNull('prev.kodeaoh')
+            ->where('prev.kodeaoh', '!=', '')
+            ->groupBy('prev.kodeaoh')
+            ->get()
+            ->keyBy('kodeaoh');
+
         // Query depositos grouped by AO with categorization
         $depositoByAO = DB::table('depositos')
             ->selectRaw("
@@ -566,9 +609,7 @@ class DashboardController extends Controller
                 SUM(CASE WHEN kdprd = '31' THEN 1 ELSE 0 END) as total_deposito,
                 SUM(CASE WHEN kdprd = '41' THEN 1 ELSE 0 END) as total_abp,
                 SUM(CASE WHEN kdprd = '31' THEN nomrp ELSE 0 END) as nominal_deposito,
-                SUM(CASE WHEN kdprd = '41' THEN nomrp ELSE 0 END) as nominal_abp,
-                SUM(CASE WHEN tgljtempo < '{$currentDate}' THEN 1 ELSE 0 END) as total_cairkan,
-                SUM(CASE WHEN tgljtempo < '{$currentDate}' THEN nomrp ELSE 0 END) as nominal_cairkan
+                SUM(CASE WHEN kdprd = '41' THEN nomrp ELSE 0 END) as nominal_abp
             ")
             ->where('period_month', $filterMonth)
             ->where('period_year', $filterYear)
@@ -632,6 +673,9 @@ class DashboardController extends Controller
             $totalDeposits = ($data->total_deposito ?? 0) + ($data->total_abp ?? 0);
             $totalNominal = ($data->nominal_deposito ?? 0) + ($data->nominal_abp ?? 0);
 
+            // Get pencairan data for this AO
+            $pencairanData = $pencairanByAO[$kodeaoh] ?? null;
+
             $aoFundingData->push([
                 'kodeaoh' => $kodeaoh,
                 'nmao' => $aoName,
@@ -639,8 +683,8 @@ class DashboardController extends Controller
                 'total_abp' => $data->total_abp ?? 0,
                 'nominal_deposito' => $data->nominal_deposito ?? 0,
                 'nominal_abp' => $data->nominal_abp ?? 0,
-                'total_cairkan' => $data->total_cairkan ?? 0,
-                'nominal_cairkan' => $data->nominal_cairkan ?? 0,
+                'total_cairkan' => $pencairanData->total_cairkan ?? 0,
+                'nominal_cairkan' => $pencairanData->nominal_cairkan ?? 0,
                 'total_nasabah' => $totalDeposits,
                 'total_funding' => $totalNominal
             ]);
@@ -655,7 +699,45 @@ class DashboardController extends Controller
         // Trend Kontrak per Bulan (6 bulan terakhir)
         $nasabahTrendData = $this->getNasabahTrendData();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user'));
+        // Top 5 Produk Tabungan berdasarkan nominal terbanyak
+        $topTabunganProducts = DB::table('tabungans')
+            ->select('kodeprd', DB::raw('SUM(sahirrp) as total_nominal'), DB::raw('COUNT(*) as jumlah_rekening'))
+            ->where('period_month', $filterMonth)
+            ->where('period_year', $filterYear)
+            ->whereNotNull('kodeprd')
+            ->where('kodeprd', '!=', '')
+            ->groupBy('kodeprd')
+            ->orderBy('total_nominal', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($item) {
+                // Mapping kode produk ke nama produk
+                $productMapping = [
+                    '02' => 'TABUNGAN BERIMAN',
+                    '04' => 'TABUNGAN BERIMAN GAYATRI',
+                    '05' => 'TABUNGAN BERIMAN PEGAWAI',
+                    '10' => 'Tabungan Simpanan Pelajar',
+                    '11' => 'Tabungan Simpanan Masyarakat',
+                    '12' => 'Tabungan Haji',
+                    '13' => 'Tabungan Umum',
+                    '14' => 'Tabungan Berjangka',
+                    '15' => 'Tabungan SiMuda',
+                    '16' => 'Tabungan SiDewasa',
+                    '17' => 'Tabungan SiAnak',
+                    '18' => 'Tabungan SiPintar',
+                    '19' => 'Tabungan SiCerdas',
+                    '20' => 'Tabungan SiBijak',
+                    '21' => 'TABUNGAN TEGAR',
+                    '22' => 'TABUNGAN SIMPANAN PELAJAR',
+                    '25' => 'TABUNGAN PASAR',
+                    '50' => 'TAB BANSOS BUPATI BOGOR',
+                ];
+
+                $item->nama_produk = $productMapping[$item->kodeprd] ?? 'Tabungan ' . $item->kodeprd;
+                return $item;
+            });
+
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'topTabunganProducts'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -1876,6 +1958,7 @@ class DashboardController extends Controller
                     '036',
                     '06',
                     '064',
+                    '065',
                     '037',
                     '084',
                     '14',
@@ -1913,7 +1996,7 @@ class DashboardController extends Controller
             ],
             'SME' => [
                 'PROPERTI' => ['PROPERTI'],
-                'MIKRO' => ['MIKRO', '096', 'NULL'],
+                'MIKRO' => ['MIKRO', '096', 'NULL', 'MOTEKAR'],
                 'KONTRAKTOR' => ['KONTRAKTOR'],
                 'PPR' => ['PPR', 'PPRSMF'],
                 'PPK' => ['PPK'],
@@ -2001,6 +2084,7 @@ class DashboardController extends Controller
                     '036',
                     '06',
                     '064',
+                    '065',
                     '037',
                     '084',
                     '14',
@@ -2038,7 +2122,7 @@ class DashboardController extends Controller
             ],
             'SME' => [
                 ['label' => 'PROPERTI', 'codes' => ['PROPERTI']],
-                ['label' => 'MIKRO', 'codes' => ['MIKRO', '096', 'NULL']],
+                ['label' => 'MIKRO', 'codes' => ['MIKRO', '096', 'NULL', 'MOTEKAR']],
                 ['label' => 'KONTRAKTOR', 'codes' => ['KONTRAKTOR']],
                 ['label' => 'PPR', 'codes' => ['PPR', 'PPRSMF']],
                 ['label' => 'PPK', 'codes' => ['PPK']],

@@ -114,7 +114,9 @@ function formatNominal($amount) {
                         <small class="text-muted">Dana Pihak Ketiga</small>
                     </div>
                     <div class="dropdown">
-                        <span class="badge bg-success">+{{ $funding['growth'] }}%</span>
+                        <span class="badge {{ $funding['growth'] >= 0 ? 'bg-success' : 'bg-danger' }}">
+                            {{ $funding['growth'] >= 0 ? '+' : '' }}{{ $funding['growth'] }}%
+                        </span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -125,8 +127,8 @@ function formatNominal($amount) {
                                     {{ formatNominal($funding['total']) }}
                                 </h2>
                             </div>
-                            <small class="text-success fw-medium">
-                                <i class="ti ti-trending-up ti-sm"></i>
+                            <small class="{{ $funding['growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
+                                <i class="ti ti-trending-{{ $funding['growth'] >= 0 ? 'up' : 'down' }} ti-sm"></i>
                                 <span>Pertumbuhan {{ $funding['growth'] }}%</span>
                             </small>
                         </div>
@@ -140,83 +142,114 @@ function formatNominal($amount) {
                     <div class="mt-3">
                         <h6 class="mb-2">Komposisi Dana</h6>
                         <ul class="list-unstyled mb-0">
-                            @foreach($funding['composition'] as $type => $percentage)
-                            <li class="d-flex mb-2 pb-1 clickable-metric" onclick="showCustomerDetails('current_{{ strtolower($type) }}', 'nominal')">
+                            @php
+                                // Hitung data real dari database untuk komposisi dana berdasarkan filter
+                                $linkageTotal = \DB::table('linkages')->where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('plafon');
+                                $abpTotal = \DB::table('depositos')->where('period_month', $filterMonth)->where('period_year', $filterYear)->where('kdprd', '41')->sum('nomrp');
+                                $tabunganTotal = \DB::table('tabungans')->where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('sahirrp');
+                                $depositoTotal = \DB::table('depositos')->where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('nomrp');
+
+                                // Hitung komposisi yang lebih akurat
+                                $dp1_modal = 75000000000; // Modal Utama
+                                $dp2_linkage_abp = $linkageTotal + $abpTotal; // Linkage + ABP
+                                $dp3_tabungan_deposito = $tabunganTotal + ($depositoTotal - $abpTotal); // Tabungan + Deposito (kecuali ABP)
+                                $totalDanaReal = $dp1_modal + $dp2_linkage_abp + $dp3_tabungan_deposito;
+
+                                // Hitung persentase
+                                $dp1_pct = $totalDanaReal > 0 ? round(($dp1_modal / $totalDanaReal) * 100, 1) : 0;
+                                $dp2_pct = $totalDanaReal > 0 ? round(($dp2_linkage_abp / $totalDanaReal) * 100, 1) : 0;
+                                $dp3_pct = $totalDanaReal > 0 ? round(($dp3_tabungan_deposito / $totalDanaReal) * 100, 1) : 0;
+                            @endphp
+                            <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded bg-label-{{ $type == 'Deposito' ? 'success' : 'info' }}">
-                                        <i class="ti ti-{{ $type == 'Deposito' ? 'clock-dollar' : 'piggy-bank' }}"></i>
+                                    <span class="avatar-initial rounded bg-label-primary">
+                                        <i class="ti ti-building-bank"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
                                     <div class="me-2">
-                                        <small class="text-muted d-block mb-1">{{ $type }}</small>
+                                        <small class="text-muted d-block mb-1">Modal Utama</small>
                                         <small class="text-primary fw-medium">
-                                            {{ formatNominal($funding['nominal'][$type]) }}
+                                            {{ formatNominal($dp1_modal) }}
                                         </small>
                                     </div>
                                     <div class="user-progress d-flex align-items-center gap-1">
-                                        <h6 class="mb-0">{{ $percentage }}%</h6>
+                                        <h6 class="mb-0">{{ $dp1_pct }}%</h6>
                                     </div>
                                 </div>
                             </li>
-                            @endforeach
+                            <li class="d-flex mb-2 pb-1">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded bg-label-success">
+                                        <i class="ti ti-link"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                    <div class="me-2">
+                                        <small class="text-muted d-block mb-1">Linkage + ABP</small>
+                                        <small class="text-success fw-medium">
+                                            {{ formatNominal($dp2_linkage_abp) }}
+                                        </small>
+                                    </div>
+                                    <div class="user-progress d-flex align-items-center gap-1">
+                                        <h6 class="mb-0">{{ $dp2_pct }}%</h6>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="d-flex mb-2 pb-1">
+                                <div class="avatar flex-shrink-0 me-3">
+                                    <span class="avatar-initial rounded bg-label-info">
+                                        <i class="ti ti-wallet"></i>
+                                    </span>
+                                </div>
+                                <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                    <div class="me-2">
+                                        <small class="text-muted d-block mb-1">Tabungan + Deposito</small>
+                                        <small class="text-info fw-medium">
+                                            {{ formatNominal($dp3_tabungan_deposito) }}
+                                        </small>
+                                    </div>
+                                    <div class="user-progress d-flex align-items-center gap-1">
+                                        <h6 class="mb-0">{{ $dp3_pct }}%</h6>
+                                    </div>
+                                </div>
+                            </li>
                         </ul>
                     </div>
 
                     <div class="mt-4">
-                        <h6 class="mb-3">Top 3 Dana Pihak</h6>
+                        <h6 class="mb-3">🏆 Top 5 Produk Tabungan</h6>
+                        <small class="text-muted d-block mb-3">Berdasarkan Nominal Terbanyak</small>
                         <ul class="list-unstyled mb-0">
+                            @forelse($topTabunganProducts as $index => $product)
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-primary">
-                                        <i class="ti ti-building-bank"></i>
+                                    <span class="avatar-initial rounded-circle bg-label-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }}">
+                                        <i class="ti ti-piggy-bank"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0">DP 1 - Modal Utama</h6>
-                                        <small class="text-muted">Modal Pokok</small>
+                                        <h6 class="mb-0">{{ $product->nama_produk }}</h6>
+                                        <small class="text-muted">{{ number_format($product->jumlah_rekening) }} Rekening</small>
                                     </div>
-                                    <small class="text-muted">Dana investasi utama perusahaan</small>
-                                    <small class="text-primary fw-medium">
-                                        {{ formatNominal(75000000000) }}
-                                    </small>
+                                    <h6 class="text-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }} fw-medium">
+                                        {{ formatNominal($product->total_nominal) }}
+                                    </h6>
                                 </div>
                             </li>
+                            @empty
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-success">
-                                        <i class="ti ti-link"></i>
+                                    <span class="avatar-initial rounded-circle bg-label-secondary">
+                                        <i class="ti ti-info-circle"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0">DP 2 - Linkage + Deposito ABP</h6>
-                                        <small class="text-muted">Dana Eksternal</small>
-                                    </div>
-                                    <small class="text-muted">Linkage program + Deposito dari ABP</small>
-                                    <small class="text-success fw-medium">
-                                        {{ formatNominal($funding['total'] * 0.3) }}
-                                    </small>
+                                    <small class="text-muted">Belum ada data produk tabungan</small>
                                 </div>
                             </li>
-                            <li class="d-flex mb-3">
-                                <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-info">
-                                        <i class="ti ti-wallet"></i>
-                                    </span>
-                                </div>
-                                <div class="d-flex w-100 flex-column">
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0">DP 3 - Deposito + Tabungan</h6>
-                                        <small class="text-muted">Dana Nasabah</small>
-                                    </div>
-                                    <small class="text-muted">Deposito & Tabungan masyarakat</small>
-                                    <small class="text-info fw-medium">
-                                        {{ formatNominal($funding['total'] * 0.7) }}
-                                    </small>
-                                </div>
-                            </li>
+                            @endforelse
                         </ul>
                     </div>
 
@@ -230,8 +263,8 @@ function formatNominal($amount) {
                             <div class="text-end">
                                 <span class="badge bg-label-warning mb-1">{{ number_format($funding['pencairan']['jumlah']) }} Bilyet</span>
                                 <div>
-                                    <small class="text-warning fw-medium">
-                                        <i class="ti ti-arrow-down-circle"></i>
+                                    <small class="{{ $funding['pencairan']['growth'] < 0 ? 'text-success' : 'text-danger' }} fw-medium">
+                                        <i class="ti ti-trending-{{ $funding['pencairan']['growth'] < 0 ? 'up' : 'down' }}"></i>
                                         {{ formatNominal($funding['pencairan']['total']) }}
                                     </small>
                                 </div>
@@ -1767,44 +1800,52 @@ function formatNominal(amount) {
         console.log('NPF distribution chart rendered');
     }
 
-    // 3. Segmentasi Pie Chart (Outstanding per Segmentasi)
+    // 3. Segmentasi Bar Chart (Outstanding per Segmentasi)
     const segmentasiEl = document.querySelector('#segmentasiPieChart');
     if (segmentasiEl) {
         const segmentasiData = @json($segmentasiDistribution);
         if (segmentasiData && segmentasiData.values && segmentasiData.values.length > 0) {
             const segmentasiChart = new ApexCharts(segmentasiEl, {
-                series: segmentasiData.values,
+                series: [{
+                    data: segmentasiData.values
+                }],
                 chart: {
-                    height: 280,
-                    type: 'pie'
-                },
-                labels: segmentasiData.labels,
-                colors: ['#696cff', '#71dd37', '#ff3e1d', '#ffab00', '#8592a3', '#00cfe8', '#ea5455', '#28c76f', '#03c3ec', '#826bf8', '#2b9bf4'],
-                dataLabels: {
-                    enabled: true,
-                    formatter: function(val, opts) {
-                        return opts.w.config.series[opts.seriesIndex].toFixed(1) + 'M';
-                    },
-                    style: {
-                        fontSize: '11px',
-                        fontWeight: 600
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    fontSize: '11px',
-                    markers: {
-                        width: 10,
-                        height: 10
-                    }
+                    height: 350,
+                    type: 'bar'
                 },
                 plotOptions: {
-                    pie: {
+                    bar: {
                         dataLabels: {
-                            offset: -10
+                            position: 'top'
+                        },
+                        columnWidth: '45%',
+                        distributed: true
+                    }
+                },
+                dataLabels: {
+                    enabled: true,
+                    formatter: function(val) {
+                        return val.toFixed(1) + 'M';
+                    },
+                    offsetY: -20,
+                    style: {
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        colors: ['#696cff', '#03c3ec', '#fdb528', '#ff5722', '#8592a3']
+                    }
+                },
+                xaxis: {
+                    categories: segmentasiData.labels
+                },
+                yaxis: {
+                    min: 0,
+                    labels: {
+                        formatter: function(val) {
+                            return val + 'M';
                         }
                     }
                 },
+                colors: ['#696cff', '#03c3ec', '#fdb528', '#ff5722', '#8592a3'],
                 tooltip: {
                     y: {
                         formatter: function(val) {
