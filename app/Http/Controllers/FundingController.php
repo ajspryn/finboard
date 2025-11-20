@@ -82,8 +82,21 @@ class FundingController extends Controller
                 ];
             });
 
-        $uploadHistory = $tabunganPeriods->merge($depositoPeriods)->merge($linkagePeriods)->sortByDesc(function ($item) {
-            return $item->year * 100 + $item->month;
+        // Merge all periods and convert to collection
+        $allPeriods = array_map(function ($item) {
+            return (array) $item;
+        }, $tabunganPeriods->toArray());
+
+        $allPeriods = array_merge($allPeriods, array_map(function ($item) {
+            return (array) $item;
+        }, $depositoPeriods->toArray()));
+
+        $allPeriods = array_merge($allPeriods, array_map(function ($item) {
+            return (array) $item;
+        }, $linkagePeriods->toArray()));
+
+        $uploadHistory = collect($allPeriods)->sortByDesc(function ($item) {
+            return $item['year'] * 100 + $item['month'];
         })->take(10); // Show last 10 uploads
 
         // Build stats manually
@@ -113,10 +126,30 @@ class FundingController extends Controller
         $request->validate([
             'month' => 'required|in:01,02,03,04,05,06,07,08,09,10,11,12',
             'year' => 'required|digits:4|integer|min:2020|max:2030',
-            'csv_tabungan' => 'required|file|mimes:csv,txt|max:10240',
-            'csv_deposito' => 'required|file|mimes:csv,txt|max:10240',
-            'csv_linkage' => 'required|file|mimes:csv,txt|max:10240',
+            'upload_types' => 'required|array|min:1',
+            'upload_types.*' => 'in:tabungan,deposito,linkage',
+            'csv_tabungan' => 'nullable|file|mimes:csv,txt|max:10240',
+            'csv_deposito' => 'nullable|file|mimes:csv,txt|max:10240',
+            'csv_linkage' => 'nullable|file|mimes:csv,txt|max:10240',
         ]);
+
+        $uploadTypes = $request->input('upload_types', []);
+
+        // Validate that required files are present for selected types
+        $validationErrors = [];
+        if (in_array('tabungan', $uploadTypes) && !$request->hasFile('csv_tabungan')) {
+            $validationErrors[] = 'File CSV Tabungan wajib diupload jika jenis Tabungan dipilih.';
+        }
+        if (in_array('deposito', $uploadTypes) && !$request->hasFile('csv_deposito')) {
+            $validationErrors[] = 'File CSV Deposito wajib diupload jika jenis Deposito dipilih.';
+        }
+        if (in_array('linkage', $uploadTypes) && !$request->hasFile('csv_linkage')) {
+            $validationErrors[] = 'File CSV Linkage wajib diupload jika jenis Linkage dipilih.';
+        }
+
+        if (!empty($validationErrors)) {
+            return back()->with('error', implode('<br>', $validationErrors));
+        }
 
         try {
             $month = $request->input('month');
@@ -129,51 +162,83 @@ class FundingController extends Controller
 
             DB::beginTransaction();
 
-            // Hapus data periode yang sama sebelum upload
-            $deletedTabungan = Tabungan::where('period_month', $month)
-                ->where('period_year', $year)
-                ->delete();
+            // Hapus data periode yang sama hanya untuk jenis yang dipilih
+            $deletedTabungan = 0;
+            $deletedDeposito = 0;
+            $deletedLinkage = 0;
 
-            $deletedDeposito = Deposito::where('period_month', $month)
-                ->where('period_year', $year)
-                ->delete();
+            if (in_array('tabungan', $uploadTypes)) {
+                $deletedTabungan = Tabungan::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            }
 
-            $deletedLinkage = Linkage::where('period_month', $month)
-                ->where('period_year', $year)
-                ->delete();
+            if (in_array('deposito', $uploadTypes)) {
+                $deletedDeposito = Deposito::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            }
+
+            if (in_array('linkage', $uploadTypes)) {
+                $deletedLinkage = Linkage::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            }
 
             Log::info("Deleted existing data for period {$year}-{$month}: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}, Linkage: {$deletedLinkage}");
 
-            // Process Tabungan
-            $resultTabungan = $this->processCSV($request->file('csv_tabungan'), $month, $year, 'TABUNGAN');
-            $totalImported += $resultTabungan['imported'];
-            $totalUpdated += $resultTabungan['updated'];
-            $totalErrors += $resultTabungan['errors'];
-            $allErrorDetails = array_merge($allErrorDetails, $resultTabungan['errorDetails']);
+            $resultTabungan = ['imported' => 0, 'updated' => 0, 'errors' => 0, 'errorDetails' => []];
+            $resultDeposito = ['imported' => 0, 'updated' => 0, 'errors' => 0, 'errorDetails' => []];
+            $resultLinkage = ['imported' => 0, 'updated' => 0, 'errors' => 0, 'errorDetails' => []];
 
-            // Process Deposito
-            $resultDeposito = $this->processCSV($request->file('csv_deposito'), $month, $year, 'DEPOSITO');
-            $totalImported += $resultDeposito['imported'];
-            $totalUpdated += $resultDeposito['updated'];
-            $totalErrors += $resultDeposito['errors'];
-            $allErrorDetails = array_merge($allErrorDetails, $resultDeposito['errorDetails']);
+            // Process Tabungan if selected
+            if (in_array('tabungan', $uploadTypes) && $request->hasFile('csv_tabungan')) {
+                $resultTabungan = $this->processCSV($request->file('csv_tabungan'), $month, $year, 'TABUNGAN');
+                $totalImported += $resultTabungan['imported'];
+                $totalUpdated += $resultTabungan['updated'];
+                $totalErrors += $resultTabungan['errors'];
+                $allErrorDetails = array_merge($allErrorDetails, $resultTabungan['errorDetails']);
+            }
 
-            // Process Linkage
-            $resultLinkage = $this->processCSV($request->file('csv_linkage'), $month, $year, 'LINKAGE');
-            $totalImported += $resultLinkage['imported'];
-            $totalUpdated += $resultLinkage['updated'];
-            $totalErrors += $resultLinkage['errors'];
-            $allErrorDetails = array_merge($allErrorDetails, $resultLinkage['errorDetails']);
+            // Process Deposito if selected
+            if (in_array('deposito', $uploadTypes) && $request->hasFile('csv_deposito')) {
+                $resultDeposito = $this->processCSV($request->file('csv_deposito'), $month, $year, 'DEPOSITO');
+                $totalImported += $resultDeposito['imported'];
+                $totalUpdated += $resultDeposito['updated'];
+                $totalErrors += $resultDeposito['errors'];
+                $allErrorDetails = array_merge($allErrorDetails, $resultDeposito['errorDetails']);
+            }
+
+            // Process Linkage if selected
+            if (in_array('linkage', $uploadTypes) && $request->hasFile('csv_linkage')) {
+                $resultLinkage = $this->processCSV($request->file('csv_linkage'), $month, $year, 'LINKAGE');
+                $totalImported += $resultLinkage['imported'];
+                $totalUpdated += $resultLinkage['updated'];
+                $totalErrors += $resultLinkage['errors'];
+                $allErrorDetails = array_merge($allErrorDetails, $resultLinkage['errorDetails']);
+            }
 
             DB::commit();
+
+            $uploadedTypes = array_map(function ($type) {
+                return strtoupper($type);
+            }, $uploadTypes);
 
             $message = "Import berhasil untuk periode {$year}-{$month}!\n\n";
             if ($deletedTabungan > 0 || $deletedDeposito > 0 || $deletedLinkage > 0) {
                 $message .= "🗑️  Data lama dihapus: Tabungan: {$deletedTabungan}, Deposito: {$deletedDeposito}, Linkage: {$deletedLinkage}\n\n";
             }
-            $message .= "📊 TABUNGAN: Imported: {$resultTabungan['imported']}, Updated: {$resultTabungan['updated']}, Errors: {$resultTabungan['errors']}\n";
-            $message .= "📊 DEPOSITO: Imported: {$resultDeposito['imported']}, Updated: {$resultDeposito['updated']}, Errors: {$resultDeposito['errors']}\n";
-            $message .= "📊 LINKAGE: Imported: {$resultLinkage['imported']}, Updated: {$resultLinkage['updated']}, Errors: {$resultLinkage['errors']}\n";
+
+            if (in_array('tabungan', $uploadTypes)) {
+                $message .= "📊 TABUNGAN: Imported: {$resultTabungan['imported']}, Updated: {$resultTabungan['updated']}, Errors: {$resultTabungan['errors']}\n";
+            }
+            if (in_array('deposito', $uploadTypes)) {
+                $message .= "📊 DEPOSITO: Imported: {$resultDeposito['imported']}, Updated: {$resultDeposito['updated']}, Errors: {$resultDeposito['errors']}\n";
+            }
+            if (in_array('linkage', $uploadTypes)) {
+                $message .= "📊 LINKAGE: Imported: {$resultLinkage['imported']}, Updated: {$resultLinkage['updated']}, Errors: {$resultLinkage['errors']}\n";
+            }
+
             $message .= "📈 TOTAL: Imported: {$totalImported}, Updated: {$totalUpdated}, Errors: {$totalErrors}";
 
             if ($totalErrors > 0 && count($allErrorDetails) > 0) {

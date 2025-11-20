@@ -201,27 +201,27 @@
                                                     <i class="ti ti-calendar ti-sm"></i>
                                                 </span>
                                             </div>
-                                            <strong>{{ str_pad($upload->month, 2, '0', STR_PAD_LEFT) }}-{{ $upload->year }}</strong>
+                                            <strong>{{ str_pad($upload['month'], 2, '0', STR_PAD_LEFT) }}-{{ $upload['year'] }}</strong>
                                         </div>
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar avatar-sm me-2">
-                                                <span class="avatar-initial rounded bg-label-{{ $upload->jenis === 'TABUNGAN' ? 'info' : 'success' }}">
-                                                    <i class="ti ti-{{ $upload->jenis === 'TABUNGAN' ? 'piggy-bank' : 'clock-dollar' }} ti-sm"></i>
+                                                <span class="avatar-initial rounded bg-label-{{ $upload['jenis'] === 'TABUNGAN' ? 'info' : 'success' }}">
+                                                    <i class="ti ti-{{ $upload['jenis'] === 'TABUNGAN' ? 'piggy-bank' : 'clock-dollar' }} ti-sm"></i>
                                                 </span>
                                             </div>
-                                            <strong>{{ $upload->jenis }}</strong>
+                                            <strong>{{ $upload['jenis'] }}</strong>
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-primary">{{ number_format($upload->count) }}</span>
+                                        <span class="badge bg-primary">{{ number_format($upload['count']) }}</span>
                                     </td>
                                     <td class="text-end">
-                                        <strong>Rp {{ number_format($upload->total_saldo / 1000000000, 2) }} M</strong>
+                                        <strong>Rp {{ number_format($upload['total_saldo'] / 1000000000, 2) }} M</strong>
                                     </td>
                                     <td class="text-center">
-                                        <small class="text-muted">{{ \Carbon\Carbon::parse($upload->last_upload)->format('d/m/Y H:i') }}</small>
+                                        <small class="text-muted">{{ \Carbon\Carbon::parse($upload['last_upload'])->format('d/m/Y H:i') }}</small>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-success">
@@ -252,47 +252,119 @@
                     <form id="uploadForm" action="{{ route('funding.upload') }}" method="POST" enctype="multipart/form-data">
                         @csrf
 
-                        <!-- Periode Data -->
+                        <!-- Pilih Periode -->
                         <div class="row mb-4">
-                            <div class="col-md-6">
-                                <label for="month" class="form-label">
-                                    <i class="ti ti-calendar me-1"></i>Bulan
+                            <div class="col-12">
+                                <label class="form-label">
+                                    <i class="ti ti-calendar me-1"></i>Periode Data Funding
                                 </label>
-                                <select name="month" id="month" class="form-select" required>
-                                    <option value="">Pilih Bulan</option>
-                                    <option value="01" {{ date('m') == '01' ? 'selected' : '' }}>Januari</option>
-                                    <option value="02" {{ date('m') == '02' ? 'selected' : '' }}>Februari</option>
-                                    <option value="03" {{ date('m') == '03' ? 'selected' : '' }}>Maret</option>
-                                    <option value="04" {{ date('m') == '04' ? 'selected' : '' }}>April</option>
-                                    <option value="05" {{ date('m') == '05' ? 'selected' : '' }}>Mei</option>
-                                    <option value="06" {{ date('m') == '06' ? 'selected' : '' }}>Juni</option>
-                                    <option value="07" {{ date('m') == '07' ? 'selected' : '' }}>Juli</option>
-                                    <option value="08" {{ date('m') == '08' ? 'selected' : '' }}>Agustus</option>
-                                    <option value="09" {{ date('m') == '09' ? 'selected' : '' }}>September</option>
-                                    <option value="10" {{ date('m') == '10' ? 'selected' : '' }}>Oktober</option>
-                                    <option value="11" {{ date('m') == '11' ? 'selected' : '' }}>November</option>
-                                    <option value="12" {{ date('m') == '12' ? 'selected' : '' }}>Desember</option>
-                                </select>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="month" class="form-label">Bulan</label>
+                                        <select class="form-select" id="month" name="month" required>
+                                            <option value="">Pilih Bulan</option>
+                                            <option value="01" {{ old('month') == '01' ? 'selected' : '' }}>Januari</option>
+                                            <option value="02" {{ old('month') == '02' ? 'selected' : '' }}>Februari</option>
+                                            <option value="03" {{ old('month') == '03' ? 'selected' : '' }}>Maret</option>
+                                            <option value="04" {{ old('month') == '04' ? 'selected' : '' }}>April</option>
+                                            <option value="05" {{ old('month') == '05' ? 'selected' : '' }}>Mei</option>
+                                            <option value="06" {{ old('month') == '06' ? 'selected' : '' }}>Juni</option>
+                                            <option value="07" {{ old('month') == '07' ? 'selected' : '' }}>Juli</option>
+                                            <option value="08" {{ old('month') == '08' ? 'selected' : '' }}>Agustus</option>
+                                            <option value="09" {{ old('month') == '09' ? 'selected' : '' }}>September</option>
+                                            <option value="10" {{ old('month') == '10' ? 'selected' : '' }}>Oktober</option>
+                                            <option value="11" {{ old('month') == '11' ? 'selected' : '' }}>November</option>
+                                            <option value="12" {{ old('month') == '12' ? 'selected' : '' }}>Desember</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="year" class="form-label">Tahun</label>
+                                        <select class="form-select" id="year" name="year" required>
+                                            <option value="">Pilih Tahun</option>
+                                            @for($y = date('Y') - 2; $y <= date('Y') + 2; $y++)
+                                            <option value="{{ $y }}" {{ old('year') == $y ? 'selected' : (date('Y') == $y ? 'selected' : '') }}>{{ $y }}</option>
+                                            @endfor
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info">
+                                    <i class="ti ti-info-circle me-2"></i>
+                                    <strong>Pilih periode data yang akan diupload.</strong> Data yang sudah ada untuk periode yang sama akan diganti dengan data baru.
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <label for="year" class="form-label">
-                                    <i class="ti ti-calendar-event me-1"></i>Tahun
+                        </div>
+
+                        <!-- Pilih Jenis Upload -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label">
+                                    <i class="ti ti-settings me-1"></i>Jenis Data Funding yang Akan Diupload
                                 </label>
-                                <select name="year" id="year" class="form-select" required>
-                                    <option value="">Pilih Tahun</option>
-                                    @php
-                                        $currentYear = date('Y');
-                                        for ($y = $currentYear; $y >= $currentYear - 5; $y--) {
-                                            $selected = ($y == $currentYear) ? 'selected' : '';
-                                            echo "<option value=\"{$y}\" {$selected}>{$y}</option>";
-                                        }
-                                    @endphp
-                                </select>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check form-check-lg">
+                                            <input class="form-check-input" type="checkbox" id="uploadTabungan" name="upload_types[]" value="tabungan" checked>
+                                            <label class="form-check-label" for="uploadTabungan">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar avatar-sm me-2">
+                                                        <span class="avatar-initial rounded bg-label-info">
+                                                            <i class="ti ti-piggy-bank"></i>
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <strong>Tabungan</strong>
+                                                        <br><small class="text-muted">Data rekening tabungan</small>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check form-check-lg">
+                                            <input class="form-check-input" type="checkbox" id="uploadDeposito" name="upload_types[]" value="deposito" checked>
+                                            <label class="form-check-label" for="uploadDeposito">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar avatar-sm me-2">
+                                                        <span class="avatar-initial rounded bg-label-success">
+                                                            <i class="ti ti-clock-dollar"></i>
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <strong>Deposito</strong>
+                                                        <br><small class="text-muted">Data deposito & ABP</small>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check form-check-lg">
+                                            <input class="form-check-input" type="checkbox" id="uploadLinkage" name="upload_types[]" value="linkage" checked>
+                                            <label class="form-check-label" for="uploadLinkage">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar avatar-sm me-2">
+                                                        <span class="avatar-initial rounded bg-label-warning">
+                                                            <i class="ti ti-link"></i>
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <strong>Linkage</strong>
+                                                        <br><small class="text-muted">Data linkage & dana pihak ketiga</small>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info mt-3">
+                                    <i class="ti ti-info-circle me-2"></i>
+                                    <strong>Pilih jenis data yang ingin Anda upload.</strong> Anda dapat memilih satu atau lebih jenis data funding sesuai kebutuhan.
+                                </div>
                             </div>
                         </div>
 
                         <!-- Upload Tabungan -->
-                        <div class="mb-4">
+                        <div class="mb-4" id="tabunganSection" style="display: block;">
                             <label class="form-label">
                                 <i class="ti ti-piggy-bank me-1"></i>File CSV Tabungan
                             </label>
@@ -302,7 +374,7 @@
                                 </div>
                                 <h5>Upload CSV Tabungan</h5>
                                 <p class="text-muted mb-3">Drag & drop atau klik untuk memilih file</p>
-                                <input type="file" name="csv_tabungan" id="csvTabungan" accept=".csv" class="d-none" required>
+                                <input type="file" name="csv_tabungan" id="csvTabungan" accept=".csv" class="d-none">
                                 <button type="button" class="btn btn-primary" onclick="document.getElementById('csvTabungan').click()">
                                     <i class="ti ti-folder-open me-1"></i>Pilih File Tabungan
                                 </button>
@@ -321,7 +393,7 @@
                         </div>
 
                         <!-- Upload Deposito -->
-                        <div class="mb-4">
+                        <div class="mb-4" id="depositoSection" style="display: block;">
                             <label class="form-label">
                                 <i class="ti ti-clock-dollar me-1"></i>File CSV Deposito
                             </label>
@@ -331,7 +403,7 @@
                                 </div>
                                 <h5>Upload CSV Deposito</h5>
                                 <p class="text-muted mb-3">Drag & drop atau klik untuk memilih file</p>
-                                <input type="file" name="csv_deposito" id="csvDeposito" accept=".csv" class="d-none" required>
+                                <input type="file" name="csv_deposito" id="csvDeposito" accept=".csv" class="d-none">
                                 <button type="button" class="btn btn-primary" onclick="document.getElementById('csvDeposito').click()">
                                     <i class="ti ti-folder-open me-1"></i>Pilih File Deposito
                                 </button>
@@ -350,7 +422,7 @@
                         </div>
 
                         <!-- Upload Linkage -->
-                        <div class="mb-4">
+                        <div class="mb-4" id="linkageSection" style="display: block;">
                             <label class="form-label">
                                 <i class="ti ti-link me-1"></i>File CSV Linkage
                             </label>
@@ -360,7 +432,7 @@
                                 </div>
                                 <h5>Upload CSV Linkage</h5>
                                 <p class="text-muted mb-3">Drag & drop atau klik untuk memilih file</p>
-                                <input type="file" name="csv_linkage" id="csvLinkage" accept=".csv" class="d-none" required>
+                                <input type="file" name="csv_linkage" id="csvLinkage" accept=".csv" class="d-none">
                                 <button type="button" class="btn btn-primary" onclick="document.getElementById('csvLinkage').click()">
                                     <i class="ti ti-folder-open me-1"></i>Pilih File Linkage
                                 </button>
@@ -381,7 +453,7 @@
                         <!-- Submit Button -->
                         <div class="text-center" id="submitButton" style="display: none;">
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="ti ti-upload me-1"></i>Upload Tiga File Funding
+                                <i class="ti ti-upload me-1"></i><span id="submitButtonText">Upload Data Funding</span>
                             </button>
                         </div>
                     </form>
@@ -393,7 +465,7 @@
                         <ul class="list-unstyled">
                             <li class="mb-2">
                                 <i class="ti ti-check text-success me-2"></i>
-                                Upload 3 file CSV: <strong>Tabungan</strong>, <strong>Deposito</strong>, dan <strong>Linkage</strong>
+                                <strong>Pilih jenis data yang ingin diupload</strong> - Anda dapat memilih satu atau lebih jenis data funding sesuai kebutuhan
                             </li>
                             <li class="mb-2">
                                 <i class="ti ti-check text-success me-2"></i>
@@ -451,183 +523,178 @@
 
 @section('scripts')
 <script>
-    // Tabungan file handling
-    const uploadAreaTabungan = document.getElementById('uploadAreaTabungan');
-    const csvTabungan = document.getElementById('csvTabungan');
-    const fileInfoTabungan = document.getElementById('fileInfoTabungan');
-    const fileNameTabungan = document.getElementById('fileNameTabungan');
-    const fileSizeTabungan = document.getElementById('fileSizeTabungan');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elements
+        const uploadCheckboxes = document.querySelectorAll('input[name="upload_types[]"]');
+        const tabunganSection = document.getElementById('tabunganSection');
+        const depositoSection = document.getElementById('depositoSection');
+        const linkageSection = document.getElementById('linkageSection');
+        const submitButton = document.getElementById('submitButton');
+        const submitButtonText = document.getElementById('submitButtonText');
 
-    // Deposito file handling
-    const uploadAreaDeposito = document.getElementById('uploadAreaDeposito');
-    const csvDeposito = document.getElementById('csvDeposito');
-    const fileInfoDeposito = document.getElementById('fileInfoDeposito');
-    const fileNameDeposito = document.getElementById('fileNameDeposito');
-    const fileSizeDeposito = document.getElementById('fileSizeDeposito');
+        // File input elements
+        const csvTabungan = document.getElementById('csvTabungan');
+        const csvDeposito = document.getElementById('csvDeposito');
+        const csvLinkage = document.getElementById('csvLinkage');
 
-    // Linkage file handling
-    const uploadAreaLinkage = document.getElementById('uploadAreaLinkage');
-    const csvLinkage = document.getElementById('csvLinkage');
-    const fileInfoLinkage = document.getElementById('fileInfoLinkage');
-    const fileNameLinkage = document.getElementById('fileNameLinkage');
-    const fileSizeLinkage = document.getElementById('fileSizeLinkage');
+        // File info elements
+        const fileInfoTabungan = document.getElementById('fileInfoTabungan');
+        const fileInfoDeposito = document.getElementById('fileInfoDeposito');
+        const fileInfoLinkage = document.getElementById('fileInfoLinkage');
 
-    const submitButton = document.getElementById('submitButton');
+        // Handle checkbox changes
+        uploadCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const type = this.value;
+                const isChecked = this.checked;
 
-    // Check if all three files are selected
-    function checkAllFiles() {
-        if (csvTabungan.files.length > 0 && csvDeposito.files.length > 0 && csvLinkage.files.length > 0) {
-            submitButton.style.display = 'block';
-        } else {
-            submitButton.style.display = 'none';
-        }
-    }
+                if (type === 'tabungan') {
+                    tabunganSection.style.display = isChecked ? 'block' : 'none';
+                    if (!isChecked) {
+                        csvTabungan.value = '';
+                        fileInfoTabungan.style.display = 'none';
+                    }
+                } else if (type === 'deposito') {
+                    depositoSection.style.display = isChecked ? 'block' : 'none';
+                    if (!isChecked) {
+                        csvDeposito.value = '';
+                        fileInfoDeposito.style.display = 'none';
+                    }
+                } else if (type === 'linkage') {
+                    linkageSection.style.display = isChecked ? 'block' : 'none';
+                    if (!isChecked) {
+                        csvLinkage.value = '';
+                        fileInfoLinkage.style.display = 'none';
+                    }
+                }
 
-    // Tabungan: Click to upload
-    uploadAreaTabungan.addEventListener('click', (e) => {
-        if (e.target !== csvTabungan) {
-            csvTabungan.click();
-        }
-    });
+                updateSubmitButton();
+            });
+        });
 
-    // Tabungan: File selected
-    csvTabungan.addEventListener('change', (e) => {
-        handleFile(e.target.files[0], 'Tabungan');
-        checkAllFiles();
-    });
+        // Check if required files are selected based on checked options
+        function updateSubmitButton() {
+            const checkedTypes = Array.from(uploadCheckboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
 
-    // Tabungan: Drag & Drop
-    uploadAreaTabungan.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadAreaTabungan.classList.add('dragover');
-    });
+            let allRequiredFilesSelected = true;
+            let selectedCount = 0;
 
-    uploadAreaTabungan.addEventListener('dragleave', () => {
-        uploadAreaTabungan.classList.remove('dragover');
-    });
+            checkedTypes.forEach(type => {
+                if (type === 'tabungan' && csvTabungan.files.length === 0) {
+                    allRequiredFilesSelected = false;
+                } else if (type === 'deposito' && csvDeposito.files.length === 0) {
+                    allRequiredFilesSelected = false;
+                } else if (type === 'linkage' && csvLinkage.files.length === 0) {
+                    allRequiredFilesSelected = false;
+                }
+                selectedCount++;
+            });
 
-    uploadAreaTabungan.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadAreaTabungan.classList.remove('dragover');
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.name.endsWith('.csv')) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            csvTabungan.files = dataTransfer.files;
-            handleFile(file, 'Tabungan');
-            checkAllFiles();
-        } else {
-            alert('Hanya file CSV yang diperbolehkan!');
-        }
-    });
-
-    // Deposito: Click to upload
-    uploadAreaDeposito.addEventListener('click', (e) => {
-        if (e.target !== csvDeposito) {
-            csvDeposito.click();
-        }
-    });
-
-    // Deposito: File selected
-    csvDeposito.addEventListener('change', (e) => {
-        handleFile(e.target.files[0], 'Deposito');
-        checkAllFiles();
-    });
-
-    // Deposito: Drag & Drop
-    uploadAreaDeposito.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadAreaDeposito.classList.add('dragover');
-    });
-
-    uploadAreaDeposito.addEventListener('dragleave', () => {
-        uploadAreaDeposito.classList.remove('dragover');
-    });
-
-    uploadAreaDeposito.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadAreaDeposito.classList.remove('dragover');
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.name.endsWith('.csv')) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            csvDeposito.files = dataTransfer.files;
-            handleFile(file, 'Deposito');
-            checkAllFiles();
-        } else {
-            alert('Hanya file CSV yang diperbolehkan!');
-        }
-    });
-
-    // Linkage: Click to upload
-    uploadAreaLinkage.addEventListener('click', (e) => {
-        if (e.target !== csvLinkage) {
-            csvLinkage.click();
-        }
-    });
-
-    // Linkage: File selected
-    csvLinkage.addEventListener('change', (e) => {
-        handleFile(e.target.files[0], 'Linkage');
-        checkAllFiles();
-    });
-
-    // Linkage: Drag & Drop
-    uploadAreaLinkage.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadAreaLinkage.classList.add('dragover');
-    });
-
-    uploadAreaLinkage.addEventListener('dragleave', () => {
-        uploadAreaLinkage.classList.remove('dragover');
-    });
-
-    uploadAreaLinkage.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadAreaLinkage.classList.remove('dragover');
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.name.endsWith('.csv')) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            csvLinkage.files = dataTransfer.files;
-            handleFile(file, 'Linkage');
-            checkAllFiles();
-        } else {
-            alert('Hanya file CSV yang diperbolehkan!');
-        }
-    });
-
-    function handleFile(file, type) {
-        if (file) {
-            if (type === 'Tabungan') {
-                fileNameTabungan.textContent = file.name;
-                fileSizeTabungan.textContent = formatFileSize(file.size);
-                fileInfoTabungan.style.display = 'block';
-            } else if (type === 'Deposito') {
-                fileNameDeposito.textContent = file.name;
-                fileSizeDeposito.textContent = formatFileSize(file.size);
-                fileInfoDeposito.style.display = 'block';
-            } else if (type === 'Pembiayaan') {
-                fileNamePembiayaan.textContent = file.name;
-                fileSizePembiayaan.textContent = formatFileSize(file.size);
-                fileInfoPembiayaan.style.display = 'block';
-            } else if (type === 'Linkage') {
-                fileNameLinkage.textContent = file.name;
-                fileSizeLinkage.textContent = formatFileSize(file.size);
-                fileInfoLinkage.style.display = 'block';
+            if (selectedCount > 0 && allRequiredFilesSelected) {
+                submitButton.style.display = 'block';
+                const typeNames = checkedTypes.map(type => {
+                    switch(type) {
+                        case 'tabungan': return 'Tabungan';
+                        case 'deposito': return 'Deposito';
+                        case 'linkage': return 'Linkage';
+                        default: return type;
+                    }
+                });
+                submitButtonText.textContent = `Upload ${typeNames.join(', ')}`;
+            } else {
+                submitButton.style.display = 'none';
             }
         }
-    }
 
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    }
+        // File change handlers
+        csvTabungan.addEventListener('change', () => {
+            handleFile(csvTabungan.files[0], 'Tabungan');
+            updateSubmitButton();
+        });
+
+        csvDeposito.addEventListener('change', () => {
+            handleFile(csvDeposito.files[0], 'Deposito');
+            updateSubmitButton();
+        });
+
+        csvLinkage.addEventListener('change', () => {
+            handleFile(csvLinkage.files[0], 'Linkage');
+            updateSubmitButton();
+        });
+
+        // Setup drag & drop for all upload areas
+        setupDragDrop('uploadAreaTabungan', 'csvTabungan', 'Tabungan');
+        setupDragDrop('uploadAreaDeposito', 'csvDeposito', 'Deposito');
+        setupDragDrop('uploadAreaLinkage', 'csvLinkage', 'Linkage');
+
+        function setupDragDrop(areaId, inputId, type) {
+            const area = document.getElementById(areaId);
+            const input = document.getElementById(inputId);
+
+            if (!area) return;
+
+            area.addEventListener('click', (e) => {
+                if (e.target !== input) {
+                    input.click();
+                }
+            });
+
+            area.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                area.classList.add('dragover');
+            });
+
+            area.addEventListener('dragleave', () => {
+                area.classList.remove('dragover');
+            });
+
+            area.addEventListener('drop', (e) => {
+                e.preventDefault();
+                area.classList.remove('dragover');
+
+                const file = e.dataTransfer.files[0];
+                if (file && file.name.endsWith('.csv')) {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    input.files = dataTransfer.files;
+                    handleFile(file, type);
+                    updateSubmitButton();
+                } else {
+                    alert('Hanya file CSV yang diperbolehkan!');
+                }
+            });
+        }
+
+        function handleFile(file, type) {
+            if (file) {
+                if (type === 'Tabungan') {
+                    document.getElementById('fileNameTabungan').textContent = file.name;
+                    document.getElementById('fileSizeTabungan').textContent = formatFileSize(file.size);
+                    fileInfoTabungan.style.display = 'block';
+                } else if (type === 'Deposito') {
+                    document.getElementById('fileNameDeposito').textContent = file.name;
+                    document.getElementById('fileSizeDeposito').textContent = formatFileSize(file.size);
+                    fileInfoDeposito.style.display = 'block';
+                } else if (type === 'Linkage') {
+                    document.getElementById('fileNameLinkage').textContent = file.name;
+                    document.getElementById('fileSizeLinkage').textContent = formatFileSize(file.size);
+                    fileInfoLinkage.style.display = 'block';
+                }
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Initialize
+        updateSubmitButton();
+    });
 </script>
 @endsection
