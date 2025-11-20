@@ -1122,15 +1122,15 @@ class DashboardController extends Controller
             if ($type === 'nominal') {
                 $data = Tabungan::where('period_month', $month)
                     ->where('period_year', $year)
-                    ->select('notab as norek', 'fnama as nama', 'sahirrp', 'tgltrnakh as tgleff', 'kodeprd')
+                    ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
                     ->orderBy('sahirrp', 'desc')
                     ->limit(100) // Limit to prevent encoding issues
                     ->get();
-                $total = $data->sum('sahirrp');
+                $total = $data->sum('nominal');
             } else {
                 $data = Tabungan::where('period_month', $month)
                     ->where('period_year', $year)
-                    ->select('notab as norek', 'fnama as nama', 'sahirrp', 'tgltrnakh as tgleff', 'kodeprd')
+                    ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
                     ->limit(100)
                     ->get();
                 $total = $data->count();
@@ -1139,15 +1139,15 @@ class DashboardController extends Controller
             if ($type === 'nominal') {
                 $data = Deposito::where('period_month', $month)
                     ->where('period_year', $year)
-                    ->select('nobilyet', 'nama', 'nomrp', 'jkwaktu as jw', 'tglbuka', 'kdprd')
+                    ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
                     ->orderBy('nomrp', 'desc')
                     ->limit(100)
                     ->get();
-                $total = $data->sum('nomrp');
+                $total = $data->sum('nominal');
             } else {
                 $data = Deposito::where('period_month', $month)
                     ->where('period_year', $year)
-                    ->select('nobilyet', 'nama', 'nomrp', 'jkwaktu as jw', 'tglbuka', 'kdprd')
+                    ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
                     ->limit(100)
                     ->get();
                 $total = $data->count();
@@ -1262,7 +1262,7 @@ class DashboardController extends Controller
                 'total_nasabah' => $type === 'nominal' ? $data->count() : $data->count(),
                 'total_nominal' => $total
             ],
-            'data' => $data->toArray(),
+            'nasabah' => $data->toArray(),
             'total' => $total,
             'type' => $type
         ]);
@@ -2769,11 +2769,19 @@ class DashboardController extends Controller
 
         if ($month !== 'all') {
             $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
-            // Filter by opening date (tglbuka) for monthly details
-            $query->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
-                ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear]);
+            // For pencairan, don't filter by opening date since withdrawn depositos could be opened in any month
+            if ($category !== 'pencairan') {
+                $query->where('period_month', $monthStr)
+                    ->where('period_year', $currentYear)
+                    ->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
+                    ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear]);
+            } else {
+                // For pencairan, just filter by period
+                $query->where('period_month', $monthStr)
+                    ->where('period_year', $currentYear);
+            }
         } else {
-            // For "all" months, show all depositos for the year
+            // For "all" months, show all depositos for the year that still exist
             $query->where('period_year', $currentYear);
         }
 
@@ -2786,7 +2794,7 @@ class DashboardController extends Controller
                 $query->where('kdprd', '41');
                 break;
             case 'pencairan':
-                // Depositos that were acquired in this month but have been withdrawn
+                // Depositos that exist in this month but not in next month (consistent with monthly table)
                 if ($month === 'all') {
                     // For "all months", we can't calculate pencairan meaningfully
                     // Return empty result
@@ -2804,21 +2812,39 @@ class DashboardController extends Controller
                 }
 
                 $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
-                // Get depositos acquired in this month that no longer exist in current period
-                $cairkanBilyets = DB::table('depositos as acquired')
-                    ->leftJoin('depositos as current', function ($join) use ($currentYear) {
-                        $join->on('acquired.nobilyet', '=', 'current.nobilyet')
-                            ->where('current.period_year', $currentYear)
-                            ->where('current.stsrec', 'A');
-                    })
-                    ->where('acquired.kodeaoh', $ao)
-                    ->whereRaw("strftime('%m', acquired.tglbuka) = ?", [$monthStr])
-                    ->whereRaw("strftime('%Y', acquired.tglbuka) = ?", [$currentYear])
-                    ->where('acquired.stsrec', 'A')
-                    ->whereNull('current.nobilyet') // No longer exists in current period
-                    ->pluck('acquired.nobilyet');
+                $nextMonth = $month == 12 ? 1 : $month + 1;
+                $nextYear = $month == 12 ? $currentYear + 1 : $currentYear;
+                $nextMonthStr = str_pad($nextMonth, 2, '0', STR_PAD_LEFT);
 
-                $query->whereIn('nobilyet', $cairkanBilyets);
+                // Check if next month has data
+                $nextMonthHasData = DB::table('depositos')
+                    ->where('kodeaoh', $ao)
+                    ->where('period_month', $nextMonthStr)
+                    ->where('period_year', $nextYear)
+                    ->where('stsrec', 'A')
+                    ->exists();
+
+                if ($nextMonthHasData) {
+                    // Get depositos that exist in current month but not in next month
+                    $cairkanBilyets = DB::table('depositos as curr')
+                        ->leftJoin('depositos as next', function ($join) use ($nextMonthStr, $nextYear) {
+                            $join->on('curr.nobilyet', '=', 'next.nobilyet')
+                                ->where('next.period_month', $nextMonthStr)
+                                ->where('next.period_year', $nextYear)
+                                ->where('next.stsrec', 'A');
+                        })
+                        ->where('curr.kodeaoh', $ao)
+                        ->where('curr.period_month', $monthStr)
+                        ->where('curr.period_year', $currentYear)
+                        ->where('curr.stsrec', 'A')
+                        ->whereNull('next.nobilyet') // Tidak ada di bulan berikutnya
+                        ->pluck('curr.nobilyet');
+
+                    $query->whereIn('nobilyet', $cairkanBilyets);
+                } else {
+                    // No data for next month, so no pencairan can be calculated
+                    $query->whereRaw('1 = 0'); // Return no results
+                }
                 break;
             case 'total':
                 // No additional filter for total

@@ -4708,15 +4708,28 @@ function showCustomerDetails(jenis, type) {
         }
 
         // Update title
-        modalTitle.innerHTML = '<i class="ti ti-users"></i> Detail Nasabah ' + categoryLabel + ' - ' + monthLabel + ' (AO: ' + ao + ')';
+        modalTitle.innerHTML = '<i class="ti ti-users"></i> Detail Nasabah Funding - ' + monthLabel + ' (AO: ' + ao + ')';
 
-        // Show loading
+        // Show loading with category buttons
         modalBody.innerHTML = `
             <div class="text-center p-4">
+                <div class="mb-3">
+                    <div class="btn-group" role="group" aria-label="Kategori Funding">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'deposito')">
+                            <i class="ti ti-wallet me-1"></i>Deposito
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'abp')">
+                            <i class="ti ti-building-bank me-1"></i>ABP
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'pencairan')">
+                            <i class="ti ti-cash-off me-1"></i>Pencairan
+                        </button>
+                    </div>
+                </div>
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="mt-2">Memuat data nasabah...</p>
+                <p class="mt-2">Pilih kategori funding untuk melihat data nasabah...</p>
             </div>
         `;
 
@@ -4755,64 +4768,7 @@ function showCustomerDetails(jenis, type) {
             })
             .then(data => {
                 console.log('Received customer data:', data);
-
-                let html = '<div class="container-fluid">';
-
-                // Summary
-                html += '<div class="row mb-3">';
-                html += '<div class="col-12">';
-                html += '<div class="alert alert-info d-flex align-items-center" role="alert">';
-                html += '<i class="ti ti-info-circle me-2"></i>';
-                html += '<div>';
-                html += '<strong>' + categoryLabel + ' - ' + monthLabel + '</strong><br>';
-                html += '<small>AO: ' + (data.ao_name || ao) + ' | Total: ' + data.customers.length + ' rekening | ';
-                html += 'Nominal: ' + formatNominalJS(data.total_nominal) + '</small>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                // Customer table
-                html += '<div class="row">';
-                html += '<div class="col-12">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-striped table-hover">';
-                html += '<thead class="table-dark">';
-                html += '<tr>';
-                html += '<th style="width: 50px;">No</th>';
-                html += '<th style="width: 120px;">No. Bilyet</th>';
-                html += '<th>Nama Nasabah</th>';
-                html += '<th style="width: 120px;">Nominal</th>';
-                html += '<th style="width: 100px;">Tgl Buka</th>';
-                html += '<th style="width: 100px;">Jatuh Tempo</th>';
-                html += '<th style="width: 80px;">Status</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
-
-                if (data.customers && data.customers.length > 0) {
-                    data.customers.forEach((customer, index) => {
-                        const statusClass = customer.is_cairkan ? 'text-danger' : 'text-success';
-                        const statusText = customer.status;
-                        html += '<tr>';
-                        html += '<td>' + (index + 1) + '</td>';
-                        html += '<td><small>' + (customer.nobilyet || '-') + '</small></td>';
-                        html += '<td><small>' + (customer.nama || '-') + '</small></td>';
-                        html += '<td class="text-end"><small>' + (customer.nomrp_formatted || 'Rp 0') + '</small></td>';
-                        html += '<td><small>' + (customer.tglbuka || '-') + '</small></td>';
-                        html += '<td><small>' + (customer.tgljtempo || '-') + '</small></td>';
-                        html += '<td><small class="' + statusClass + '">' + statusText + '</small></td>';
-                        html += '</tr>';
-                    });
-                } else {
-                    html += '<tr><td colspan="7" class="text-center">Tidak ada data nasabah</td></tr>';
-                }
-
-                html += '</tbody></table>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-
-                modalBody.innerHTML = html;
+                loadAOCustomerData(ao, month, category, data);
             })
             .catch(error => {
                 console.error('Error fetching AO customer details:', error);
@@ -4823,6 +4779,162 @@ function showCustomerDetails(jenis, type) {
                     </div>
                 `;
             });
+    }
+
+    // Function to load AO customer data with category buttons
+    window.loadAOCustomerData = function(ao, month, category, data = null) {
+        console.log('Loading AO customer data for ao:', ao, 'month:', month, 'category:', category);
+
+        const modalBody = document.getElementById('customerDetailsModalBody');
+
+        // Determine month label
+        let monthLabel = '';
+        if (month === 'all') {
+            monthLabel = 'Seluruh Tahun ' + new Date().getFullYear();
+        } else {
+            const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                               'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            monthLabel = monthNames[parseInt(month) - 1] + ' ' + new Date().getFullYear();
+        }
+
+        // Determine category label and button classes
+        let categoryLabel = '';
+        let depositoBtnClass = 'btn-outline-primary';
+        let abpBtnClass = 'btn-outline-success';
+        let pencairanBtnClass = 'btn-outline-danger';
+
+        if (category === 'deposito') {
+            categoryLabel = 'Deposito';
+            depositoBtnClass = 'btn-primary';
+        } else if (category === 'abp') {
+            categoryLabel = 'ABP';
+            abpBtnClass = 'btn-success';
+        } else if (category === 'pencairan') {
+            categoryLabel = 'Pencairan';
+            pencairanBtnClass = 'btn-danger';
+        }
+
+        if (!data) {
+            // Show loading for the selected category
+            modalBody.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="mb-3">
+                        <div class="btn-group" role="group" aria-label="Kategori Funding">
+                            <button type="button" class="btn ${depositoBtnClass} btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'deposito')">
+                                <i class="ti ti-wallet me-1"></i>Deposito
+                            </button>
+                            <button type="button" class="btn ${abpBtnClass} btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'abp')">
+                                <i class="ti ti-building-bank me-1"></i>ABP
+                            </button>
+                            <button type="button" class="btn ${pencairanBtnClass} btn-sm" onclick="loadAOCustomerData('${ao}', '${month}', 'pencairan')">
+                                <i class="ti ti-cash-off me-1"></i>Pencairan
+                            </button>
+                        </div>
+                    </div>
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Memuat data ${categoryLabel.toLowerCase()}...</p>
+                </div>
+            `;
+
+            // Fetch data
+            fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(fetchedData => {
+                    loadAOCustomerData(ao, month, category, fetchedData);
+                })
+                .catch(error => {
+                    console.error('Error fetching AO customer data:', error);
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="ti ti-alert-circle"></i> Gagal memuat data. Silakan coba lagi.
+                        </div>
+                    `;
+                });
+            return;
+        }
+
+        // Display data with category buttons
+        let html = '<div class="container-fluid">';
+
+        // Category buttons
+        html += '<div class="row mb-3">';
+        html += '<div class="col-12 text-center">';
+        html += '<div class="btn-group" role="group" aria-label="Kategori Funding">';
+        html += '<button type="button" class="btn ' + depositoBtnClass + ' btn-sm" onclick="loadAOCustomerData(\'' + ao + '\', \'' + month + '\', \'deposito\')">';
+        html += '<i class="ti ti-wallet me-1"></i>Deposito';
+        html += '</button>';
+        html += '<button type="button" class="btn ' + abpBtnClass + ' btn-sm" onclick="loadAOCustomerData(\'' + ao + '\', \'' + month + '\', \'abp\')">';
+        html += '<i class="ti ti-building-bank me-1"></i>ABP';
+        html += '</button>';
+        html += '<button type="button" class="btn ' + pencairanBtnClass + ' btn-sm" onclick="loadAOCustomerData(\'' + ao + '\', \'' + month + '\', \'pencairan\')">';
+        html += '<i class="ti ti-cash-off me-1"></i>Pencairan';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Summary
+        html += '<div class="row mb-3">';
+        html += '<div class="col-12">';
+        html += '<div class="alert alert-info d-flex align-items-center" role="alert">';
+        html += '<i class="ti ti-info-circle me-2"></i>';
+        html += '<div>';
+        html += '<strong>' + categoryLabel + ' - ' + monthLabel + '</strong><br>';
+        html += '<small>AO: ' + (data.ao_name || ao) + ' | Total: ' + data.customers.length + ' rekening | ';
+        html += 'Nominal: ' + formatNominalJS(data.total_nominal) + '</small>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Customer table
+        html += '<div class="row">';
+        html += '<div class="col-12">';
+        html += '<div class="table-responsive">';
+        html += '<table class="table table-sm table-striped table-hover">';
+        html += '<thead class="table-dark">';
+        html += '<tr>';
+        html += '<th style="width: 50px;">No</th>';
+        html += '<th style="width: 120px;">No. Bilyet</th>';
+        html += '<th>Nama Nasabah</th>';
+        html += '<th style="width: 120px;">Nominal</th>';
+        html += '<th style="width: 100px;">Tgl Buka</th>';
+        html += '<th style="width: 100px;">Jatuh Tempo</th>';
+        html += '<th style="width: 80px;">Status</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+
+        if (data.customers && data.customers.length > 0) {
+            data.customers.forEach((customer, index) => {
+                const statusClass = customer.is_cairkan ? 'text-danger' : 'text-success';
+                const statusText = customer.status;
+                html += '<tr>';
+                html += '<td>' + (index + 1) + '</td>';
+                html += '<td><small>' + (customer.nobilyet || '-') + '</small></td>';
+                html += '<td><small>' + (customer.nama || '-') + '</small></td>';
+                html += '<td class="text-end"><small>' + (customer.nomrp_formatted || 'Rp 0') + '</small></td>';
+                html += '<td><small>' + (customer.tglbuka || '-') + '</small></td>';
+                html += '<td><small>' + (customer.tgljtempo || '-') + '</small></td>';
+                html += '<td><small class="' + statusClass + '">' + statusText + '</small></td>';
+                html += '</tr>';
+            });
+        } else {
+            html += '<tr><td colspan="7" class="text-center">Tidak ada data nasabah untuk kategori ini</td></tr>';
+        }
+
+        html += '</tbody></table>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        modalBody.innerHTML = html;
     }
     window.showAOFundingDetail = function(kodeaoh) {
         console.log('showAOFundingDetail called with kodeaoh:', kodeaoh);
