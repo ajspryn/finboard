@@ -121,6 +121,7 @@
                                         <th>Nama</th>
                                         <th>Email</th>
                                         <th>Role</th>
+                                        <th>Terakhir Login</th>
                                         <th>Dibuat</th>
                                         <th>Aksi</th>
                                     </tr>
@@ -148,6 +149,19 @@
                                                 <span class="badge bg-label-{{ $user->role === 'admin' ? 'primary' : ($user->role === 'pengurus' ? 'info' : ($user->role === 'lending' ? 'warning' : 'success')) }}">
                                                     {{ ucfirst($user->role) }}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                @if($user->last_login)
+                                                    <span class="text-muted">
+                                                        <i class="ti ti-clock me-1"></i>
+                                                        {{ $user->last_login->format('d M Y H:i') }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">
+                                                        <i class="ti ti-minus me-1"></i>
+                                                        Belum pernah login
+                                                    </span>
+                                                @endif
                                             </td>
                                             <td>{{ $user->created_at->format('d M Y') }}</td>
                                             <td>

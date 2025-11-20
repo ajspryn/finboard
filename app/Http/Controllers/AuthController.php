@@ -124,6 +124,9 @@ class AuthController extends Controller
             if ($user) {
                 Auth::login($user);
 
+                // Update last login timestamp
+                $user->updateLastLogin();
+
                 // Set session pin_verified for layout
                 session(['pin_verified' => true]);
 

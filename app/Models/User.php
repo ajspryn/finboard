@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'role',
+        'last_login',
     ];
 
     /**
@@ -41,6 +42,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login' => 'datetime',
         ];
     }
 
@@ -79,5 +81,13 @@ class User extends Authenticatable
             'lending' => 'Lending',
             default => 'Unknown'
         };
+    }
+
+    /**
+     * Update last login timestamp
+     */
+    public function updateLastLogin(): void
+    {
+        $this->update(['last_login' => now()]);
     }
 }
