@@ -1405,10 +1405,10 @@ function formatNominal($amount) {
                                         <td class="text-center">{{ number_format($segment['noa']) }}</td>
                                     @else
                                         <td class="text-center"><strong>{{ $segment['type'] }}</strong></td>
-                                        <td class="text-end"><strong>{{ number_format($segment['outstanding'], 0, ',', '.') }}</strong></td>
-                                        <td class="text-center"><strong>{{ number_format($segment['pct_outstanding'], 2) }}%</strong></td>
                                         <td class="text-end"><strong>{{ number_format($segment['disburse'], 0, ',', '.') }}</strong></td>
                                         <td class="text-center"><strong>{{ number_format($segment['pct_disburse'], 2) }}%</strong></td>
+                                        <td class="text-end"><strong>{{ number_format($segment['outstanding'], 0, ',', '.') }}</strong></td>
+                                        <td class="text-center"><strong>{{ number_format($segment['pct_outstanding'], 2) }}%</strong></td>
                                         <td class="text-center" style="line-height: 1.2;">
                                             <div style="font-size: 14px;"><strong>
                                                 @if(($segment['col1_sum'] ?? 0) >= 1000000000)
