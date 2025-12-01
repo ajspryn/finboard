@@ -1,8 +1,6 @@
-@extends('layouts.app')
+<?php $__env->startSection('title', 'Dashboard Bank'); ?>
 
-@section('title', 'Dashboard Bank')
-
-@php
+<?php
 // Helper function untuk format nominal dengan satuan yang jelas
 function formatNominal($amount) {
     if ($amount >= 1000000000) {
@@ -17,9 +15,9 @@ function formatNominal($amount) {
         return 'Rp ' . number_format($amount, 0); // Di bawah ribu
     }
 }
-@endphp
+?>
 
-@section('styles')
+<?php $__env->startSection('styles'); ?>
 <link rel="stylesheet" href="/template/assets/vendor/libs/apex-charts/apex-charts.css" />
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -156,12 +154,12 @@ function formatNominal($amount) {
     }
 
 </style>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('content')
+<?php $__env->startSection('content'); ?>
 
     <!-- Financial Highlights Row -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-warning border-2">
@@ -184,7 +182,7 @@ function formatNominal($amount) {
                             </button>
                         </div>
                         <!-- Manage Button -->
-                        <a href="{{ route('financial-highlights.index') }}" class="btn btn-warning btn-sm">
+                        <a href="<?php echo e(route('financial-highlights.index')); ?>" class="btn btn-warning btn-sm">
                             <i class="ti ti-settings me-1"></i>Kelola
                         </a>
                     </div>
@@ -203,12 +201,12 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 1: KPI Cards Detail (Funding, Lending, NPF) -->
     <div class="row">
         <!-- Funding Card -->
-        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+        <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
         <div class="col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 border-primary border-2">
                 <div class="card-header d-flex justify-content-between bg-label-primary">
@@ -217,8 +215,8 @@ function formatNominal($amount) {
                         <small class="text-muted">Dana Pihak Ketiga</small>
                     </div>
                     <div class="dropdown">
-                        <span class="badge {{ $funding['growth'] >= 0 ? 'bg-success' : 'bg-danger' }}">
-                            {{ $funding['growth'] >= 0 ? '+' : '' }}{{ $funding['growth'] }}%
+                        <span class="badge <?php echo e($funding['growth'] >= 0 ? 'bg-success' : 'bg-danger'); ?>">
+                            <?php echo e($funding['growth'] >= 0 ? '+' : ''); ?><?php echo e($funding['growth']); ?>%
                         </span>
                     </div>
                 </div>
@@ -227,12 +225,13 @@ function formatNominal($amount) {
                         <div class="d-flex flex-column">
                             <div class="d-flex align-items-center mb-1">
                                 <h2 class="mb-0 me-2 text-primary fw-bold clickable-metric" onclick="showCustomerDetails('current_total_funding', 'nominal')" title="Klik untuk lihat detail nasabah">
-                                    {{ formatNominal($funding['total']) }}
+                                    <?php echo e(formatNominal($funding['total'])); ?>
+
                                 </h2>
                             </div>
-                            <small class="{{ $funding['growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                <i class="ti ti-trending-{{ $funding['growth'] >= 0 ? 'up' : 'down' }} ti-sm"></i>
-                                <span>Pertumbuhan {{ $funding['growth'] }}%</span>
+                            <small class="<?php echo e($funding['growth'] >= 0 ? 'text-success' : 'text-danger'); ?> fw-medium">
+                                <i class="ti ti-trending-<?php echo e($funding['growth'] >= 0 ? 'up' : 'down'); ?> ti-sm"></i>
+                                <span>Pertumbuhan <?php echo e($funding['growth']); ?>%</span>
                             </small>
                         </div>
                         <div class="avatar avatar-lg">
@@ -245,7 +244,7 @@ function formatNominal($amount) {
                     <div class="mt-3">
                         <h6 class="mb-2">Komposisi Dana</h6>
                         <ul class="list-unstyled mb-0">
-                            @php
+                            <?php
                                 // Hitung data real dari database untuk komposisi dana berdasarkan filter
                                 $linkageTotal = \DB::table('linkages')->where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('plafon');
                                 $abpTotal = \DB::table('depositos')->where('period_month', $filterMonth)->where('period_year', $filterYear)->where('kdprd', '41')->sum('nomrp');
@@ -262,7 +261,7 @@ function formatNominal($amount) {
                                 $dp1_pct = $totalDanaReal > 0 ? round(($dp1_modal / $totalDanaReal) * 100, 1) : 0;
                                 $dp2_pct = $totalDanaReal > 0 ? round(($dp2_linkage_abp / $totalDanaReal) * 100, 1) : 0;
                                 $dp3_pct = $totalDanaReal > 0 ? round(($dp3_tabungan_deposito / $totalDanaReal) * 100, 1) : 0;
-                            @endphp
+                            ?>
                             <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded bg-label-primary">
@@ -273,11 +272,12 @@ function formatNominal($amount) {
                                     <div class="me-2">
                                         <small class="text-muted d-block mb-1">Modal Utama</small>
                                         <small class="text-primary fw-medium">
-                                            {{ formatNominal($dp1_modal) }}
+                                            <?php echo e(formatNominal($dp1_modal)); ?>
+
                                         </small>
                                     </div>
                                     <div class="user-progress d-flex align-items-center gap-1">
-                                        <h6 class="mb-0">{{ $dp1_pct }}%</h6>
+                                        <h6 class="mb-0"><?php echo e($dp1_pct); ?>%</h6>
                                     </div>
                                 </div>
                             </li>
@@ -291,11 +291,12 @@ function formatNominal($amount) {
                                     <div class="me-2">
                                         <small class="text-muted d-block mb-1">Linkage + ABP</small>
                                         <small class="text-success fw-medium">
-                                            {{ formatNominal($dp2_linkage_abp) }}
+                                            <?php echo e(formatNominal($dp2_linkage_abp)); ?>
+
                                         </small>
                                     </div>
                                     <div class="user-progress d-flex align-items-center gap-1">
-                                        <h6 class="mb-0">{{ $dp2_pct }}%</h6>
+                                        <h6 class="mb-0"><?php echo e($dp2_pct); ?>%</h6>
                                     </div>
                                 </div>
                             </li>
@@ -309,11 +310,12 @@ function formatNominal($amount) {
                                     <div class="me-2">
                                         <small class="text-muted d-block mb-1">Tabungan + Deposito</small>
                                         <small class="text-info fw-medium">
-                                            {{ formatNominal($dp3_tabungan_deposito) }}
+                                            <?php echo e(formatNominal($dp3_tabungan_deposito)); ?>
+
                                         </small>
                                     </div>
                                     <div class="user-progress d-flex align-items-center gap-1">
-                                        <h6 class="mb-0">{{ $dp3_pct }}%</h6>
+                                        <h6 class="mb-0"><?php echo e($dp3_pct); ?>%</h6>
                                     </div>
                                 </div>
                             </li>
@@ -324,24 +326,26 @@ function formatNominal($amount) {
                         <h6 class="mb-3">🏆 Top 5 Produk Tabungan</h6>
                         <small class="text-muted d-block mb-3">Berdasarkan Nominal Terbanyak</small>
                         <ul class="list-unstyled mb-0">
-                            @forelse($topTabunganProducts as $index => $product)
+                            <?php $__empty_1 = true; $__currentLoopData = $topTabunganProducts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $product): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }}">
-                                        {{ $index + 1 }}
+                                    <span class="avatar-initial rounded-circle bg-label-<?php echo e(['primary', 'success', 'info', 'warning', 'danger'][$index]); ?>">
+                                        <?php echo e($index + 1); ?>
+
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <h6 class="mb-0">{{ $product->nama_produk }}</h6>
-                                        <small class="text-muted">{{ number_format($product->jumlah_rekening) }} Rekening</small>
+                                        <h6 class="mb-0"><?php echo e($product->nama_produk); ?></h6>
+                                        <small class="text-muted"><?php echo e(number_format($product->jumlah_rekening)); ?> Rekening</small>
                                     </div>
-                                    <h6 class="text-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }} fw-medium">
-                                        {{ formatNominal($product->total_nominal) }}
+                                    <h6 class="text-<?php echo e(['primary', 'success', 'info', 'warning', 'danger'][$index]); ?> fw-medium">
+                                        <?php echo e(formatNominal($product->total_nominal)); ?>
+
                                     </h6>
                                 </div>
                             </li>
-                            @empty
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded-circle bg-label-secondary">
@@ -352,7 +356,7 @@ function formatNominal($amount) {
                                     <small class="text-muted">Belum ada data produk tabungan</small>
                                 </div>
                             </li>
-                            @endforelse
+                            <?php endif; ?>
                         </ul>
                     </div>
 
@@ -364,11 +368,12 @@ function formatNominal($amount) {
                                 <small class="text-muted">Bulan ini</small>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-label-warning mb-1">{{ number_format($funding['pencairan']['jumlah']) }} Bilyet</span>
+                                <span class="badge bg-label-warning mb-1"><?php echo e(number_format($funding['pencairan']['jumlah'])); ?> Bilyet</span>
                                 <div>
-                                    <small class="{{ $funding['pencairan']['growth'] < 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                        <i class="ti ti-trending-{{ $funding['pencairan']['growth'] < 0 ? 'up' : 'down' }}"></i>
-                                        {{ formatNominal($funding['pencairan']['total']) }}
+                                    <small class="<?php echo e($funding['pencairan']['growth'] < 0 ? 'text-success' : 'text-danger'); ?> fw-medium">
+                                        <i class="ti ti-trending-<?php echo e($funding['pencairan']['growth'] < 0 ? 'up' : 'down'); ?>"></i>
+                                        <?php echo e(formatNominal($funding['pencairan']['total'])); ?>
+
                                     </small>
                                 </div>
                             </div>
@@ -377,10 +382,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
-        @endif
+        <?php endif; ?>
 
         <!-- Lending Card -->
-        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
+        <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending'): ?>
         <div class="col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 border-success border-2">
                 <div class="card-header d-flex justify-content-between bg-label-success">
@@ -394,7 +399,8 @@ function formatNominal($amount) {
                         <div class="d-flex flex-column">
                             <div class="d-flex align-items-center mb-1">
                                 <h2 class="mb-0 me-2 text-success fw-bold">
-                                    {{ formatNominal($lending['total']) }}
+                                    <?php echo e(formatNominal($lending['total'])); ?>
+
                                 </h2>
                             </div>
                             <small class="text-muted">Total Pembiayaan</small>
@@ -420,7 +426,8 @@ function formatNominal($amount) {
                                 <div class="flex-grow-1">
                                     <small class="text-muted d-block">Outstanding</small>
                                     <h6 class="mb-0">
-                                        {{ formatNominal($lending['total']) }}
+                                        <?php echo e(formatNominal($lending['total'])); ?>
+
                                     </h6>
                                 </div>
                             </div>
@@ -433,7 +440,8 @@ function formatNominal($amount) {
                                 <div class="flex-grow-1">
                                     <small class="text-muted d-block">Disbursement (Plafon)</small>
                                     <h6 class="mb-0">
-                                        {{ formatNominal($lending['plafon_awal']) }}
+                                        <?php echo e(formatNominal($lending['plafon_awal'])); ?>
+
                                     </h6>
                                 </div>
                             </div>
@@ -450,7 +458,7 @@ function formatNominal($amount) {
                                 </div>
                                 <div>
                                     <small class="text-muted d-block">Rate Flat</small>
-                                    <h6 class="mb-0">{{ $lending['rate_flat'] }}%</h6>
+                                    <h6 class="mb-0"><?php echo e($lending['rate_flat']); ?>%</h6>
                                 </div>
                             </div>
                             <div class="d-flex align-items-center">
@@ -461,7 +469,7 @@ function formatNominal($amount) {
                                 </div>
                                 <div>
                                     <small class="text-muted d-block">Rate Efektif</small>
-                                    <h6 class="mb-0">{{ $lending['rate_eff'] }}%</h6>
+                                    <h6 class="mb-0"><?php echo e($lending['rate_eff']); ?>%</h6>
                                 </div>
                             </div>
                         </div>
@@ -474,7 +482,7 @@ function formatNominal($amount) {
                             </div>
                             <div>
                                 <small class="text-muted d-block">Nasabah Aktif</small>
-                                <h6 class="mb-0">{{ number_format($lending['nasabah']) }} Nasabah</h6>
+                                <h6 class="mb-0"><?php echo e(number_format($lending['nasabah'])); ?> Nasabah</h6>
                             </div>
                         </div>
 
@@ -488,10 +496,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
-        @endif
+        <?php endif; ?>
 
         <!-- Kolektibilitas Card -->
-        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
+        <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
         <div class="col-lg-4 col-md-12 col-12 mb-4">
             <div class="card h-100 border-danger border-2">
                 <div class="card-header d-flex justify-content-between bg-label-danger">
@@ -505,7 +513,7 @@ function formatNominal($amount) {
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="d-flex flex-column">
                             <h2 class="mb-0 me-2 text-danger fw-bold">
-                                {{ $npf['ratio'] }}%
+                                <?php echo e($npf['ratio']); ?>%
                             </h2>
                             <small class="text-muted">NPF Ratio</small>
                         </div>
@@ -520,13 +528,13 @@ function formatNominal($amount) {
                         <div class="col-6">
                             <div class="d-flex flex-column">
                                 <small class="text-muted">Total NPF</small>
-                                <h3 class="mb-0 text-danger">{{ formatNominal($npf['total']) }}</h3>
+                                <h3 class="mb-0 text-danger"><?php echo e(formatNominal($npf['total'])); ?></h3>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="d-flex flex-column">
                                 <small class="text-muted">Tunggakan Pokok</small>
-                                <h3 class="mb-0 text-warning">{{ formatNominal($npf['tunggakan_pokok']) }}</h3>
+                                <h3 class="mb-0 text-warning"><?php echo e(formatNominal($npf['tunggakan_pokok'])); ?></h3>
                             </div>
                         </div>
                     </div>
@@ -536,58 +544,61 @@ function formatNominal($amount) {
                     <!-- Kolektibilitas Categories -->
                     <div class="mt-3">
                         <h6 class="mb-3">📈 Kategori Kolektibilitas</h6>
-                        @if(isset($kolektibilitasComparison) && count($kolektibilitasComparison) > 0)
-                            @foreach($kolektibilitasComparison as $kolektibilitas)
-                            <div class="d-flex align-items-start mb-3 pb-3 {{ $loop->last ? '' : 'border-bottom' }} clickable-metric" onclick="showKolektibilitasDetails({{ $kolektibilitas['kategori'] }}, '{{ $kolektibilitas['nama_kategori'] }}')" style="cursor: pointer;" title="Klik untuk lihat 100 nasabah teratas">
+                        <?php if(isset($kolektibilitasComparison) && count($kolektibilitasComparison) > 0): ?>
+                            <?php $__currentLoopData = $kolektibilitasComparison; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $kolektibilitas): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <div class="d-flex align-items-start mb-3 pb-3 <?php echo e($loop->last ? '' : 'border-bottom'); ?> clickable-metric" onclick="showKolektibilitasDetails(<?php echo e($kolektibilitas['kategori']); ?>, '<?php echo e($kolektibilitas['nama_kategori']); ?>')" style="cursor: pointer;" title="Klik untuk lihat 100 nasabah teratas">
                                 <div class="avatar avatar-sm me-3 flex-shrink-0">
-                                    <span class="avatar-initial rounded-circle bg-label-{{ ['success', 'warning', 'danger', 'dark', 'secondary'][$kolektibilitas['kategori']-1] }}">
-                                        {{ $kolektibilitas['kategori'] }}
+                                    <span class="avatar-initial rounded-circle bg-label-<?php echo e(['success', 'warning', 'danger', 'dark', 'secondary'][$kolektibilitas['kategori']-1]); ?>">
+                                        <?php echo e($kolektibilitas['kategori']); ?>
+
                                     </span>
                                 </div>
                                 <div class="flex-grow-1 overflow-hidden">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
-                                        <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="{{ $kolektibilitas['nama_kategori'] }}">
-                                            Kol {{ $kolektibilitas['kategori'] }} - {{ $kolektibilitas['nama_kategori'] }}
+                                        <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="<?php echo e($kolektibilitas['nama_kategori']); ?>">
+                                            Kol <?php echo e($kolektibilitas['kategori']); ?> - <?php echo e($kolektibilitas['nama_kategori']); ?>
+
                                         </h6>
                                         <div class="text-end">
-                                            <span class="badge bg-{{ $kolektibilitas['nominal_growth'] >= 0 ? 'success' : 'danger' }} badge-sm">
-                                                {{ $kolektibilitas['nominal_growth'] >= 0 ? '+' : '' }}{{ number_format($kolektibilitas['nominal_growth'], 1) }}%
+                                            <span class="badge bg-<?php echo e($kolektibilitas['nominal_growth'] >= 0 ? 'success' : 'danger'); ?> badge-sm">
+                                                <?php echo e($kolektibilitas['nominal_growth'] >= 0 ? '+' : ''); ?><?php echo e(number_format($kolektibilitas['nominal_growth'], 1)); ?>%
                                             </span>
                                         </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <small class="text-muted d-block">{{ number_format($kolektibilitas['current_jumlah']) }} Nasabah</small>
+                                            <small class="text-muted d-block"><?php echo e(number_format($kolektibilitas['current_jumlah'])); ?> Nasabah</small>
                                             <strong class="text-info">
-                                                {{ formatNominal($kolektibilitas['current_nominal']) }}
+                                                <?php echo e(formatNominal($kolektibilitas['current_nominal'])); ?>
+
                                             </strong>
                                         </div>
                                         <div class="text-end">
                                             <small class="text-muted d-block">vs Bulan Lalu</small>
-                                            <small class="{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                                <i class="ti ti-trending-{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'up' : 'down' }} ti-xs"></i>
-                                                {{ number_format(abs($kolektibilitas['jumlah_growth']), 1) }}%
+                                            <small class="<?php echo e($kolektibilitas['jumlah_growth'] >= 0 ? 'text-success' : 'text-danger'); ?> fw-medium">
+                                                <i class="ti ti-trending-<?php echo e($kolektibilitas['jumlah_growth'] >= 0 ? 'up' : 'down'); ?> ti-xs"></i>
+                                                <?php echo e(number_format(abs($kolektibilitas['jumlah_growth']), 1)); ?>%
                                             </small>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            @endforeach
-                        @else
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        <?php else: ?>
                             <div class="text-center text-muted py-3">
                                 <i class="ti ti-info-circle ti-lg mb-2"></i>
                                 <p class="mb-0 small">Belum ada data kolektibilitas</p>
                             </div>
-                        @endif
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
-        @endif
+        <?php endif; ?>
     </div>
 
     <!-- Row 5.5: Combined Product Trend Chart -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -711,10 +722,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 4.5: AO Funding Performance -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -741,50 +752,55 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($aoFundingData as $index => $ao)
-                                <tr class="ao-funding-row" data-ao="{{ $ao['kodeaoh'] }}" style="cursor: pointer;">
-                                    <td><strong>{{ $index + 1 }}</strong></td>
+                                <?php $__currentLoopData = $aoFundingData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $ao): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr class="ao-funding-row" data-ao="<?php echo e($ao['kodeaoh']); ?>" style="cursor: pointer;">
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar avatar-sm me-2">
                                                 <span class="avatar-initial rounded-circle bg-label-success">
-                                                    {{ strtoupper(substr($ao['nmao'], 0, 2)) }}
+                                                    <?php echo e(strtoupper(substr($ao['nmao'], 0, 2))); ?>
+
                                                 </span>
                                             </div>
-                                            <strong>{{ $ao['nmao'] }}</strong>
+                                            <strong><?php echo e($ao['nmao']); ?></strong>
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-info">{{ number_format($ao['total_deposito']) }}</span>
+                                        <span class="badge bg-label-info"><?php echo e(number_format($ao['total_deposito'])); ?></span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-warning">{{ number_format($ao['total_abp']) }}</span>
+                                        <span class="badge bg-label-warning"><?php echo e(number_format($ao['total_abp'])); ?></span>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-danger">{{ number_format($ao['total_cairkan']) }}</span>
+                                        <span class="badge bg-label-danger"><?php echo e(number_format($ao['total_cairkan'])); ?></span>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-info">
-                                            {{ formatNominal($ao['nominal_deposito']) }}
+                                            <?php echo e(formatNominal($ao['nominal_deposito'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-warning">
-                                            {{ formatNominal($ao['nominal_abp']) }}
+                                            <?php echo e(formatNominal($ao['nominal_abp'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-danger">
-                                            {{ formatNominal($ao['nominal_cairkan']) }}
+                                            <?php echo e(formatNominal($ao['nominal_cairkan'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-primary">
-                                            {{ formatNominal($ao['total_funding']) }}
+                                            <?php echo e(formatNominal($ao['total_funding'])); ?>
+
                                         </strong>
                                     </td>
                                 </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </tbody>
                         </table>
                     </div>
@@ -792,10 +808,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 6: Funding Detail Tables -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
     <div class="row mb-4">
         <div class="col-xl-6 col-12 mb-4">
             <div class="card">
@@ -816,29 +832,30 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($fundingDetails['tabungan'] as $index => $tab)
+                                <?php $__empty_1 = true; $__currentLoopData = $fundingDetails['tabungan']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $tab): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                 <tr>
-                                    <td><strong>{{ $index + 1 }}</strong></td>
-                                    <td><code>{{ $tab->notab }}</code></td>
-                                    <td>{{ Str::limit($tab->fnama ?? 'N/A', 25) }}</td>
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
+                                    <td><code><?php echo e($tab->notab); ?></code></td>
+                                    <td><?php echo e(Str::limit($tab->fnama ?? 'N/A', 25)); ?></td>
                                     <td class="text-end">
                                         <strong>
-                                            {{ formatNominal($tab->sahirrp) }}
+                                            <?php echo e(formatNominal($tab->sahirrp)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-center">
-                                        @if($tab->stsrec == 'A')
+                                        <?php if($tab->stsrec == 'A'): ?>
                                             <span class="badge bg-label-success">Aktif</span>
-                                        @else
-                                            <span class="badge bg-label-secondary">{{ $tab->stsrec }}</span>
-                                        @endif
+                                        <?php else: ?>
+                                            <span class="badge bg-label-secondary"><?php echo e($tab->stsrec); ?></span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
-                                @empty
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <tr>
                                     <td colspan="5" class="text-center text-muted">Belum ada data</td>
                                 </tr>
-                                @endforelse
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -865,29 +882,30 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($fundingDetails['deposito'] as $index => $dep)
+                                <?php $__empty_1 = true; $__currentLoopData = $fundingDetails['deposito']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $dep): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                 <tr>
-                                    <td><strong>{{ $index + 1 }}</strong></td>
-                                    <td><code>{{ $dep->nodep }}</code></td>
-                                    <td>{{ Str::limit($dep->nama ?? 'N/A', 25) }}</td>
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
+                                    <td><code><?php echo e($dep->nodep); ?></code></td>
+                                    <td><?php echo e(Str::limit($dep->nama ?? 'N/A', 25)); ?></td>
                                     <td class="text-end">
                                         <strong>
-                                            {{ formatNominal($dep->nomrp) }}
+                                            <?php echo e(formatNominal($dep->nomrp)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-center">
-                                        @if($dep->stsrec == 'A')
+                                        <?php if($dep->stsrec == 'A'): ?>
                                             <span class="badge bg-label-success">Aktif</span>
-                                        @else
-                                            <span class="badge bg-label-secondary">{{ $dep->stsrec }}</span>
-                                        @endif
+                                        <?php else: ?>
+                                            <span class="badge bg-label-secondary"><?php echo e($dep->stsrec); ?></span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
-                                @empty
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <tr>
                                     <td colspan="5" class="text-center text-muted">Belum ada data</td>
                                 </tr>
-                                @endforelse
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -895,10 +913,10 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 7: Nasabah dengan Tabungan DAN Deposito -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -908,7 +926,7 @@ function formatNominal($amount) {
                         <small class="text-muted">Gabungan Tabungan & Deposito</small>
                     </div>
                     <div>
-                        <span class="badge bg-label-primary">{{ number_format($nasabahBothFunding->count()) }} Nasabah</span>
+                        <span class="badge bg-label-primary"><?php echo e(number_format($nasabahBothFunding->count())); ?> Nasabah</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -927,76 +945,82 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($nasabahBothFunding as $index => $nasabah)
+                                <?php $__empty_1 = true; $__currentLoopData = $nasabahBothFunding; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $nasabah): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                 <tr>
-                                    <td><strong>{{ $index + 1 }}</strong></td>
-                                    <td><code>{{ $nasabah->nocif }}</code></td>
-                                    <td>{{ Str::limit($nasabah->nama ?? 'N/A', 30) }}</td>
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
+                                    <td><code><?php echo e($nasabah->nocif); ?></code></td>
+                                    <td><?php echo e(Str::limit($nasabah->nama ?? 'N/A', 30)); ?></td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-info">{{ $nasabah->jumlah_tabungan }}</span>
+                                        <span class="badge bg-label-info"><?php echo e($nasabah->jumlah_tabungan); ?></span>
                                     </td>
                                     <td class="text-end">
-                                        {{ formatNominal($nasabah->total_tabungan) }}
+                                        <?php echo e(formatNominal($nasabah->total_tabungan)); ?>
+
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-success">{{ $nasabah->jumlah_deposito }}</span>
+                                        <span class="badge bg-label-success"><?php echo e($nasabah->jumlah_deposito); ?></span>
                                     </td>
                                     <td class="text-end">
-                                        {{ formatNominal($nasabah->total_deposito) }}
+                                        <?php echo e(formatNominal($nasabah->total_deposito)); ?>
+
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-primary">
-                                            {{ formatNominal($nasabah->total_funding) }}
+                                            <?php echo e(formatNominal($nasabah->total_funding)); ?>
+
                                         </strong>
                                     </td>
                                 </tr>
-                                @empty
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <tr>
                                     <td colspan="8" class="text-center text-muted">Belum ada data</td>
                                 </tr>
-                                @endforelse
+                                <?php endif; ?>
                             </tbody>
-                            @if($nasabahBothFunding->count() > 0)
+                            <?php if($nasabahBothFunding->count() > 0): ?>
                             <tfoot class="table-light sticky-bottom bg-white" style="box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
                                 <tr>
                                     <td colspan="3" class="text-end"><strong>TOTAL (Top 50)</strong></td>
                                     <td class="text-center">
-                                        <span class="badge bg-info">{{ number_format($nasabahBothFunding->sum('jumlah_tabungan')) }}</span>
+                                        <span class="badge bg-info"><?php echo e(number_format($nasabahBothFunding->sum('jumlah_tabungan'))); ?></span>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            @php $totalTab = $nasabahBothFunding->sum('total_tabungan'); @endphp
-                                            {{ formatNominal($totalTab) }}
+                                            <?php $totalTab = $nasabahBothFunding->sum('total_tabungan'); ?>
+                                            <?php echo e(formatNominal($totalTab)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-success">{{ number_format($nasabahBothFunding->sum('jumlah_deposito')) }}</span>
+                                        <span class="badge bg-success"><?php echo e(number_format($nasabahBothFunding->sum('jumlah_deposito'))); ?></span>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            @php $totalDep = $nasabahBothFunding->sum('total_deposito'); @endphp
-                                            {{ formatNominal($totalDep) }}
+                                            <?php $totalDep = $nasabahBothFunding->sum('total_deposito'); ?>
+                                            <?php echo e(formatNominal($totalDep)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-primary">
-                                            @php $totalAll = $nasabahBothFunding->sum('total_funding'); @endphp
-                                            {{ formatNominal($totalAll) }}
+                                            <?php $totalAll = $nasabahBothFunding->sum('total_funding'); ?>
+                                            <?php echo e(formatNominal($totalAll)); ?>
+
                                         </strong>
                                     </td>
                                 </tr>
                             </tfoot>
-                            @endif
+                            <?php endif; ?>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 8: Lending Tables -->
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -1006,7 +1030,7 @@ function formatNominal($amount) {
                         <small class="text-muted">Data Pinjaman Aktif</small>
                     </div>
                     <div>
-                        <span class="badge bg-label-warning">{{ number_format($nasabahLending->count()) }} Nasabah</span>
+                        <span class="badge bg-label-warning"><?php echo e(number_format($nasabahLending->count())); ?> Nasabah</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -1024,72 +1048,78 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($nasabahLending as $index => $nasabah)
+                                <?php $__empty_1 = true; $__currentLoopData = $nasabahLending; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $nasabah): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                 <tr>
-                                    <td><strong>{{ $index + 1 }}</strong></td>
-                                    <td><code>{{ $nasabah->nocif }}</code></td>
-                                    <td>{{ Str::limit($nasabah->nama ?? 'N/A', 30) }}</td>
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
+                                    <td><code><?php echo e($nasabah->nocif); ?></code></td>
+                                    <td><?php echo e(Str::limit($nasabah->nama ?? 'N/A', 30)); ?></td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-warning">{{ $nasabah->jumlah_pinjaman }}</span>
+                                        <span class="badge bg-label-warning"><?php echo e($nasabah->jumlah_pinjaman); ?></span>
                                     </td>
                                     <td class="text-end">
-                                        {{ formatNominal($nasabah->total_pinjaman) }}
+                                        <?php echo e(formatNominal($nasabah->total_pinjaman)); ?>
+
                                     </td>
                                     <td class="text-end">
-                                        {{ formatNominal($nasabah->total_bunga) }}
+                                        <?php echo e(formatNominal($nasabah->total_bunga)); ?>
+
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-warning">
-                                            {{ formatNominal($nasabah->total_angsuran) }}
+                                            <?php echo e(formatNominal($nasabah->total_angsuran)); ?>
+
                                         </strong>
                                     </td>
                                 </tr>
-                                @empty
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <tr>
                                     <td colspan="7" class="text-center text-muted">Belum ada data</td>
                                 </tr>
-                                @endforelse
+                                <?php endif; ?>
                             </tbody>
-                            @if($nasabahLending->count() > 0)
+                            <?php if($nasabahLending->count() > 0): ?>
                             <tfoot class="table-light sticky-bottom bg-white" style="box-shadow: 0 -2px 4px rgba(0,0,0,0.1);">
                                 <tr>
                                     <td colspan="3" class="text-end"><strong>TOTAL (Top 50)</strong></td>
                                     <td class="text-center">
-                                        <span class="badge bg-warning">{{ number_format($nasabahLending->sum('jumlah_pinjaman')) }}</span>
+                                        <span class="badge bg-warning"><?php echo e(number_format($nasabahLending->sum('jumlah_pinjaman'))); ?></span>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            @php $totalPinj = $nasabahLending->sum('total_pinjaman'); @endphp
-                                            {{ formatNominal($totalPinj) }}
+                                            <?php $totalPinj = $nasabahLending->sum('total_pinjaman'); ?>
+                                            <?php echo e(formatNominal($totalPinj)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            @php $totalBunga = $nasabahLending->sum('total_bunga'); @endphp
-                                            {{ formatNominal($totalBunga) }}
+                                            <?php $totalBunga = $nasabahLending->sum('total_bunga'); ?>
+                                            <?php echo e(formatNominal($totalBunga)); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong class="text-warning">
-                                            @php $totalAngsuran = $nasabahLending->sum('total_angsuran'); @endphp
-                                            {{ formatNominal($totalAngsuran) }}
+                                            <?php $totalAngsuran = $nasabahLending->sum('total_angsuran'); ?>
+                                            <?php echo e(formatNominal($totalAngsuran)); ?>
+
                                         </strong>
                                     </td>
                                 </tr>
                             </tfoot>
-                            @endif
+                            <?php endif; ?>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
     <!-- Row 2: Charts (Monthly Trends & NPF Distribution) -->
     <div class="row">
         <!-- Monthly Trends Chart (hanya untuk admin dan pengurus) -->
-        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
+        <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
         <div class="col-lg-8 mb-4">
             <div class="card">
                 <div class="card-header">
@@ -1101,10 +1131,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
-        @endif
+        <?php endif; ?>
 
         <!-- NPF Distribution Chart -->
-        @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
+        <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
         <div class="col-lg-4 mb-4">
             <div class="card">
                 <div class="card-header">
@@ -1116,10 +1146,10 @@ function formatNominal($amount) {
                 </div>
             </div>
         </div>
-        @endif
+        <?php endif; ?>
     </div>
 
-    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending')
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'lending'): ?>
     <!-- Row 3: Additional Charts -->
     <div class="row">
         <!-- Kolektibilitas Donut Chart -->
@@ -1205,67 +1235,70 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($topAOData as $index => $ao)
-                                <tr class="ao-row" data-ao="{{ $ao['nmao'] }}" style="cursor: pointer;">
-                                    <td><strong>{{ $index + 1 }}</strong></td>
+                                <?php $__currentLoopData = $topAOData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $ao): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr class="ao-row" data-ao="<?php echo e($ao['nmao']); ?>" style="cursor: pointer;">
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar avatar-sm me-2">
                                                 <span class="avatar-initial rounded-circle bg-label-primary">
-                                                    {{ strtoupper(substr($ao['nmao'], 0, 2)) }}
+                                                    <?php echo e(strtoupper(substr($ao['nmao'], 0, 2))); ?>
+
                                                 </span>
                                             </div>
-                                            <strong>{{ $ao['nmao'] }}</strong>
+                                            <strong><?php echo e($ao['nmao']); ?></strong>
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-info">{{ number_format($ao['total_nasabah']) }} Nasabah</span>
+                                        <span class="badge bg-label-info"><?php echo e(number_format($ao['total_nasabah'])); ?> Nasabah</span>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            {{ formatNominal($ao['total_outstanding']) }}
+                                            <?php echo e(formatNominal($ao['total_outstanding'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            {{ formatNominal($ao['total_plafon']) }}
+                                            <?php echo e(formatNominal($ao['total_plafon'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-center">
-                                        @if($ao['jumlah_npf'] > 0)
+                                        <?php if($ao['jumlah_npf'] > 0): ?>
                                             <span class="badge bg-label-danger npf-badge"
                                                 style="cursor: pointer;"
-                                                onclick="showAONpfDetail(event, '{{ $ao['nmao'] }}')"
+                                                onclick="showAONpfDetail(event, '<?php echo e($ao['nmao']); ?>')"
                                                 title="Klik untuk melihat detail NPF">
-                                                {{ $ao['jumlah_npf'] }} NPF
+                                                <?php echo e($ao['jumlah_npf']); ?> NPF
                                             </span>
-                                        @else
+                                        <?php else: ?>
                                             <span class="badge bg-label-success">0 NPF</span>
-                                        @endif
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-center">
-                                        @php
+                                        <?php
                                             $npfClass = $ao['npf_ratio'] >= 5 ? 'danger' : ($ao['npf_ratio'] >= 2 ? 'warning' : 'success');
-                                        @endphp
-                                        <span class="badge bg-label-{{ $npfClass }}">{{ number_format($ao['npf_ratio'], 2) }}%</span>
+                                        ?>
+                                        <span class="badge bg-label-<?php echo e($npfClass); ?>"><?php echo e(number_format($ao['npf_ratio'], 2)); ?>%</span>
                                     </td>
                                     <td>
-                                        @php
+                                        <?php
                                             $performanceScore = 100 - $ao['npf_ratio'];
                                             $performanceClass = $performanceScore >= 95 ? 'success' : ($performanceScore >= 90 ? 'primary' : ($performanceScore >= 85 ? 'warning' : 'danger'));
-                                        @endphp
+                                        ?>
                                         <div class="progress" style="height: 25px;">
-                                            <div class="progress-bar bg-{{ $performanceClass }}" role="progressbar"
-                                                style="width: {{ $performanceScore }}%;"
-                                                aria-valuenow="{{ $performanceScore }}"
+                                            <div class="progress-bar bg-<?php echo e($performanceClass); ?>" role="progressbar"
+                                                style="width: <?php echo e($performanceScore); ?>%;"
+                                                aria-valuenow="<?php echo e($performanceScore); ?>"
                                                 aria-valuemin="0"
                                                 aria-valuemax="100">
-                                                <small><strong>{{ number_format($performanceScore, 1) }}%</strong></small>
+                                                <small><strong><?php echo e(number_format($performanceScore, 1)); ?>%</strong></small>
                                             </div>
                                         </div>
                                     </td>
                                 </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </tbody>
                         </table>
                     </div>
@@ -1326,52 +1359,54 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody id="kecamatanTableBody">
-                                @php
+                                <?php
                                     $totalNasabahKec = $kecamatanData->sum('total_nasabah');
                                     $totalOutstandingKec = $kecamatanData->sum('total_outstanding');
-                                @endphp
-                                @foreach($kecamatanData as $index => $kec)
+                                ?>
+                                <?php $__currentLoopData = $kecamatanData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $kec): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                 <tr class="kecamatan-row"
-                                    data-kecamatan="{{ $kec['kecamatan'] }}"
-                                    data-nasabah="{{ $kec['total_nasabah'] }}"
-                                    data-outstanding="{{ $kec['total_outstanding'] }}"
-                                    data-persentase="{{ $totalNasabahKec > 0 ? ($kec['total_nasabah'] / $totalNasabahKec) * 100 : 0 }}"
+                                    data-kecamatan="<?php echo e($kec['kecamatan']); ?>"
+                                    data-nasabah="<?php echo e($kec['total_nasabah']); ?>"
+                                    data-outstanding="<?php echo e($kec['total_outstanding']); ?>"
+                                    data-persentase="<?php echo e($totalNasabahKec > 0 ? ($kec['total_nasabah'] / $totalNasabahKec) * 100 : 0); ?>"
                                     style="cursor: pointer;">
-                                    <td><strong>{{ $index + 1 }}</strong></td>
+                                    <td><strong><?php echo e($index + 1); ?></strong></td>
                                     <td>
-                                        <strong>{{ $kec['kecamatan'] }}</strong>
+                                        <strong><?php echo e($kec['kecamatan']); ?></strong>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-primary">{{ number_format($kec['total_nasabah']) }} Nasabah</span>
+                                        <span class="badge bg-label-primary"><?php echo e(number_format($kec['total_nasabah'])); ?> Nasabah</span>
                                     </td>
                                     <td class="text-end">
                                         <strong>
-                                            {{ formatNominal($kec['total_outstanding']) }}
+                                            <?php echo e(formatNominal($kec['total_outstanding'])); ?>
+
                                         </strong>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-label-success">{{ $totalNasabahKec > 0 ? number_format(($kec['total_nasabah'] / $totalNasabahKec) * 100, 1) : 0 }}%</span>
+                                        <span class="badge bg-label-success"><?php echo e($totalNasabahKec > 0 ? number_format(($kec['total_nasabah'] / $totalNasabahKec) * 100, 1) : 0); ?>%</span>
                                     </td>
                                     <td>
                                         <div class="progress" style="height: 25px;">
                                             <div class="progress-bar bg-primary" role="progressbar"
-                                                style="width: {{ $totalNasabahKec > 0 ? ($kec['total_nasabah'] / $totalNasabahKec) * 100 : 0 }}%;"
-                                                aria-valuenow="{{ $kec['total_nasabah'] }}"
+                                                style="width: <?php echo e($totalNasabahKec > 0 ? ($kec['total_nasabah'] / $totalNasabahKec) * 100 : 0); ?>%;"
+                                                aria-valuenow="<?php echo e($kec['total_nasabah']); ?>"
                                                 aria-valuemin="0"
-                                                aria-valuemax="{{ $totalNasabahKec }}">
-                                                <small>{{ $kec['total_nasabah'] }}</small>
+                                                aria-valuemax="<?php echo e($totalNasabahKec); ?>">
+                                                <small><?php echo e($kec['total_nasabah']); ?></small>
                                             </div>
                                         </div>
                                     </td>
                                 </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 <tr class="table-active fw-bold">
                                     <td colspan="2" class="text-end">TOTAL</td>
                                     <td class="text-center">
-                                        <span class="badge bg-primary">{{ number_format($totalNasabahKec) }} Nasabah</span>
+                                        <span class="badge bg-primary"><?php echo e(number_format($totalNasabahKec)); ?> Nasabah</span>
                                     </td>
                                     <td class="text-end">
-                                        {{ formatNominal($totalOutstandingKec) }}
+                                        <?php echo e(formatNominal($totalOutstandingKec)); ?>
+
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-success">100%</span>
@@ -1420,144 +1455,144 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($segmentasiData as $segment)
-                                <tr class="{{ $segment['is_total'] ? 'table-active fw-bold' : 'segment-row' }}"
-                                    @if(!$segment['is_total'])
-                                        data-category="{{ $segment['category'] }}"
-                                        data-type="{{ $segment['type'] }}"
-                                    @endif>
-                                    @if($segment['rowspan'] > 0)
-                                        <td rowspan="{{ $segment['rowspan'] }}" class="align-middle fw-bold">{{ $segment['category'] }}</td>
-                                    @endif
-                                    @if(!$segment['is_total'])
-                                        <td>{{ $segment['type'] }}</td>
-                                        <td class="text-end">{{ number_format($segment['disburse'], 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($segment['pct_disburse'], 2) }}%</td>
-                                        <td class="text-end">{{ number_format($segment['outstanding'], 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($segment['pct_outstanding'], 2) }}%</td>
+                                <?php $__currentLoopData = $segmentasiData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $segment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr class="<?php echo e($segment['is_total'] ? 'table-active fw-bold' : 'segment-row'); ?>"
+                                    <?php if(!$segment['is_total']): ?>
+                                        data-category="<?php echo e($segment['category']); ?>"
+                                        data-type="<?php echo e($segment['type']); ?>"
+                                    <?php endif; ?>>
+                                    <?php if($segment['rowspan'] > 0): ?>
+                                        <td rowspan="<?php echo e($segment['rowspan']); ?>" class="align-middle fw-bold"><?php echo e($segment['category']); ?></td>
+                                    <?php endif; ?>
+                                    <?php if(!$segment['is_total']): ?>
+                                        <td><?php echo e($segment['type']); ?></td>
+                                        <td class="text-end"><?php echo e(number_format($segment['disburse'], 0, ',', '.')); ?></td>
+                                        <td class="text-center"><?php echo e(number_format($segment['pct_disburse'], 2)); ?>%</td>
+                                        <td class="text-end"><?php echo e(number_format($segment['outstanding'], 0, ',', '.')); ?></td>
+                                        <td class="text-center"><?php echo e(number_format($segment['pct_outstanding'], 2)); ?>%</td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '1')"
+                                            onclick="showSegmentKolDetail(event, '<?php echo e($segment['category']); ?>', '<?php echo e($segment['type']); ?>', '1')"
                                             title="Klik untuk melihat detail nasabah KOL 1">
                                             <div style="font-size: 14px;">
-                                                @if(($segment['col1_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col1_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col1_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col1_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col1_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col1_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col1'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col1'] ?? 0); ?> NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '2')"
+                                            onclick="showSegmentKolDetail(event, '<?php echo e($segment['category']); ?>', '<?php echo e($segment['type']); ?>', '2')"
                                             title="Klik untuk melihat detail nasabah KOL 2">
                                             <div style="font-size: 14px;">
-                                                @if(($segment['col2_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col2_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col2_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col2_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col2_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col2_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col2'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col2'] ?? 0); ?> NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '3')"
+                                            onclick="showSegmentKolDetail(event, '<?php echo e($segment['category']); ?>', '<?php echo e($segment['type']); ?>', '3')"
                                             title="Klik untuk melihat detail nasabah KOL 3">
                                             <div style="font-size: 14px;">
-                                                @if(($segment['col3_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col3_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col3_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col3_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col3_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col3_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col3'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col3'] ?? 0); ?> NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '4')"
+                                            onclick="showSegmentKolDetail(event, '<?php echo e($segment['category']); ?>', '<?php echo e($segment['type']); ?>', '4')"
                                             title="Klik untuk melihat detail nasabah KOL 4">
                                             <div style="font-size: 14px;">
-                                                @if(($segment['col4_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col4_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col4_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col4_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col4_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col4_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col4'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col4'] ?? 0); ?> NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '5')"
+                                            onclick="showSegmentKolDetail(event, '<?php echo e($segment['category']); ?>', '<?php echo e($segment['type']); ?>', '5')"
                                             title="Klik untuk melihat detail nasabah KOL 5">
                                             <div style="font-size: 14px;">
-                                                @if(($segment['col5_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col5_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col5_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col5_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col5_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col5_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col5'] ?? 0 }} NOA</small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col5'] ?? 0); ?> NOA</small>
                                         </td>
-                                        <td class="text-center">{{ number_format($segment['cif'] ?? 0) }}</td>
-                                        <td class="text-center">{{ number_format($segment['noa']) }}</td>
-                                    @else
-                                        <td class="text-center"><strong>{{ $segment['type'] }}</strong></td>
-                                        <td class="text-end"><strong>{{ number_format($segment['disburse'], 0, ',', '.') }}</strong></td>
-                                        <td class="text-center"><strong>{{ number_format($segment['pct_disburse'], 2) }}%</strong></td>
-                                        <td class="text-end"><strong>{{ number_format($segment['outstanding'], 0, ',', '.') }}</strong></td>
-                                        <td class="text-center"><strong>{{ number_format($segment['pct_outstanding'], 2) }}%</strong></td>
+                                        <td class="text-center"><?php echo e(number_format($segment['cif'] ?? 0)); ?></td>
+                                        <td class="text-center"><?php echo e(number_format($segment['noa'])); ?></td>
+                                    <?php else: ?>
+                                        <td class="text-center"><strong><?php echo e($segment['type']); ?></strong></td>
+                                        <td class="text-end"><strong><?php echo e(number_format($segment['disburse'], 0, ',', '.')); ?></strong></td>
+                                        <td class="text-center"><strong><?php echo e(number_format($segment['pct_disburse'], 2)); ?>%</strong></td>
+                                        <td class="text-end"><strong><?php echo e(number_format($segment['outstanding'], 0, ',', '.')); ?></strong></td>
+                                        <td class="text-center"><strong><?php echo e(number_format($segment['pct_outstanding'], 2)); ?>%</strong></td>
                                         <td class="text-center" style="line-height: 1.2;">
                                             <div style="font-size: 14px;"><strong>
-                                                @if(($segment['col1_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col1_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col1_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col1_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col1_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col1_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </strong></div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col1'] ?? 0 }} </small>
-                                        </td>
-                                        <td class="text-center" style="line-height: 1.2;">
-                                            <div style="font-size: 14px;"><strong>
-                                                @if(($segment['col2_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col2_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col2_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
-                                            </strong></div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col2'] ?? 0 }} </small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col1'] ?? 0); ?> </small>
                                         </td>
                                         <td class="text-center" style="line-height: 1.2;">
                                             <div style="font-size: 14px;"><strong>
-                                                @if(($segment['col3_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col3_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col3_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col2_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col2_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col2_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </strong></div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col3'] ?? 0 }} </small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col2'] ?? 0); ?> </small>
                                         </td>
                                         <td class="text-center" style="line-height: 1.2;">
                                             <div style="font-size: 14px;"><strong>
-                                                @if(($segment['col4_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col4_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col4_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col3_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col3_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col3_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </strong></div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col4'] ?? 0 }} </small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col3'] ?? 0); ?> </small>
                                         </td>
                                         <td class="text-center" style="line-height: 1.2;">
                                             <div style="font-size: 14px;"><strong>
-                                                @if(($segment['col5_sum'] ?? 0) >= 1000000000)
-                                                    {{ number_format(($segment['col5_sum'] ?? 0) / 1000000000, 1) }}M
-                                                @else
-                                                    {{ number_format(($segment['col5_sum'] ?? 0) / 1000000, 0) }}jt
-                                                @endif
+                                                <?php if(($segment['col4_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col4_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col4_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
                                             </strong></div>
-                                            <small class="text-muted" style="font-size: 9px;">{{ $segment['col5'] ?? 0 }} </small>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col4'] ?? 0); ?> </small>
                                         </td>
-                                        <td class="text-center"><strong>{{ number_format($segment['cif'] ?? 0) }}</strong></td>
-                                        <td class="text-center"><strong>{{ number_format($segment['noa']) }}</strong></td>
-                                    @endif
+                                        <td class="text-center" style="line-height: 1.2;">
+                                            <div style="font-size: 14px;"><strong>
+                                                <?php if(($segment['col5_sum'] ?? 0) >= 1000000000): ?>
+                                                    <?php echo e(number_format(($segment['col5_sum'] ?? 0) / 1000000000, 1)); ?>M
+                                                <?php else: ?>
+                                                    <?php echo e(number_format(($segment['col5_sum'] ?? 0) / 1000000, 0)); ?>jt
+                                                <?php endif; ?>
+                                            </strong></div>
+                                            <small class="text-muted" style="font-size: 9px;"><?php echo e($segment['col5'] ?? 0); ?> </small>
+                                        </td>
+                                        <td class="text-center"><strong><?php echo e(number_format($segment['cif'] ?? 0)); ?></strong></td>
+                                        <td class="text-center"><strong><?php echo e(number_format($segment['noa'])); ?></strong></td>
+                                    <?php endif; ?>
                                 </tr>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </tbody>
                         </table>
                     </div>
@@ -1565,7 +1600,7 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
-    @endif
+    <?php endif; ?>
 
 
 <!-- Modal Detail Segmentasi -->
@@ -1710,9 +1745,9 @@ function formatNominal($amount) {
         </div>
     </div>
 </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -1787,10 +1822,10 @@ function formatNominal(amount) {
         const monthlyTrendChart = new ApexCharts(monthlyTrendEl, {
             series: [{
                 name: 'Plafon',
-                data: @json($monthlyTrends['funding'])
+                data: <?php echo json_encode($monthlyTrends['funding'], 15, 512) ?>
             }, {
                 name: 'Outstanding',
-                data: @json($monthlyTrends['lending'])
+                data: <?php echo json_encode($monthlyTrends['lending'], 15, 512) ?>
             }],
             chart: {
                 height: 350,
@@ -1829,7 +1864,7 @@ function formatNominal(amount) {
                 offsetY: -10
             },
             xaxis: {
-                categories: @json($monthlyTrends['labels'])
+                categories: <?php echo json_encode($monthlyTrends['labels'], 15, 512) ?>
             },
             yaxis: {
                 title: { text: 'Miliar Rupiah' },
@@ -1855,12 +1890,12 @@ function formatNominal(amount) {
     const npfDistributionEl = document.querySelector("#npfDistributionChart");
     if (npfDistributionEl) {
         const npfDistributionChart = new ApexCharts(npfDistributionEl, {
-            series: @json($npfDistribution['values']),
+            series: <?php echo json_encode($npfDistribution['values'], 15, 512) ?>,
             chart: {
                 height: 280,
                 type: 'donut'
             },
-            labels: @json($npfDistribution['labels']),
+            labels: <?php echo json_encode($npfDistribution['labels'], 15, 512) ?>,
             colors: ['#ff3e1d', '#EA5455', '#FF9F43', '#ffab00', '#8592a3', '#343A40', '#696cff', '#71dd37', '#00cfe8', '#826bf8'],
             plotOptions: {
                 pie: {
@@ -1918,7 +1953,7 @@ function formatNominal(amount) {
     // 3. Segmentasi Bar Chart (Outstanding per Segmentasi)
     const segmentasiEl = document.querySelector('#segmentasiPieChart');
     if (segmentasiEl) {
-        const segmentasiData = @json($segmentasiDistribution);
+        const segmentasiData = <?php echo json_encode($segmentasiDistribution, 15, 512) ?>;
         if (segmentasiData && segmentasiData.values && segmentasiData.values.length > 0) {
             // Calculate total for percentage calculation
             const totalValue = segmentasiData.values.reduce((sum, val) => sum + val, 0);
@@ -1983,12 +2018,12 @@ function formatNominal(amount) {
     const kolektibilitasEl = document.querySelector('#kolektibilitasChart');
     if (kolektibilitasEl) {
         const kolektibilitasChart = new ApexCharts(kolektibilitasEl, {
-            series: @json($kolektibilitasDistribution['series']),
+            series: <?php echo json_encode($kolektibilitasDistribution['series'], 15, 512) ?>,
             chart: {
                 height: 280,
                 type: 'donut'
             },
-            labels: @json($kolektibilitasDistribution['labels']),
+            labels: <?php echo json_encode($kolektibilitasDistribution['labels'], 15, 512) ?>,
             colors: ['#28c76f', '#00cfe8', '#ffab00', '#ff6b6b', '#ea5455'],
             plotOptions: {
                 pie: {
@@ -2035,7 +2070,7 @@ function formatNominal(amount) {
         const topProductsChart = new ApexCharts(topProductsEl, {
             series: [{
                 name: 'Outstanding',
-                data: @json($topProductsChart['data'])
+                data: <?php echo json_encode($topProductsChart['data'], 15, 512) ?>
             }],
             chart: {
                 type: 'bar',
@@ -2057,7 +2092,7 @@ function formatNominal(amount) {
             },
             colors: ['#696cff'],
             xaxis: {
-                categories: @json($topProductsChart['categories']),
+                categories: <?php echo json_encode($topProductsChart['categories'], 15, 512) ?>,
                 labels: {
                     formatter: function(val) {
                         return val.toFixed(1) + 'M';
@@ -2083,14 +2118,14 @@ function formatNominal(amount) {
     // Data untuk jumlah dan nominal
     const trendData = {
         jumlah: {
-            nasabah_baru: @json($nasabahTrendData['nasabah_baru']),
-            pelunasan_cepat: @json($nasabahTrendData['pelunasan_cepat']),
-            nasabah_lunas: @json($nasabahTrendData['nasabah_lunas'])
+            nasabah_baru: <?php echo json_encode($nasabahTrendData['nasabah_baru'], 15, 512) ?>,
+            pelunasan_cepat: <?php echo json_encode($nasabahTrendData['pelunasan_cepat'], 15, 512) ?>,
+            nasabah_lunas: <?php echo json_encode($nasabahTrendData['nasabah_lunas'], 15, 512) ?>
         },
         nominal: {
-            nasabah_baru: @json($nasabahTrendData['nasabah_baru_nominal']),
-            pelunasan_cepat: @json($nasabahTrendData['pelunasan_cepat_nominal']),
-            nasabah_lunas: @json($nasabahTrendData['nasabah_lunas_nominal'])
+            nasabah_baru: <?php echo json_encode($nasabahTrendData['nasabah_baru_nominal'], 15, 512) ?>,
+            pelunasan_cepat: <?php echo json_encode($nasabahTrendData['pelunasan_cepat_nominal'], 15, 512) ?>,
+            nasabah_lunas: <?php echo json_encode($nasabahTrendData['nasabah_lunas_nominal'], 15, 512) ?>
         }
     };
 
@@ -2124,7 +2159,7 @@ function formatNominal(amount) {
                             console.log('Marker clicked!', config);
                             const seriesIndex = config.seriesIndex;
                             const dataPointIndex = config.dataPointIndex;
-                            const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
+                            const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[dataPointIndex];
 
                             // Tentukan kategori berdasarkan series
                             let kategori = '';
@@ -2140,7 +2175,7 @@ function formatNominal(amount) {
                             console.log('Data point selected!', config);
                             const monthIndex = config.dataPointIndex;
                             const seriesIndex = config.seriesIndex;
-                            const monthLabel = @json($nasabahTrendData['labels'])[monthIndex];
+                            const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[monthIndex];
 
                             // Tentukan kategori berdasarkan series
                             let kategori = '';
@@ -2157,7 +2192,7 @@ function formatNominal(amount) {
                             if (config && config.dataPointIndex !== undefined) {
                                 const seriesIndex = config.seriesIndex;
                                 const dataPointIndex = config.dataPointIndex;
-                                const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
+                                const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[dataPointIndex];
 
                                 // Tentukan kategori berdasarkan series
                                 let kategori = '';
@@ -2222,7 +2257,7 @@ function formatNominal(amount) {
                     offsetY: -10
                 },
                 xaxis: {
-                    categories: @json($nasabahTrendData['labels']),
+                    categories: <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>,
                     labels: {
                         style: {
                             fontSize: '12px'
@@ -2281,9 +2316,9 @@ function formatNominal(amount) {
                         label.style.cursor = 'pointer';
                         label.addEventListener('click', function() {
                             // Calculate which data point this label belongs to
-                            const seriesIndex = Math.floor(index / @json($nasabahTrendData['labels']).length);
-                            const dataPointIndex = index % @json($nasabahTrendData['labels']).length;
-                            const monthLabel = @json($nasabahTrendData['labels'])[dataPointIndex];
+                            const seriesIndex = Math.floor(index / <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>.length);
+                            const dataPointIndex = index % <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>.length;
+                            const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[dataPointIndex];
 
                             // Tentukan kategori berdasarkan series
                             let kategori = '';
@@ -3035,7 +3070,7 @@ function initializeMap() {
     }).addTo(map);
 
     // Data kecamatan dari blade
-    const kecamatanData = @json($kecamatanData);
+    const kecamatanData = <?php echo json_encode($kecamatanData, 15, 512) ?>;
 
     console.log('Total kecamatan yang akan dimuat:', kecamatanData.length);
 
@@ -5571,5 +5606,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
     });
     </script>
 
-@endsection
+<?php $__env->stopSection(); ?>
 
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /Users/ajspryn/Project/finboard/resources/views/dashboard.blade.php ENDPATH**/ ?>
