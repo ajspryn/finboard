@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Laravel cache files
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
