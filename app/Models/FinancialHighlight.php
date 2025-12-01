@@ -59,8 +59,10 @@ class FinancialHighlight extends Model
     public static function getPreviousPeriod($year, $month, $comparisonType = 'MOM')
     {
         if ($comparisonType === 'YOY') {
+            // Get the latest period from the previous year
             return static::where('period_year', $year - 1)
-                ->where('period_month', $month)
+                ->orderBy('period_year', 'desc')
+                ->orderBy('period_month', 'desc')
                 ->first();
         } else { // MOM
             $prevMonth = $month - 1;

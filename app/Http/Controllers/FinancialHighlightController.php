@@ -153,6 +153,13 @@ class FinancialHighlightController extends Controller
             ->orderBy('period_month', 'desc')
             ->first();
 
+        // If filtered period has no data, fallback to latest available data
+        if (!$latest && $filterMonth && $filterYear) {
+            $latest = FinancialHighlight::orderBy('period_year', 'desc')
+                ->orderBy('period_month', 'desc')
+                ->first();
+        }
+
         if (!$latest) {
             return response()->json([
                 'data' => null,

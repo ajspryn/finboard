@@ -164,10 +164,10 @@ function formatNominal($amount) {
     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-warning border-2">
-                <div class="card-header d-flex justify-content-between align-items-center bg-label-warning">
+            <div class="card border-primary border-2">
+                <div class="card-header d-flex justify-content-between align-items-center bg-label-primary">
                     <div class="card-title mb-0">
-                        <h4 class="mb-0 text-warning">
+                        <h4 class="mb-0 text-primary">
                             <i class="ti ti-chart-line me-2"></i>
                             Financial Highlights
                         </h4>
@@ -176,15 +176,15 @@ function formatNominal($amount) {
                     <div class="d-flex gap-2 align-items-center">
                         <!-- Comparison Type Toggle -->
                         <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-outline-warning active" id="btnMOM" onclick="setComparisonType('MOM')">
+                            <button type="button" class="btn btn-outline-primary active" id="btnMOM" onclick="setComparisonType('MOM')">
                                 <i class="ti ti-calendar-month me-1"></i>MOM
                             </button>
-                            <button type="button" class="btn btn-outline-warning" id="btnYOY" onclick="setComparisonType('YOY')">
+                            <button type="button" class="btn btn-outline-primary" id="btnYOY" onclick="setComparisonType('YOY')">
                                 <i class="ti ti-calendar-year me-1"></i>YOY
                             </button>
                         </div>
                         <!-- Manage Button -->
-                        <a href="{{ route('financial-highlights.index') }}" class="btn btn-warning btn-sm">
+                        <a href="{{ route('financial-highlights.index') }}" class="btn btn-primary btn-sm">
                             <i class="ti ti-settings me-1"></i>Kelola
                         </a>
                     </div>
@@ -193,7 +193,7 @@ function formatNominal($amount) {
                     <div id="financialHighlightsContainer">
                         <!-- Loading state -->
                         <div class="text-center py-4">
-                            <div class="spinner-border text-warning" role="status">
+                            <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                             <p class="text-muted mt-2">Memuat data financial highlights...</p>
@@ -210,10 +210,10 @@ function formatNominal($amount) {
         <!-- Funding Card -->
         @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus' || auth()->user()->role === 'funding')
         <div class="col-lg-4 col-md-6 col-12 mb-4">
-            <div class="card h-100 border-primary border-2">
-                <div class="card-header d-flex justify-content-between bg-label-primary">
+            <div class="card h-100 border-info border-2">
+                <div class="card-header d-flex justify-content-between bg-label-info">
                     <div class="card-title mb-0">
-                        <h5 class="mb-0 text-primary">💰 Funding</h5>
+                        <h5 class="mb-0 text-info">💰 Funding</h5>
                         <small class="text-muted">Dana Pihak Ketiga</small>
                     </div>
                     <div class="dropdown">
@@ -226,7 +226,7 @@ function formatNominal($amount) {
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="d-flex flex-column">
                             <div class="d-flex align-items-center mb-1">
-                                <h2 class="mb-0 me-2 text-primary fw-bold clickable-metric" onclick="showCustomerDetails('current_total_funding', 'nominal')" title="Klik untuk lihat detail nasabah">
+                                <h2 class="mb-0 me-2 text-info fw-bold clickable-metric" onclick="showCustomerDetails('current_total_funding', 'nominal')" title="Klik untuk lihat detail nasabah">
                                     {{ formatNominal($funding['total']) }}
                                 </h2>
                             </div>
@@ -236,7 +236,7 @@ function formatNominal($amount) {
                             </small>
                         </div>
                         <div class="avatar avatar-lg">
-                            <span class="avatar-initial rounded-3 bg-primary">
+                            <span class="avatar-initial rounded-3 bg-info">
                                 <i class="ti ti-coin ti-lg text-white"></i>
                             </span>
                         </div>
@@ -327,7 +327,7 @@ function formatNominal($amount) {
                             @forelse($topTabunganProducts as $index => $product)
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
-                                    <span class="avatar-initial rounded-circle bg-label-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }}">
+                                    <span class="avatar-initial rounded-circle bg-label-{{ ['info', 'success', 'info', 'warning', 'danger'][$index] }}">
                                         {{ $index + 1 }}
                                     </span>
                                 </div>
@@ -336,7 +336,7 @@ function formatNominal($amount) {
                                         <h6 class="mb-0">{{ $product->nama_produk }}</h6>
                                         <small class="text-muted">{{ number_format($product->jumlah_rekening) }} Rekening</small>
                                     </div>
-                                    <h6 class="text-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }} fw-medium">
+                                    <h6 class="text-{{ ['info', 'success', 'info', 'warning', 'danger'][$index] }} fw-medium">
                                         {{ formatNominal($product->total_nominal) }}
                                     </h6>
                                 </div>
