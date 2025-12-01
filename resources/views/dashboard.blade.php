@@ -5325,22 +5325,38 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 const period = data.period;
 
                 const indicators = [
+                    // Rasio Modal & Kesehatan (Capital & Health Ratios)
                     { key: 'car', label: 'CAR', unit: '%', icon: 'ti-shield-check', color: 'primary', reverseColor: true },
+                    { key: 'kpmm', label: 'KPMM', unit: 'Rp', icon: 'ti-currency-dollar', color: 'info', format: 'currency' },
+
+                    // Rasio Profitabilitas (Profitability Ratios)
                     { key: 'roa', label: 'ROA', unit: '%', icon: 'ti-trending-up', color: 'success', reverseColor: true },
                     { key: 'roe', label: 'ROE', unit: '%', icon: 'ti-chart-bar', color: 'info', reverseColor: true },
-                    { key: 'aset', label: 'Aset', unit: 'Rp', icon: 'ti-building-bank', color: 'warning', format: 'currency' },
-                    { key: 'pembiayaan', label: 'Pembiayaan', unit: 'Rp', icon: 'ti-cash', color: 'danger', format: 'currency' },
-                    { key: 'laba_rugi', label: 'Laba/Rugi', unit: 'Rp', icon: 'ti-coins', color: 'success', format: 'currency' },
-                    { key: 'dpk', label: 'DPK', unit: 'Rp', icon: 'ti-wallet', color: 'primary', format: 'currency' },
-                    { key: 'fdr', label: 'FDR', unit: '%', icon: 'ti-percentage', color: 'info', badWhenUp: true },
+
+                    // Rasio Likuiditas (Liquidity Ratios)
+                    { key: 'cash_ratio', label: 'Cash Ratio', unit: '%', icon: 'ti-cash-banknote', color: 'success' },
+
+                    // Rasio Risiko (Risk Ratios)
                     { key: 'npf', label: 'NPF', unit: '%', icon: 'ti-alert-triangle', color: 'danger', badWhenUp: true },
-                    { key: 'bopo', label: 'BOPO', unit: '%', icon: 'ti-calculator', color: 'warning', badWhenUp: true }
+                    { key: 'fdr', label: 'FDR', unit: '%', icon: 'ti-percentage', color: 'warning', badWhenUp: true },
+
+                    // Rasio Efisiensi (Efficiency Ratios)
+                    { key: 'bopo', label: 'BOPO', unit: '%', icon: 'ti-calculator', color: 'secondary', badWhenUp: true },
+
+                    // Posisi Keuangan (Financial Position)
+                    { key: 'aset', label: 'Aset', unit: 'Rp', icon: 'ti-building-bank', color: 'warning', format: 'currency' },
+                    { key: 'dpk', label: 'DPK', unit: 'Rp', icon: 'ti-wallet', color: 'primary', format: 'currency' },
+                    { key: 'pembiayaan', label: 'Pembiayaan', unit: 'Rp', icon: 'ti-cash', color: 'danger', format: 'currency' },
+
+                    // Laba & Biaya (Profit & Expenses)
+                    { key: 'laba_rugi', label: 'Laba/Rugi', unit: 'Rp', icon: 'ti-coins', color: 'success', format: 'currency' },
+                    { key: 'biaya', label: 'Biaya', unit: 'Rp', icon: 'ti-receipt', color: 'dark', format: 'currency' }
                 ];
 
-                // Group indicators by column
-                const leftColumn = indicators.slice(0, 3); // CAR, ROA, ROE
-                const centerColumn = indicators.slice(3, 7); // Aset, Pembiayaan, Laba Rugi, DPK
-                const rightColumn = indicators.slice(7, 10); // FDR, NPF, BOPO
+                // Group indicators by column (organized by category)
+                const leftColumn = indicators.slice(0, 4); // Modal & Profitabilitas (CAR, KPMM, ROA, ROE)
+                const centerColumn = indicators.slice(4, 9); // Likuiditas, Risiko & Efisiensi (Cash Ratio, NPF, FDR, BOPO, Aset)
+                const rightColumn = indicators.slice(9, 13); // Posisi Keuangan & Laba (DPK, Pembiayaan, Laba/Rugi, Biaya)
 
                 let html = `
                     <div class="row g-3">
@@ -5405,7 +5421,14 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                     `;
                 }
 
-                // Render left column (CAR, ROA, ROE)
+                // Render left column (Modal & Profitabilitas)
+                html += `
+                        <div class="col-lg-4 col-md-12">
+                            <div class="mb-2">
+                                <small class="text-muted fw-medium">📊 Modal & Profitabilitas</small>
+                            </div>
+                            <div class="row g-3">
+                `;
                 leftColumn.forEach(indicator => {
                     const value = highlights[indicator.key];
                     const change = changes[indicator.key];
@@ -5416,10 +5439,13 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                             </div>
                         </div>
                         <div class="col-lg-4 col-md-12">
+                            <div class="mb-2">
+                                <small class="text-muted fw-medium">⚡ Likuiditas, Risiko & Efisiensi</small>
+                            </div>
                             <div class="row g-3">
                 `;
 
-                // Render center column (Aset, Pembiayaan, Laba Rugi, DPK)
+                // Render center column (Likuiditas, Risiko & Efisiensi)
                 centerColumn.forEach(indicator => {
                     const value = highlights[indicator.key];
                     const change = changes[indicator.key];
@@ -5430,10 +5456,13 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                             </div>
                         </div>
                         <div class="col-lg-4 col-md-12">
+                            <div class="mb-2">
+                                <small class="text-muted fw-medium">💰 Posisi Keuangan & Laba</small>
+                            </div>
                             <div class="row g-3">
                 `;
 
-                // Render right column (FDR, NPF, BOPO)
+                // Render right column (Posisi Keuangan & Laba)
                 rightColumn.forEach(indicator => {
                     const value = highlights[indicator.key];
                     const change = changes[indicator.key];

@@ -73,17 +73,20 @@
                             @enderror
                         </div>
 
-                        <!-- Aset (Calculated) -->
+                        <!-- Aset (Manual Input) -->
                         <div class="col-md-6 mb-3">
-                            <label for="aset" class="form-label">Total Aset <span class="badge bg-info">Otomatis</span></label>
+                            <label for="aset" class="form-label">Total Aset <span class="badge bg-secondary">Manual</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number" min="0" readonly
-                                       class="form-control bg-light"
-                                       id="aset" name="aset" value="{{ old('aset', $financialHighlight->getCalculatedField('aset')) }}"
-                                       placeholder="Dihitung otomatis">
+                                <input type="number" min="0"
+                                       class="form-control @error('aset') is-invalid @enderror"
+                                       id="aset" name="aset" value="{{ old('aset', $financialHighlight->aset) }}"
+                                       placeholder="Masukkan total aset">
                             </div>
-                            <small class="text-muted">Total aset (dihitung dari pembiayaan + DPK + estimasi aset lain)</small>
+                            <small class="text-muted">Total aset perusahaan (input manual)</small>
+                            @error('aset')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
                         </div>
 
                         <!-- Pembiayaan (Calculated) -->
@@ -111,6 +114,22 @@
                             </div>
                             <small class="text-muted">Laba bersih (positif) atau rugi (negatif)</small>
                             @error('laba_rugi')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Biaya -->
+                        <div class="col-md-6 mb-3">
+                            <label for="biaya" class="form-label">Biaya</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number"
+                                       class="form-control @error('biaya') is-invalid @enderror"
+                                       id="biaya" name="biaya" value="{{ old('biaya', $financialHighlight->biaya) }}"
+                                       placeholder="Masukkan total biaya">
+                            </div>
+                            <small class="text-muted">Total biaya operasional</small>
+                            @error('biaya')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
@@ -169,6 +188,38 @@
                             </div>
                             <small class="text-muted">Efficiency ratio</small>
                             @error('bopo')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Cash Ratio -->
+                        <div class="col-md-6 mb-3">
+                            <label for="cash_ratio" class="form-label">Cash Ratio</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" min="0" max="200"
+                                       class="form-control @error('cash_ratio') is-invalid @enderror"
+                                       id="cash_ratio" name="cash_ratio" value="{{ old('cash_ratio', $financialHighlight->cash_ratio) }}"
+                                       placeholder="Contoh: 15.50">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Rasio kas terhadap kewajiban lancar</small>
+                            @error('cash_ratio')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- KPMM -->
+                        <div class="col-md-6 mb-3">
+                            <label for="kpmm" class="form-label">KPMM</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" min="0"
+                                       class="form-control @error('kpmm') is-invalid @enderror"
+                                       id="kpmm" name="kpmm" value="{{ old('kpmm', $financialHighlight->kpmm) }}"
+                                       placeholder="Masukkan nominal KPMM">
+                            </div>
+                            <small class="text-muted">Kewajiban Penyediaan Modal Minimum (nominal)</small>
+                            @error('kpmm')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>

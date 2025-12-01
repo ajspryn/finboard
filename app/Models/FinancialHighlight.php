@@ -16,10 +16,13 @@ class FinancialHighlight extends Model
         'aset',
         'pembiayaan',
         'laba_rugi',
+        'biaya',
         'dpk',
         'fdr',
         'npf',
         'bopo',
+        'cash_ratio',
+        'kpmm',
     ];
 
     protected $casts = [
@@ -31,10 +34,13 @@ class FinancialHighlight extends Model
         'aset' => 'decimal:2',
         'pembiayaan' => 'decimal:2',
         'laba_rugi' => 'decimal:2',
+        'biaya' => 'decimal:2',
         'dpk' => 'decimal:2',
         'fdr' => 'decimal:4',
         'npf' => 'decimal:4',
         'bopo' => 'decimal:4',
+        'cash_ratio' => 'decimal:4',
+        'kpmm' => 'decimal:2',
     ];
 
     /**
@@ -90,6 +96,7 @@ class FinancialHighlight extends Model
 
     /**
      * Calculate DPK (Dana Pihak Ketiga) from database
+     * Includes tabungan and deposito excluding ABP (kdprd 41)
      */
     public static function calculateDpk($year, $month)
     {
@@ -101,6 +108,7 @@ class FinancialHighlight extends Model
         $depositoTotal = DB::table('depositos')
             ->where('period_year', $year)
             ->where('period_month', $month)
+            ->where('kdprd', '!=', '41') // Exclude ABP (Arisan Berjangka Pasiva)
             ->sum('nomrp');
 
         return $tabunganTotal + $depositoTotal;
@@ -138,17 +146,14 @@ class FinancialHighlight extends Model
 
     /**
      * Calculate Aset (Assets) from database
-     * Simplified calculation: Financing + DPK + estimated other assets (10% buffer)
+     * Formula: Financing + DPK (without buffer)
      */
     public static function calculateAset($year, $month)
     {
         $pembiayaan = self::calculatePembiayaan($year, $month);
         $dpk = self::calculateDpk($year, $month);
 
-        // Add 10% buffer for other assets (cash, fixed assets, etc.)
-        $otherAssets = ($pembiayaan + $dpk) * 0.1;
-
-        return $pembiayaan + $dpk + $otherAssets;
+        return $pembiayaan + $dpk;
     }
 
     /**

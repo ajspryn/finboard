@@ -42,6 +42,7 @@ class FinancialHighlightController extends Controller
             'aset' => 'nullable|numeric|min:0',
             'pembiayaan' => 'nullable|numeric|min:0',
             'laba_rugi' => 'nullable|numeric',
+            'biaya' => 'nullable|numeric',
             'dpk' => 'nullable|numeric|min:0',
             'fdr' => 'nullable|numeric|min:0|max:200',
             'npf' => 'nullable|numeric|min:0|max:100',
@@ -94,10 +95,13 @@ class FinancialHighlightController extends Controller
             'aset' => 'nullable|numeric|min:0',
             'pembiayaan' => 'nullable|numeric|min:0',
             'laba_rugi' => 'nullable|numeric',
+            'biaya' => 'nullable|numeric',
             'dpk' => 'nullable|numeric|min:0',
             'fdr' => 'nullable|numeric|min:0|max:200',
             'npf' => 'nullable|numeric|min:0|max:100',
             'bopo' => 'nullable|numeric|min:0|max:200',
+            'cash_ratio' => 'nullable|numeric|min:0|max:200',
+            'kpmm' => 'nullable|numeric|min:0',
         ]);
 
         $data = $request->all();
@@ -168,7 +172,7 @@ class FinancialHighlightController extends Controller
 
         // Calculate percentage changes
         $changes = [];
-        $fields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'dpk', 'fdr', 'npf', 'bopo'];
+        $fields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'biaya', 'dpk', 'fdr', 'npf', 'bopo', 'cash_ratio', 'kpmm'];
 
         foreach ($fields as $field) {
             $changes[$field] = $latest->getPercentageChange($field, $comparison);
@@ -219,7 +223,6 @@ class FinancialHighlightController extends Controller
             'dpk' => FinancialHighlight::calculateDpk($year, $month),
             'pembiayaan' => FinancialHighlight::calculatePembiayaan($year, $month),
             'npf' => FinancialHighlight::calculateNpf($year, $month),
-            'aset' => FinancialHighlight::calculateAset($year, $month),
         ]);
     }
 }
