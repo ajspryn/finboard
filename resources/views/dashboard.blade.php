@@ -549,11 +549,6 @@ function formatNominal($amount) {
                                         <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="{{ $kolektibilitas['nama_kategori'] }}">
                                             Kol {{ $kolektibilitas['kategori'] }} - {{ $kolektibilitas['nama_kategori'] }}
                                         </h6>
-                                        <div class="text-end">
-                                            <span class="badge bg-{{ $kolektibilitas['nominal_growth'] >= 0 ? 'success' : 'danger' }} badge-sm">
-                                                {{ $kolektibilitas['nominal_growth'] >= 0 ? '+' : '' }}{{ number_format($kolektibilitas['nominal_growth'], 1) }}%
-                                            </span>
-                                        </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
@@ -564,9 +559,23 @@ function formatNominal($amount) {
                                         </div>
                                         <div class="text-end">
                                             <small class="text-muted d-block">vs Bulan Lalu</small>
-                                            <small class="{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
-                                                <i class="ti ti-trending-{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'up' : 'down' }} ti-xs"></i>
-                                                {{ number_format(abs($kolektibilitas['jumlah_growth']), 1) }}%
+                                            @php
+                                                $isNasabahTambah = $kolektibilitas['jumlah_growth'] >= 0;
+                                                $isKolTinggi = $kolektibilitas['kategori'] >= 2;
+                                                $colorClass = $isNasabahTambah ? ($isKolTinggi ? 'text-danger' : 'text-success') : 'text-success';
+                                                $icon = $isNasabahTambah ? 'ti-trending-up' : 'ti-trending-down';
+
+                                                // Hitung jumlah sebelumnya
+                                                $currentJumlah = $kolektibilitas['current_jumlah'];
+                                                $growthPercent = $kolektibilitas['jumlah_growth'];
+                                                $previousJumlah = $growthPercent != 0 ?
+                                                    round($currentJumlah / (1 + $growthPercent/100)) :
+                                                    $currentJumlah;
+                                            @endphp
+                                            <small class="{{ $colorClass }} fw-medium">
+                                                <i class="ti {{ $icon }} ti-xs"></i>
+                                                {{ $isNasabahTambah ? '+' : '' }}{{ number_format(abs($growthPercent), 1) }}%
+                                                ({{ number_format($previousJumlah) }} → {{ number_format($currentJumlah) }})
                                             </small>
                                         </div>
                                     </div>

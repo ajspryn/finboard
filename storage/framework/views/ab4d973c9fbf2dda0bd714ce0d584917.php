@@ -559,11 +559,6 @@ function formatNominal($amount) {
                                             Kol <?php echo e($kolektibilitas['kategori']); ?> - <?php echo e($kolektibilitas['nama_kategori']); ?>
 
                                         </h6>
-                                        <div class="text-end">
-                                            <span class="badge bg-<?php echo e($kolektibilitas['nominal_growth'] >= 0 ? 'success' : 'danger'); ?> badge-sm">
-                                                <?php echo e($kolektibilitas['nominal_growth'] >= 0 ? '+' : ''); ?><?php echo e(number_format($kolektibilitas['nominal_growth'], 1)); ?>%
-                                            </span>
-                                        </div>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
@@ -575,9 +570,23 @@ function formatNominal($amount) {
                                         </div>
                                         <div class="text-end">
                                             <small class="text-muted d-block">vs Bulan Lalu</small>
-                                            <small class="<?php echo e($kolektibilitas['jumlah_growth'] >= 0 ? 'text-success' : 'text-danger'); ?> fw-medium">
-                                                <i class="ti ti-trending-<?php echo e($kolektibilitas['jumlah_growth'] >= 0 ? 'up' : 'down'); ?> ti-xs"></i>
-                                                <?php echo e(number_format(abs($kolektibilitas['jumlah_growth']), 1)); ?>%
+                                            <?php
+                                                $isNasabahTambah = $kolektibilitas['jumlah_growth'] >= 0;
+                                                $isKolTinggi = $kolektibilitas['kategori'] >= 2;
+                                                $colorClass = $isNasabahTambah ? ($isKolTinggi ? 'text-danger' : 'text-success') : 'text-success';
+                                                $icon = $isNasabahTambah ? 'ti-trending-up' : 'ti-trending-down';
+
+                                                // Hitung jumlah sebelumnya
+                                                $currentJumlah = $kolektibilitas['current_jumlah'];
+                                                $growthPercent = $kolektibilitas['jumlah_growth'];
+                                                $previousJumlah = $growthPercent != 0 ?
+                                                    round($currentJumlah / (1 + $growthPercent/100)) :
+                                                    $currentJumlah;
+                                            ?>
+                                            <small class="<?php echo e($colorClass); ?> fw-medium">
+                                                <i class="ti <?php echo e($icon); ?> ti-xs"></i>
+                                                <?php echo e($isNasabahTambah ? '+' : ''); ?><?php echo e(number_format(abs($growthPercent), 1)); ?>%
+                                                (<?php echo e(number_format($previousJumlah)); ?> → <?php echo e(number_format($currentJumlah)); ?>)
                                             </small>
                                         </div>
                                     </div>
