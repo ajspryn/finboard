@@ -97,6 +97,64 @@ function formatNominal($amount) {
         background-color: rgba(0,123,255,0.1) !important;
         transform: scale(1.02);
     }
+
+    /* Financial Highlights Card Styles */
+    .financial-highlight-card {
+        min-height: 140px;
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+    }
+    .financial-highlight-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+    }
+    .financial-highlight-card .card-body {
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+    }
+    .financial-highlight-card .avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .financial-highlight-card .card-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+    }
+    .financial-highlight-card h4 {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+    }
+    .financial-highlight-card .change-indicator {
+        margin-top: auto;
+        padding-top: 0.5rem;
+    }
+
+    /* Category headers */
+    .category-header {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
 </style>
 @endsection
 
@@ -5406,15 +5464,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                     }
 
                     return `
-                        <div class="col-12">
-                            <div class="card h-100 border-${indicator.color} border-opacity-25">
-                                <div class="card-body text-center">
-                                    <div class="avatar avatar-sm mx-auto mb-2" style="background-color: rgba(var(--bs-${indicator.color}-rgb), 0.1);">
-                                        <i class="ti ${indicator.icon} text-${indicator.color}" style="font-size: 1.25rem;"></i>
+                        <div class="col-12 mb-3">
+                            <div class="card financial-highlight-card h-100 border-${indicator.color} border-opacity-25 shadow-sm">
+                                <div class="card-body text-center p-3">
+                                    <div class="avatar avatar-sm mx-auto mb-3" style="background: linear-gradient(135deg, rgba(var(--bs-${indicator.color}-rgb), 0.1), rgba(var(--bs-${indicator.color}-rgb), 0.2)); border-radius: 50%; box-shadow: 0 4px 12px rgba(var(--bs-${indicator.color}-rgb), 0.2);">
+                                        <i class="ti ${indicator.icon} text-${indicator.color}" style="font-size: 1.5rem;"></i>
                                     </div>
-                                    <h6 class="card-title mb-1 text-${indicator.color}">${indicator.label}</h6>
-                                    <h4 class="mb-1 ${value !== null ? 'text-dark' : 'text-muted'}">${displayValue}</h4>
-                                    ${changeHtml}
+                                    <h6 class="card-title mb-2 text-${indicator.color} fw-bold" style="font-size: 0.9rem;">${indicator.label}</h6>
+                                    <h4 class="mb-2 ${value !== null ? 'text-dark' : 'text-muted'} fw-bold" style="font-size: 1.25rem; line-height: 1.2;">${displayValue}</h4>
+                                    <div class="change-indicator">
+                                        ${changeHtml}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -5423,9 +5483,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
 
                 // Render left column (Modal & Profitabilitas)
                 html += `
-                        <div class="col-lg-4 col-md-12">
-                            <div class="mb-2">
-                                <small class="text-muted fw-medium">📊 Modal & Profitabilitas</small>
+                        <div class="col-lg-4 col-md-6 col-12">
+                            <div class="mb-3">
+                                <small class="category-header">📊 Modal & Profitabilitas</small>
                             </div>
                             <div class="row g-3">
                 `;
@@ -5438,9 +5498,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 html += `
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-12">
-                            <div class="mb-2">
-                                <small class="text-muted fw-medium">⚡ Likuiditas, Risiko & Efisiensi</small>
+                        <div class="col-lg-4 col-md-6 col-12">
+                            <div class="mb-3">
+                                <small class="category-header">⚡ Likuiditas, Risiko & Efisiensi</small>
                             </div>
                             <div class="row g-3">
                 `;
@@ -5455,9 +5515,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 html += `
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-12">
-                            <div class="mb-2">
-                                <small class="text-muted fw-medium">💰 Posisi Keuangan & Laba</small>
+                        <div class="col-lg-4 col-md-6 col-12">
+                            <div class="mb-3">
+                                <small class="category-header">💰 Posisi Keuangan & Laba</small>
                             </div>
                             <div class="row g-3">
                 `;
