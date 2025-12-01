@@ -1,0 +1,225 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\FinancialHighlight;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class FinancialHighlightController extends Controller
+{
+    /**
+     * Display financial highlights management page
+     */
+    public function index()
+    {
+        $highlights = FinancialHighlight::orderBy('period_year', 'desc')
+            ->orderBy('period_month', 'desc')
+            ->paginate(12);
+
+        return view('financial-highlights.index', compact('highlights'));
+    }
+
+    /**
+     * Show the form for creating a new financial highlight
+     */
+    public function create()
+    {
+        return view('financial-highlights.create');
+    }
+
+    /**
+     * Store a newly created financial highlight
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'period_year' => 'required|integer|min:2020|max:2030',
+            'period_month' => 'required|integer|min:1|max:12',
+            'car' => 'nullable|numeric|min:0|max:100',
+            'roa' => 'nullable|numeric|min:-100|max:100',
+            'roe' => 'nullable|numeric|min:-100|max:100',
+            'aset' => 'nullable|numeric|min:0',
+            'pembiayaan' => 'nullable|numeric|min:0',
+            'laba_rugi' => 'nullable|numeric',
+            'dpk' => 'nullable|numeric|min:0',
+            'fdr' => 'nullable|numeric|min:0|max:200',
+            'npf' => 'nullable|numeric|min:0|max:100',
+            'bopo' => 'nullable|numeric|min:0|max:200',
+        ]);
+
+        // Check if period already exists
+        $existing = FinancialHighlight::where('period_year', $request->period_year)
+            ->where('period_month', $request->period_month)
+            ->first();
+
+        if ($existing) {
+            return back()->withErrors(['period' => 'Data untuk periode ini sudah ada.'])->withInput();
+        }
+
+        $data = $request->all();
+
+        // Calculate derived values if not provided
+        $derivedFields = ['dpk', 'pembiayaan', 'npf', 'aset'];
+        foreach ($derivedFields as $field) {
+            if (empty($data[$field])) {
+                $method = 'calculate' . ucfirst($field);
+                $data[$field] = FinancialHighlight::$method($data['period_year'], $data['period_month']);
+            }
+        }
+
+        FinancialHighlight::create($data);
+
+        return redirect()->route('financial-highlights.index')
+            ->with('success', 'Data financial highlight berhasil ditambahkan.');
+    }
+
+    /**
+     * Show the form for editing financial highlight
+     */
+    public function edit(FinancialHighlight $financialHighlight)
+    {
+        return view('financial-highlights.edit', compact('financialHighlight'));
+    }
+
+    /**
+     * Update financial highlight
+     */
+    public function update(Request $request, FinancialHighlight $financialHighlight)
+    {
+        $request->validate([
+            'car' => 'nullable|numeric|min:0|max:100',
+            'roa' => 'nullable|numeric|min:-100|max:100',
+            'roe' => 'nullable|numeric|min:-100|max:100',
+            'aset' => 'nullable|numeric|min:0',
+            'pembiayaan' => 'nullable|numeric|min:0',
+            'laba_rugi' => 'nullable|numeric',
+            'dpk' => 'nullable|numeric|min:0',
+            'fdr' => 'nullable|numeric|min:0|max:200',
+            'npf' => 'nullable|numeric|min:0|max:100',
+            'bopo' => 'nullable|numeric|min:0|max:200',
+        ]);
+
+        $data = $request->all();
+
+        // Calculate derived values if not provided
+        $derivedFields = ['dpk', 'pembiayaan', 'npf', 'aset'];
+        foreach ($derivedFields as $field) {
+            if (empty($data[$field])) {
+                $method = 'calculate' . ucfirst($field);
+                $data[$field] = FinancialHighlight::$method($financialHighlight->period_year, $financialHighlight->period_month);
+            }
+        }
+
+        $financialHighlight->update($data);
+
+        return redirect()->route('financial-highlights.index')
+            ->with('success', 'Data financial highlight berhasil diperbarui.');
+    }
+
+    /**
+     * Delete financial highlight
+     */
+    public function destroy(FinancialHighlight $financialHighlight)
+    {
+        $financialHighlight->delete();
+
+        return redirect()->route('financial-highlights.index')
+            ->with('success', 'Data financial highlight berhasil dihapus.');
+    }
+
+    /**
+     * Get financial highlights data for dashboard
+     */
+    public function getDashboardData(Request $request)
+    {
+        $comparisonType = $request->get('comparison', 'MOM'); // MOM or YOY
+        $filterMonth = $request->get('month');
+        $filterYear = $request->get('year');
+
+        // Get data for the specified period or latest if no filters
+        $query = FinancialHighlight::query();
+
+        if ($filterMonth && $filterYear) {
+            $query->where('period_month', $filterMonth)
+                ->where('period_year', $filterYear);
+        }
+
+        $latest = $query->orderBy('period_year', 'desc')
+            ->orderBy('period_month', 'desc')
+            ->first();
+
+        if (!$latest) {
+            return response()->json([
+                'data' => null,
+                'comparison' => null,
+                'changes' => [],
+                'comparison_type' => $comparisonType,
+                'period' => null
+            ]);
+        }
+
+        // Get comparison data
+        $comparison = FinancialHighlight::getPreviousPeriod(
+            $latest->period_year,
+            $latest->period_month,
+            $comparisonType
+        );
+
+        // Calculate percentage changes
+        $changes = [];
+        $fields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'dpk', 'fdr', 'npf', 'bopo'];
+
+        foreach ($fields as $field) {
+            $changes[$field] = $latest->getPercentageChange($field, $comparison);
+        }
+
+        // Prepare data with calculated fields
+        $data = $latest->toArray();
+        $calculatedFields = ['dpk', 'pembiayaan', 'npf', 'aset', 'fdr'];
+        foreach ($calculatedFields as $field) {
+            if ($data[$field] === null) {
+                $data[$field] = $latest->getCalculatedField($field);
+            }
+        }
+
+        // Prepare comparison data with calculated fields
+        $comparisonData = null;
+        if ($comparison) {
+            $comparisonData = $comparison->toArray();
+            foreach ($calculatedFields as $field) {
+                if ($comparisonData[$field] === null) {
+                    $comparisonData[$field] = $comparison->getCalculatedField($field);
+                }
+            }
+        }
+
+        return response()->json([
+            'data' => $data,
+            'comparison' => $comparisonData,
+            'changes' => $changes,
+            'comparison_type' => $comparisonType,
+            'period' => $latest->period_year . '-' . str_pad($latest->period_month, 2, '0', STR_PAD_LEFT)
+        ]);
+    }
+
+    /**
+     * Calculate derived financial metrics for a specific period
+     */
+    public function calculateDerivedValues(Request $request)
+    {
+        $year = $request->get('year');
+        $month = $request->get('month');
+
+        if (!$year || !$month) {
+            return response()->json(['error' => 'Year and month are required'], 400);
+        }
+
+        return response()->json([
+            'dpk' => FinancialHighlight::calculateDpk($year, $month),
+            'pembiayaan' => FinancialHighlight::calculatePembiayaan($year, $month),
+            'npf' => FinancialHighlight::calculateNpf($year, $month),
+            'aset' => FinancialHighlight::calculateAset($year, $month),
+        ]);
+    }
+}

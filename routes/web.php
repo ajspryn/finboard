@@ -7,6 +7,7 @@ use App\Http\Controllers\UploadController;
 use App\Http\Controllers\FundingController;
 use App\Http\Controllers\DailyActivityController;
 use App\Http\Controllers\UserSettingsController;
+use App\Http\Controllers\FinancialHighlightController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +44,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/trend-funding-detail', [DashboardController::class, 'getTrendFundingDetail'])->name('dashboard.trend.funding.detail');
     Route::get('/dashboard/trend-product-detail', [DashboardController::class, 'getTrendProductDetail'])->name('dashboard.trend.product.detail');
     Route::get('/dashboard/customer-details', [DashboardController::class, 'getCustomerDetails'])->name('dashboard.customer.details');
+    Route::get('/dashboard/kolektibilitas-details', [DashboardController::class, 'getKolektibilitasDetails'])->name('dashboard.kolektibilitas.details');
 
     // Daily Activity Routes (Admin and Pengurus only)
     Route::middleware(['role:admin,pengurus'])->group(function () {
@@ -62,6 +64,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/user-settings', [UserSettingsController::class, 'store'])->name('user.settings.store');
         Route::put('/user-settings/{user}', [UserSettingsController::class, 'update'])->name('user.settings.update');
         Route::delete('/user-settings/{user}', [UserSettingsController::class, 'destroy'])->name('user.settings.destroy');
+
+        // Financial Highlights Routes
+        Route::resource('financial-highlights', FinancialHighlightController::class);
+        Route::get('/api/financial-highlights/dashboard', [FinancialHighlightController::class, 'getDashboardData'])->name('financial-highlights.dashboard');
+        Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
     });
 
     // Funding Routes (Admin and Funding roles)

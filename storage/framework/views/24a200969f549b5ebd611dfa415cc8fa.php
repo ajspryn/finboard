@@ -135,6 +135,13 @@
                             <div data-i18n="UserSettings">Pengaturan User</div>
                         </a>
                     </li>
+
+                    <li class="menu-item <?php echo e(request()->is('financial-highlights*') ? 'active' : ''); ?>">
+                        <a href="/financial-highlights" class="menu-link">
+                            <i class="menu-icon tf-icons ti ti-chart-line"></i>
+                            <div data-i18n="FinancialHighlights">Financial Highlights</div>
+                        </a>
+                    </li>
                     <?php endif; ?>
                 </ul>
             </aside>

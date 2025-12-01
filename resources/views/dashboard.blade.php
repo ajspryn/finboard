@@ -102,6 +102,51 @@ function formatNominal($amount) {
 
 @section('content')
 
+    <!-- Financial Highlights Row -->
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning border-2">
+                <div class="card-header d-flex justify-content-between align-items-center bg-label-warning">
+                    <div class="card-title mb-0">
+                        <h4 class="mb-0 text-warning">
+                            <i class="ti ti-chart-line me-2"></i>
+                            Financial Highlights
+                        </h4>
+                        <small class="text-muted">Indikator Kinerja Keuangan Terbaru</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Comparison Type Toggle -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-warning active" id="btnMOM" onclick="setComparisonType('MOM')">
+                                <i class="ti ti-calendar-month me-1"></i>MOM
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" id="btnYOY" onclick="setComparisonType('YOY')">
+                                <i class="ti ti-calendar-year me-1"></i>YOY
+                            </button>
+                        </div>
+                        <!-- Manage Button -->
+                        <a href="{{ route('financial-highlights.index') }}" class="btn btn-warning btn-sm">
+                            <i class="ti ti-settings me-1"></i>Kelola
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="financialHighlightsContainer">
+                        <!-- Loading state -->
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="text-muted mt-2">Memuat data financial highlights...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Row 1: KPI Cards Detail (Funding, Lending, NPF) -->
     <div class="row">
         <!-- Funding Card -->
@@ -163,7 +208,7 @@ function formatNominal($amount) {
                             <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded bg-label-primary">
-                                        <i class="ti ti-building-bank"></i>
+                                        DP 1
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
@@ -181,7 +226,7 @@ function formatNominal($amount) {
                             <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded bg-label-success">
-                                        <i class="ti ti-link"></i>
+                                        DP 2
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
@@ -199,7 +244,7 @@ function formatNominal($amount) {
                             <li class="d-flex mb-2 pb-1">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded bg-label-info">
-                                        <i class="ti ti-wallet"></i>
+                                        DP 3
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
@@ -225,7 +270,7 @@ function formatNominal($amount) {
                             <li class="d-flex mb-3">
                                 <div class="avatar flex-shrink-0 me-3">
                                     <span class="avatar-initial rounded-circle bg-label-{{ ['primary', 'success', 'info', 'warning', 'danger'][$index] }}">
-                                        <i class="ti ti-piggy-bank"></i>
+                                        {{ $index + 1 }}
                                     </span>
                                 </div>
                                 <div class="d-flex w-100 flex-column">
@@ -387,25 +432,24 @@ function formatNominal($amount) {
         </div>
         @endif
 
-        <!-- NPF Card -->
+        <!-- Kolektibilitas Card -->
         @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
         <div class="col-lg-4 col-md-12 col-12 mb-4">
             <div class="card h-100 border-danger border-2">
                 <div class="card-header d-flex justify-content-between bg-label-danger">
                     <div class="card-title mb-0">
-                        <h5 class="mb-0 text-danger">⚠️ NPF</h5>
-                        <small class="text-muted">Non-Performing Financing</small>
+                        <h5 class="mb-0 text-danger">📊 NPF & Kolektibilitas</h5>
+                        <small class="text-muted">Kualitas Pembiayaan & Risiko</small>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <!-- NPF Information -->
+                    <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="d-flex flex-column">
-                            <div class="d-flex align-items-center mb-1">
-                                <h2 class="mb-0 me-2 text-danger fw-bold">
-                                    {{ formatNominal($npf['total']) }}
-                                </h2>
-                            </div>
-                            <small class="text-muted">Total NPF</small>
+                            <h2 class="mb-0 me-2 text-danger fw-bold">
+                                {{ $npf['ratio'] }}%
+                            </h2>
+                            <small class="text-muted">NPF Ratio</small>
                         </div>
                         <div class="avatar avatar-lg">
                             <span class="avatar-initial rounded-3 bg-danger">
@@ -414,77 +458,69 @@ function formatNominal($amount) {
                         </div>
                     </div>
 
-                    <div class="mt-3">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <h6 class="mb-0">Rasio NPF</h6>
-                            <h4 class="mb-0 text-danger">{{ $npf['ratio'] }}%</h4>
-                        </div>
-
-                        <div class="progress mb-3" style="height: 10px;">
-                            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ $npf['ratio'] }}%;" aria-valuenow="{{ $npf['ratio'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <small class="text-muted">
-                                <i class="ti ti-clock-exclamation me-1"></i>Tunggakan Pokok NPF
-                            </small>
-                            <strong class="text-danger">
-                                {{ formatNominal($npf['tunggakan_pokok']) }}
-                            </strong>
-                        </div>                        <div class="alert alert-warning mb-3" role="alert">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="ti ti-info-circle"></i>
-                                </div>
-                                <div class="flex-grow-1 ms-2">
-                                    <small>
-                                        @if($npf['ratio'] < 5)
-                                            NPF dalam batas aman (< 5%)
-                                        @else
-                                            NPF memerlukan perhatian khusus
-                                        @endif
-                                    </small>
-                                </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <div class="d-flex flex-column">
+                                <small class="text-muted">Total NPF</small>
+                                <h3 class="mb-0 text-danger">{{ formatNominal($npf['total']) }}</h3>
                             </div>
                         </div>
+                        <div class="col-6">
+                            <div class="d-flex flex-column">
+                                <small class="text-muted">Tunggakan Pokok</small>
+                                <h3 class="mb-0 text-warning">{{ formatNominal($npf['tunggakan_pokok']) }}</h3>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- Top 5 Nasabah Penyumbang NPF -->
-                        <div class="border-top pt-3">
-                            <h6 class="mb-3 text-danger">
-                                <i class="ti ti-users-group me-1"></i>
-                                Top 5 Nasabah NPF
-                            </h6>
-                            @if($topNpfContributors->count() > 0)
-                                @foreach($topNpfContributors as $index => $contributor)
-                                <div class="d-flex align-items-start mb-3 pb-3 {{ $loop->last ? '' : 'border-bottom' }}">
-                                    <div class="avatar avatar-sm me-3 flex-shrink-0">
-                                        <span class="avatar-initial rounded-circle bg-label-{{ $contributor['colbaru'] == '3' ? 'warning' : ($contributor['colbaru'] == '4' ? 'danger' : 'dark') }}">
-                                            {{ $index + 1 }}
-                                        </span>
-                                    </div>
-                                    <div class="flex-grow-1 overflow-hidden">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <h6 class="mb-0 text-truncate" style="max-width: 180px;" title="{{ $contributor['nama'] }}">
-                                                {{ $contributor['nama'] }}
-                                            </h6>
-                                            <span class="badge bg-{{ $contributor['colbaru'] == '3' ? 'warning' : ($contributor['colbaru'] == '4' ? 'danger' : 'dark') }} badge-sm">
-                                                {{ $contributor['colbaru_label'] }}
+                    <hr class="my-3">
+
+                    <!-- Kolektibilitas Categories -->
+                    <div class="mt-3">
+                        <h6 class="mb-3">📈 Kategori Kolektibilitas</h6>
+                        @if(isset($kolektibilitasComparison) && count($kolektibilitasComparison) > 0)
+                            @foreach($kolektibilitasComparison as $kolektibilitas)
+                            <div class="d-flex align-items-start mb-3 pb-3 {{ $loop->last ? '' : 'border-bottom' }} clickable-metric" onclick="showKolektibilitasDetails({{ $kolektibilitas['kategori'] }}, '{{ $kolektibilitas['nama_kategori'] }}')" style="cursor: pointer;" title="Klik untuk lihat 100 nasabah teratas">
+                                <div class="avatar avatar-sm me-3 flex-shrink-0">
+                                    <span class="avatar-initial rounded-circle bg-label-{{ ['success', 'warning', 'danger', 'dark', 'secondary'][$kolektibilitas['kategori']-1] }}">
+                                        {{ $kolektibilitas['kategori'] }}
+                                    </span>
+                                </div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="{{ $kolektibilitas['nama_kategori'] }}">
+                                            Kol {{ $kolektibilitas['kategori'] }} - {{ $kolektibilitas['nama_kategori'] }}
+                                        </h6>
+                                        <div class="text-end">
+                                            <span class="badge bg-{{ $kolektibilitas['nominal_growth'] >= 0 ? 'success' : 'danger' }} badge-sm">
+                                                {{ $kolektibilitas['nominal_growth'] >= 0 ? '+' : '' }}{{ number_format($kolektibilitas['nominal_growth'], 1) }}%
                                             </span>
                                         </div>
-                                        <small class="text-muted d-block mb-1">{{ $contributor['nokontrak'] }}</small>
-                                        <strong class="text-danger">
-                                            {{ formatNominal($contributor['osmdlc']) }}
-                                        </strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="text-muted d-block">{{ number_format($kolektibilitas['current_jumlah']) }} Nasabah</small>
+                                            <strong class="text-info">
+                                                {{ formatNominal($kolektibilitas['current_nominal']) }}
+                                            </strong>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted d-block">vs Bulan Lalu</small>
+                                            <small class="{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
+                                                <i class="ti ti-trending-{{ $kolektibilitas['jumlah_growth'] >= 0 ? 'up' : 'down' }} ti-xs"></i>
+                                                {{ number_format(abs($kolektibilitas['jumlah_growth']), 1) }}%
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
-                                @endforeach
-                            @else
-                                <div class="text-center text-muted py-3">
-                                    <i class="ti ti-check-circle ti-lg mb-2"></i>
-                                    <p class="mb-0 small">Tidak ada NPF</p>
-                                </div>
-                            @endif
-                        </div>
+                            </div>
+                            @endforeach
+                        @else
+                            <div class="text-center text-muted py-3">
+                                <i class="ti ti-info-circle ti-lg mb-2"></i>
+                                <p class="mb-0 small">Belum ada data kolektibilitas</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -1595,6 +1631,27 @@ function formatNominal($amount) {
         </div>
     </div>
 </div>
+
+<!-- Modal Detail Kolektibilitas -->
+<div class="modal fade" id="kolektibilitasDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="kolektibilitasDetailsModalTitle">
+                    <i class="ti ti-users"></i> Detail Nasabah Kolektibilitas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="kolektibilitasDetailsModalBody">
+                <div class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -1805,6 +1862,9 @@ function formatNominal(amount) {
     if (segmentasiEl) {
         const segmentasiData = @json($segmentasiDistribution);
         if (segmentasiData && segmentasiData.values && segmentasiData.values.length > 0) {
+            // Calculate total for percentage calculation
+            const totalValue = segmentasiData.values.reduce((sum, val) => sum + val, 0);
+
             const segmentasiChart = new ApexCharts(segmentasiEl, {
                 series: [{
                     data: segmentasiData.values
@@ -1824,12 +1884,13 @@ function formatNominal(amount) {
                 },
                 dataLabels: {
                     enabled: true,
-                    formatter: function(val) {
-                        return val.toFixed(1) + 'M';
+                    formatter: function(val, opts) {
+                        const percentage = totalValue > 0 ? ((val / totalValue) * 100).toFixed(1) : 0;
+                        return val.toFixed(1) + 'M\n(' + percentage + '%)';
                     },
-                    offsetY: -20,
+                    offsetY: -30,
                     style: {
-                        fontSize: '11px',
+                        fontSize: '10px',
                         fontWeight: 600,
                         colors: ['#696cff', '#03c3ec', '#fdb528', '#ff5722', '#8592a3']
                     }
@@ -1849,7 +1910,8 @@ function formatNominal(amount) {
                 tooltip: {
                     y: {
                         formatter: function(val) {
-                            return 'Rp ' + val.toFixed(2) + ' Miliar';
+                            const percentage = totalValue > 0 ? ((val / totalValue) * 100).toFixed(1) : 0;
+                            return 'Rp ' + val.toFixed(2) + ' Miliar (' + percentage + '%)';
                         }
                     }
                 }
@@ -4430,6 +4492,107 @@ function showCustomerDetails(jenis, type) {
             `;
         });
 }
+
+// Kolektibilitas Details Modal Function
+function showKolektibilitasDetails(kategori, namaKategori) {
+    // Get modal elements
+    const modal = document.getElementById('kolektibilitasDetailsModal');
+    const modalTitle = document.getElementById('kolektibilitasDetailsModalTitle');
+    const modalBody = document.getElementById('kolektibilitasDetailsModalBody');
+
+    // Dispose of any existing modal instance to prevent conflicts
+    const existingModal = bootstrap.Modal.getInstance(modal);
+    if (existingModal) {
+        existingModal.dispose();
+    }
+
+    // Clear any existing backdrop
+    const existingBackdrop = document.querySelector('.modal-backdrop');
+    if (existingBackdrop) {
+        existingBackdrop.remove();
+    }
+
+    // Remove modal-open class from body if it exists
+    document.body.classList.remove('modal-open');
+
+    const modalInstance = new bootstrap.Modal(modal, {
+        backdrop: true,
+        keyboard: true
+    });
+
+    // Set modal title
+    modalTitle.textContent = `Top 100 Nasabah - Kol ${kategori} (${namaKategori})`;
+
+    // Show loading
+    modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"></div><br>Loading...</div>';
+    modalInstance.show();
+
+    // Add event listener for when modal is hidden to ensure proper cleanup
+    modal.addEventListener('hidden.bs.modal', function() {
+        console.log('Kolektibilitas details modal hidden, cleaning up...');
+        // Dispose of the modal instance
+        modalInstance.dispose();
+        // Ensure backdrop is removed
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+        // Remove modal-open class from body
+        document.body.classList.remove('modal-open');
+        // Restore body scroll
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }, { once: true });
+
+    // Fetch kolektibilitas customer data
+    fetch(`/dashboard/kolektibilitas-details?kategori=${kategori}&limit=100`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.customers && data.customers.length > 0) {
+                let html = '<div class="table-responsive" style="max-height: 500px; overflow-y: auto;">';
+                html += '<table class="table table-striped table-hover table-sm">';
+                html += '<thead class="sticky-top bg-white">';
+                html += '<tr>';
+                html += '<th class="text-center">#</th>';
+                html += '<th>Nama Nasabah</th>';
+                html += '<th>No Kontrak</th>';
+                html += '<th class="text-end">Outstanding</th>';
+                html += '<th class="text-center">Produk</th>';
+                html += '<th class="text-center">Nama AO</th>';
+                html += '<th class="text-center">Tgl Akad</th>';
+                html += '</tr>';
+                html += '</thead><tbody>';
+
+                data.customers.forEach((customer, index) => {
+                    html += '<tr>';
+                    html += `<td class="text-center">${index + 1}</td>`;
+                    html += `<td><strong>${customer.nama || 'N/A'}</strong></td>`;
+                    html += `<td><code>${customer.nokontrak}</code></td>`;
+                    html += `<td class="text-end"><strong>${formatNominal(customer.osmdlc)}</strong></td>`;
+                    html += `<td class="text-center"><span class="badge bg-secondary">${customer.nama_produk || 'N/A'}</span></td>`;
+                    html += `<td class="text-center">${customer.nama_ao || customer.kodeaoh || 'N/A'}</td>`;
+                    html += `<td class="text-center">${customer.tgl_akad || 'N/A'}</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                html += `<div class="mt-3 text-muted small">Menampilkan ${data.customers.length} dari ${data.total || data.customers.length} nasabah dengan kolektibilitas Kol ${kategori}</div>`;
+                html += '</div>';
+                modalBody.innerHTML = html;
+            } else {
+                modalBody.innerHTML = '<div class="text-center text-muted py-4"><i class="ti ti-info-circle ti-lg mb-2"></i><br>Tidak ada data nasabah untuk kategori ini</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading kolektibilitas details:', error);
+            modalBody.innerHTML = `
+                <div class="alert alert-danger d-flex justify-content-between align-items-center">
+                    <div><i class="ti ti-alert-circle me-2"></i>Gagal memuat data nasabah: ${error.message}</div>
+                    <button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('kolektibilitasDetailsModal')).hide()" aria-label="Close"></button>
+                </div>
+            `;
+        });
+}
 </script>
 
 <!-- Customer Details Modal -->
@@ -5109,6 +5272,213 @@ function showCustomerDetails(jenis, type) {
                 }
             }
         });
+    });
+
+    // Financial Highlights
+    let currentComparisonType = 'MOM';
+
+    function setComparisonType(type) {
+        currentComparisonType = type;
+        // Update button states
+        document.getElementById('btnMOM').classList.toggle('active', type === 'MOM');
+        document.getElementById('btnYOY').classList.toggle('active', type === 'YOY');
+        document.getElementById('btnMOM').classList.toggle('btn-outline-warning', type !== 'MOM');
+        document.getElementById('btnMOM').classList.toggle('btn-warning', type === 'MOM');
+        document.getElementById('btnYOY').classList.toggle('btn-outline-warning', type !== 'YOY');
+        document.getElementById('btnYOY').classList.toggle('btn-warning', type === 'YOY');
+
+        loadFinancialHighlights();
+    }
+
+    function loadFinancialHighlights() {
+        const container = document.getElementById('financialHighlightsContainer');
+
+        // Get current filter parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const month = urlParams.get('month');
+        const year = urlParams.get('year');
+
+        // Build API URL with filters
+        let apiUrl = `/api/financial-highlights/dashboard?comparison=${currentComparisonType}`;
+        if (month) apiUrl += `&month=${month}`;
+        if (year) apiUrl += `&year=${year}`;
+
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.data) {
+                    container.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="ti ti-chart-line text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="text-muted mt-2">Belum ada data Financial Highlights</h5>
+                            <p class="text-muted">Silakan tambahkan data indikator keuangan terlebih dahulu.</p>
+                            <a href="${window.location.origin}/financial-highlights" class="btn btn-warning">
+                                <i class="ti ti-plus me-1"></i>Tambah Data
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const highlights = data.data;
+                const changes = data.changes;
+                const period = data.period;
+
+                const indicators = [
+                    { key: 'car', label: 'CAR', unit: '%', icon: 'ti-shield-check', color: 'primary', reverseColor: true },
+                    { key: 'roa', label: 'ROA', unit: '%', icon: 'ti-trending-up', color: 'success', reverseColor: true },
+                    { key: 'roe', label: 'ROE', unit: '%', icon: 'ti-chart-bar', color: 'info', reverseColor: true },
+                    { key: 'aset', label: 'Aset', unit: 'Rp', icon: 'ti-building-bank', color: 'warning', format: 'currency' },
+                    { key: 'pembiayaan', label: 'Pembiayaan', unit: 'Rp', icon: 'ti-cash', color: 'danger', format: 'currency' },
+                    { key: 'laba_rugi', label: 'Laba/Rugi', unit: 'Rp', icon: 'ti-coins', color: 'success', format: 'currency' },
+                    { key: 'dpk', label: 'DPK', unit: 'Rp', icon: 'ti-wallet', color: 'primary', format: 'currency' },
+                    { key: 'fdr', label: 'FDR', unit: '%', icon: 'ti-percentage', color: 'info', badWhenUp: true },
+                    { key: 'npf', label: 'NPF', unit: '%', icon: 'ti-alert-triangle', color: 'danger', badWhenUp: true },
+                    { key: 'bopo', label: 'BOPO', unit: '%', icon: 'ti-calculator', color: 'warning', badWhenUp: true }
+                ];
+
+                // Group indicators by column
+                const leftColumn = indicators.slice(0, 3); // CAR, ROA, ROE
+                const centerColumn = indicators.slice(3, 7); // Aset, Pembiayaan, Laba Rugi, DPK
+                const rightColumn = indicators.slice(7, 10); // FDR, NPF, BOPO
+
+                let html = `
+                    <div class="row g-3">
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 text-muted">Periode: ${period}</h6>
+                                <small class="text-muted">Perbandingan: ${currentComparisonType}</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-12">
+                            <div class="row g-3">
+                `;
+
+                // Helper function to render indicator card
+                function renderIndicatorCard(indicator, value, change) {
+                    let displayValue = '-';
+                    if (value !== null && value !== undefined) {
+                        if (indicator.format === 'currency') {
+                            displayValue = formatCurrency(value);
+                        } else {
+                            displayValue = `${number_format(value, 2)} ${indicator.unit}`;
+                        }
+                    }
+
+                    let changeHtml = '';
+                    if (change !== null && change !== undefined) {
+                        // Determine if change is good or bad based on indicator type
+                        let isGoodChange = change >= 0;
+                        if (indicator.reverseColor) {
+                            // For CAR, ROA, ROE: going down is bad
+                            isGoodChange = change < 0;
+                        } else if (indicator.badWhenUp) {
+                            // For FDR, NPF, BOPO: going up is bad
+                            isGoodChange = change < 0;
+                        }
+
+                        const changeClass = isGoodChange ? 'text-success' : 'text-danger';
+                        const changeIcon = change >= 0 ? 'ti-trending-up' : 'ti-trending-down';
+                        const changeSign = change >= 0 ? '+' : '';
+                        const arrowSize = '1.25rem'; // Larger arrow
+                        changeHtml = `
+                            <div class="d-flex flex-column align-items-center mt-2">
+                                <i class="ti ${changeIcon} ${changeClass} mb-1" style="font-size: ${arrowSize};"></i>
+                                <small class="${changeClass} fw-bold">${changeSign}${number_format(change, 2)}%</small>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="col-12">
+                            <div class="card h-100 border-${indicator.color} border-opacity-25">
+                                <div class="card-body text-center">
+                                    <div class="avatar avatar-sm mx-auto mb-2" style="background-color: rgba(var(--bs-${indicator.color}-rgb), 0.1);">
+                                        <i class="ti ${indicator.icon} text-${indicator.color}" style="font-size: 1.25rem;"></i>
+                                    </div>
+                                    <h6 class="card-title mb-1 text-${indicator.color}">${indicator.label}</h6>
+                                    <h4 class="mb-1 ${value !== null ? 'text-dark' : 'text-muted'}">${displayValue}</h4>
+                                    ${changeHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Render left column (CAR, ROA, ROE)
+                leftColumn.forEach(indicator => {
+                    const value = highlights[indicator.key];
+                    const change = changes[indicator.key];
+                    html += renderIndicatorCard(indicator, value, change);
+                });
+
+                html += `
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-12">
+                            <div class="row g-3">
+                `;
+
+                // Render center column (Aset, Pembiayaan, Laba Rugi, DPK)
+                centerColumn.forEach(indicator => {
+                    const value = highlights[indicator.key];
+                    const change = changes[indicator.key];
+                    html += renderIndicatorCard(indicator, value, change);
+                });
+
+                html += `
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-12">
+                            <div class="row g-3">
+                `;
+
+                // Render right column (FDR, NPF, BOPO)
+                rightColumn.forEach(indicator => {
+                    const value = highlights[indicator.key];
+                    const change = changes[indicator.key];
+                    html += renderIndicatorCard(indicator, value, change);
+                });
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading financial highlights:', error);
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="ti ti-alert-circle text-danger" style="font-size: 3rem;"></i>
+                        <h5 class="text-danger mt-2">Error memuat data</h5>
+                        <p class="text-muted">Terjadi kesalahan saat memuat financial highlights.</p>
+                    </div>
+                `;
+            });
+    }
+
+    function formatCurrency(amount) {
+        if (amount >= 1000000000) {
+            return 'Rp ' + (amount / 1000000000).toFixed(2) + ' M';
+        } else if (amount >= 1000000) {
+            return 'Rp ' + (amount / 1000000).toFixed(2) + ' Jt';
+        } else if (amount >= 1000) {
+            return 'Rp ' + (amount / 1000).toFixed(1) + ' Rb';
+        } else {
+            return 'Rp ' + amount.toLocaleString('id-ID');
+        }
+    }
+
+    function number_format(number, decimals = 2) {
+        return parseFloat(number).toFixed(decimals);
+    }
+
+    // Load financial highlights on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadFinancialHighlights();
     });
     </script>
 

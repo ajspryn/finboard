@@ -507,6 +507,64 @@ class DashboardController extends Controller
             $kolektibilitasDistribution['series'][] = round($col->total_outstanding / 1000000000, 2);
         }
 
+        // Kolektibilitas Categories with Month-over-Month Comparison
+        $kolektibilitasComparison = [];
+        $prevMonth = $filterMonth - 1;
+        $prevYear = $filterYear;
+        if ($prevMonth < 1) {
+            $prevMonth = 12;
+            $prevYear = $filterYear - 1;
+        }
+
+        // Current month data
+        $currentKolektibilitas = (clone $query)
+            ->select(
+                'colbaru',
+                DB::raw('COUNT(*) as jumlah_nasabah'),
+                DB::raw('SUM(osmdlc) as total_outstanding')
+            )
+            ->whereNotNull('colbaru')
+            ->groupBy('colbaru')
+            ->orderBy('colbaru')
+            ->get()
+            ->keyBy('colbaru');
+
+        // Previous month data
+        $prevKolektibilitas = Pembiayaan::where('period_month', str_pad($prevMonth, 2, '0', STR_PAD_LEFT))
+            ->where('period_year', $prevYear)
+            ->select(
+                'colbaru',
+                DB::raw('COUNT(*) as jumlah_nasabah'),
+                DB::raw('SUM(osmdlc) as total_outstanding')
+            )
+            ->whereNotNull('colbaru')
+            ->groupBy('colbaru')
+            ->orderBy('colbaru')
+            ->get()
+            ->keyBy('colbaru');
+
+        // Build comparison data for categories 1-5
+        for ($i = 1; $i <= 5; $i++) {
+            $current = $currentKolektibilitas->get($i);
+            $previous = $prevKolektibilitas->get($i);
+
+            $currentJumlah = $current ? $current->jumlah_nasabah : 0;
+            $currentNominal = $current ? $current->total_outstanding : 0;
+            $prevJumlah = $previous ? $previous->jumlah_nasabah : 0;
+            $prevNominal = $previous ? $previous->total_outstanding : 0;
+
+            $kolektibilitasComparison[$i] = [
+                'kategori' => $i,
+                'nama_kategori' => ['Lancar', 'Dalam Perhatian Khusus', 'Kurang Lancar', 'Diragukan', 'Macet'][$i - 1],
+                'current_jumlah' => $currentJumlah,
+                'current_nominal' => $currentNominal,
+                'prev_jumlah' => $prevJumlah,
+                'prev_nominal' => $prevNominal,
+                'jumlah_growth' => $prevJumlah > 0 ? (($currentJumlah - $prevJumlah) / $prevJumlah) * 100 : ($currentJumlah > 0 ? 100 : 0),
+                'nominal_growth' => $prevNominal > 0 ? (($currentNominal - $prevNominal) / $prevNominal) * 100 : ($currentNominal > 0 ? 100 : 0),
+            ];
+        }
+
         // Top Products Chart Data (for bar chart)
         $topProductsChart = [
             'categories' => $topProducts->pluck('nama_produk')->toArray(),
@@ -737,7 +795,7 @@ class DashboardController extends Controller
                 return $item;
             });
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'topTabunganProducts'));
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'topTabunganProducts'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -2897,6 +2955,79 @@ class DashboardController extends Controller
             'total_nominal' => $totalNominal,
             'total_nominal_formatted' => 'Rp ' . number_format($totalNominal, 0, ',', '.'),
             'count' => $customers->count()
+        ]);
+    }
+
+    /**
+     * Get kolektibilitas details for a specific category
+     */
+    public function getKolektibilitasDetails(Request $request)
+    {
+        $kategori = $request->input('kategori');
+        $limit = $request->input('limit', 100);
+
+        // Validate kategori
+        if (!in_array($kategori, ['1', '2', '3', '4', '5'])) {
+            return response()->json(['error' => 'Invalid kategori'], 400);
+        }
+
+        // Product mapping for pembiayaan (financing) products
+        $productMapping = [
+            '55' => 'Musyarakah',
+            '50' => 'Murabahah',
+            '56' => 'MMQ',
+            '88' => 'Isthisna',
+            '86' => 'Multijasa Piutang',
+        ];
+
+        // Get current month and year
+        $currentMonth = date('m');
+        $currentYear = date('Y');
+
+        // Query pembiayaan data for current month with kolektibilitas filter
+        $query = Pembiayaan::where('period_month', $currentMonth)
+            ->where('period_year', $currentYear)
+            ->where('colbaru', $kategori)
+            ->orderBy('osmdlc', 'desc') // Order by outstanding descending
+            ->limit($limit);
+
+        $customers = $query->select([
+            'nama',
+            'nokontrak',
+            'osmdlc',
+            'kdprd',
+            'kdaoh',
+            'nmao',
+            'tgleff'
+        ])->get();
+
+        // Get total count for this kategori
+        $totalCount = Pembiayaan::where('period_month', $currentMonth)
+            ->where('period_year', $currentYear)
+            ->where('colbaru', $kategori)
+            ->count();
+
+        // Format data
+        $formattedCustomers = $customers->map(function ($customer) use ($productMapping) {
+            return [
+                'nama' => $customer->nama,
+                'nokontrak' => $customer->nokontrak,
+                'osmdlc' => (float) $customer->osmdlc,
+                'nama_produk' => $productMapping[$customer->kdprd] ?? 'Produk ' . ($customer->kdprd ?: 'Unknown'),
+                'kodeaoh' => $customer->kdaoh,
+                'nama_ao' => $customer->nmao,
+                'tgl_akad' => $customer->tgleff ? $customer->tgleff->format('d/m/Y') : null,
+                'jenis_akad' => $customer->kdprd // Using product code as contract type
+            ];
+        });
+
+        return response()->json([
+            'kategori' => $kategori,
+            'customers' => $formattedCustomers,
+            'total' => $totalCount,
+            'limit' => $limit,
+            'month' => $currentMonth,
+            'year' => $currentYear
         ]);
     }
 }
