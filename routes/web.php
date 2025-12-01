@@ -23,7 +23,7 @@ use App\Http\Controllers\FinancialHighlightController;
 // Authentication Routes
 Route::get('/', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/auth/send-pin', [AuthController::class, 'sendPin'])->name('auth.send-pin');
-Route::get('/auth/verify-pin', [AuthController::class, 'showVerifyPinForm'])->name('auth.verify-pin');
+Route::get('/auth/verify-pin', [AuthController::class, 'showVerifyPinForm'])->name('auth.verify-pin.form');
 Route::post('/auth/verify-pin', [AuthController::class, 'verifyPin'])->name('auth.verify-pin');
 Route::post('/auth/resend-pin', [AuthController::class, 'resendPin'])->name('auth.resend-pin');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
