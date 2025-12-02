@@ -1,31 +1,30 @@
-@extends('layouts.app')
+<?php $__env->startSection('title', 'Manajemen User'); ?>
 
-@section('title', 'Manajemen User')
-
-@section('content')
+<?php $__env->startSection('content'); ?>
     <div class="row">
         <div class="col-md-12">
             <!-- Alerts -->
-            @if(session('success'))
+            <?php if(session('success')): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <i class="ti ti-check-circle me-2"></i>
-                    {{ session('success') }}
+                    <?php echo e(session('success')); ?>
+
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-            @endif
+            <?php endif; ?>
 
-            @if($errors->any())
+            <?php if($errors->any()): ?>
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     <i class="ti ti-alert-circle me-2"></i>
                     <strong>Terjadi kesalahan:</strong>
                     <ul class="mb-0 mt-2">
-                        @foreach($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
+                        <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <li><?php echo e($error); ?></li>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </ul>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-            @endif
+            <?php endif; ?>
 
             <!-- Add New User Card -->
             <div class="card mb-4">
@@ -36,23 +35,37 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ route('user.settings.store') }}">
-                        @csrf
+                    <form method="POST" action="<?php echo e(route('user.settings.store')); ?>">
+                        <?php echo csrf_field(); ?>
 
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="name" class="form-label">Nama Lengkap</label>
                                     <input type="text"
-                                           class="form-control @error('name') is-invalid @enderror"
+                                           class="form-control <?php $__errorArgs = ['name'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>"
                                            id="name"
                                            name="name"
-                                           value="{{ old('name') }}"
+                                           value="<?php echo e(old('name')); ?>"
                                            placeholder="Masukkan nama lengkap"
                                            required>
-                                    @error('name')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <?php $__errorArgs = ['name'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <div class="invalid-feedback"><?php echo e($message); ?></div>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
                                 </div>
                             </div>
 
@@ -60,34 +73,62 @@
                                 <div class="mb-3">
                                     <label for="email" class="form-label">Email</label>
                                     <input type="email"
-                                           class="form-control @error('email') is-invalid @enderror"
+                                           class="form-control <?php $__errorArgs = ['email'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>"
                                            id="email"
                                            name="email"
-                                           value="{{ old('email') }}"
+                                           value="<?php echo e(old('email')); ?>"
                                            placeholder="Masukkan email"
                                            required>
-                                    @error('email')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <?php $__errorArgs = ['email'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <div class="invalid-feedback"><?php echo e($message); ?></div>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
                                 </div>
                             </div>
 
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="role" class="form-label">Role</label>
-                                    <select class="form-select @error('role') is-invalid @enderror"
+                                    <select class="form-select <?php $__errorArgs = ['role'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>"
                                             id="role"
                                             name="role"
                                             required>
                                         <option value="">Pilih Role</option>
-                                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
-                                        <option value="pengurus" {{ old('role') == 'pengurus' ? 'selected' : '' }}>Pengurus</option>
-                                        <option value="lending" {{ old('role') == 'lending' ? 'selected' : '' }}>Lending</option>
-                                        <option value="funding" {{ old('role') == 'funding' ? 'selected' : '' }}>Funding</option>
+                                        <option value="admin" <?php echo e(old('role') == 'admin' ? 'selected' : ''); ?>>Admin</option>
+                                        <option value="pengurus" <?php echo e(old('role') == 'pengurus' ? 'selected' : ''); ?>>Pengurus</option>
+                                        <option value="lending" <?php echo e(old('role') == 'lending' ? 'selected' : ''); ?>>Lending</option>
+                                        <option value="funding" <?php echo e(old('role') == 'funding' ? 'selected' : ''); ?>>Funding</option>
                                     </select>
-                                    @error('role')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <?php $__errorArgs = ['role'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <div class="invalid-feedback"><?php echo e($message); ?></div>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
                                 </div>
                             </div>
                         </div>
@@ -109,11 +150,11 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="card-title mb-0">
                         <i class="ti ti-users me-2"></i>
-                        Daftar User ({{ $users->count() }})
+                        Daftar User (<?php echo e($users->count()); ?>)
                     </h4>
                 </div>
                 <div class="card-body">
-                    @if($users->count() > 0)
+                    <?php if($users->count() > 0): ?>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -127,80 +168,83 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($users as $user)
+                                    <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                         <tr>
                                             <td>
                                                 <div class="d-flex align-items-center">
                                                     <div class="avatar avatar-sm me-3">
                                                         <span class="avatar-initial rounded-circle bg-label-primary">
-                                                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                                                            <?php echo e(strtoupper(substr($user->name, 0, 1))); ?>
+
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <span class="fw-medium">{{ $user->name }}</span>
-                                                        @if($user->id === auth()->id())
+                                                        <span class="fw-medium"><?php echo e($user->name); ?></span>
+                                                        <?php if($user->id === auth()->id()): ?>
                                                             <small class="text-muted">(Anda)</small>
-                                                        @endif
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td>{{ $user->email }}</td>
+                                            <td><?php echo e($user->email); ?></td>
                                             <td>
-                                                <span class="badge bg-label-{{ $user->role === 'admin' ? 'primary' : ($user->role === 'pengurus' ? 'info' : ($user->role === 'lending' ? 'warning' : 'success')) }}">
-                                                    {{ ucfirst($user->role) }}
+                                                <span class="badge bg-label-<?php echo e($user->role === 'admin' ? 'primary' : ($user->role === 'pengurus' ? 'info' : ($user->role === 'lending' ? 'warning' : 'success'))); ?>">
+                                                    <?php echo e(ucfirst($user->role)); ?>
+
                                                 </span>
                                             </td>
                                             <td>
-                                                @if($user->last_login)
+                                                <?php if($user->last_login): ?>
                                                     <span class="text-muted">
                                                         <i class="ti ti-clock me-1"></i>
-                                                        {{ $user->last_login->setTimezone('Asia/Jakarta')->format('d M Y H:i') }}
+                                                        <?php echo e($user->last_login->setTimezone('Asia/Jakarta')->format('d M Y H:i')); ?>
+
                                                     </span>
-                                                @else
+                                                <?php else: ?>
                                                     <span class="text-muted">
                                                         <i class="ti ti-minus me-1"></i>
                                                         Belum pernah login
                                                     </span>
-                                                @endif
+                                                <?php endif; ?>
                                             </td>
-                                            <td>{{ $user->created_at->format('d M Y') }}</td>
+                                            <td><?php echo e($user->created_at->format('d M Y')); ?></td>
                                             <td>
                                                 <!-- Edit Role Button -->
                                                 <button type="button"
                                                         class="btn btn-sm btn-outline-primary me-1"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#editRoleModal"
-                                                        onclick="editUserRole({{ $user->id }}, '{{ $user->name }}', '{{ $user->role }}')">
+                                                        onclick="editUserRole(<?php echo e($user->id); ?>, '<?php echo e($user->name); ?>', '<?php echo e($user->role); ?>')">
                                                     <i class="ti ti-edit"></i>
                                                 </button>
 
                                                 <!-- Delete Button (disabled for current user) -->
-                                                @if($user->id !== auth()->id())
+                                                <?php if($user->id !== auth()->id()): ?>
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-danger"
                                                             data-bs-toggle="modal"
                                                             data-bs-target="#deleteUserModal"
-                                                            onclick="deleteUser({{ $user->id }}, '{{ $user->name }}')">
+                                                            onclick="deleteUser(<?php echo e($user->id); ?>, '<?php echo e($user->name); ?>')">
                                                         <i class="ti ti-trash"></i>
                                                     </button>
-                                                @else
+                                                <?php else: ?>
                                                     <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
                                                         <i class="ti ti-trash"></i>
                                                     </button>
-                                                @endif
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
-                                    @endforeach
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </tbody>
                             </table>
                         </div>
-                    @else
+                    <?php else: ?>
                         <div class="text-center py-5">
                             <i class="ti ti-users display-1 text-muted mb-3"></i>
                             <h5 class="text-muted">Belum ada user</h5>
                             <p class="text-muted">Tambah user pertama menggunakan form di atas.</p>
                         </div>
-                    @endif
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -215,8 +259,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="editRoleForm" method="POST">
-                @csrf
-                @method('PUT')
+                <?php echo csrf_field(); ?>
+                <?php echo method_field('PUT'); ?>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nama User</label>
@@ -250,8 +294,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="deleteUserForm" method="POST">
-                @csrf
-                @method('DELETE')
+                <?php echo csrf_field(); ?>
+                <?php echo method_field('DELETE'); ?>
                 <div class="modal-body">
                     <div class="text-center mb-3">
                         <i class="ti ti-alert-triangle display-1 text-warning"></i>
@@ -268,9 +312,9 @@
         </div>
     </div>
 </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
 <script>
 function editUserRole(userId, userName, currentRole) {
     document.getElementById('editUserName').value = userName;
@@ -294,4 +338,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /Users/ajspryn/Project/finboard/resources/views/user-settings.blade.php ENDPATH**/ ?>
