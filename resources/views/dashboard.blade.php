@@ -5349,10 +5349,10 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         // Update button states
         document.getElementById('btnMOM').classList.toggle('active', type === 'MOM');
         document.getElementById('btnYOY').classList.toggle('active', type === 'YOY');
-        document.getElementById('btnMOM').classList.toggle('btn-outline-warning', type !== 'MOM');
-        document.getElementById('btnMOM').classList.toggle('btn-warning', type === 'MOM');
-        document.getElementById('btnYOY').classList.toggle('btn-outline-warning', type !== 'YOY');
-        document.getElementById('btnYOY').classList.toggle('btn-warning', type === 'YOY');
+        document.getElementById('btnMOM').classList.toggle('btn-outline-primary', type !== 'MOM');
+        document.getElementById('btnMOM').classList.toggle('btn-primary', type === 'MOM');
+        document.getElementById('btnYOY').classList.toggle('btn-outline-primary', type !== 'YOY');
+        document.getElementById('btnYOY').classList.toggle('btn-primary', type === 'YOY');
 
         loadFinancialHighlights();
     }
