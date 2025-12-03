@@ -208,18 +208,18 @@
                             @enderror
                         </div>
 
-                        <!-- KPMM -->
+                        <!-- Pendapatan -->
                         <div class="col-md-6 mb-3">
-                            <label for="kpmm" class="form-label">KPMM</label>
+                            <label for="pendapatan" class="form-label">Pendapatan</label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number" min="0"
-                                       class="form-control @error('kpmm') is-invalid @enderror"
-                                       id="kpmm" name="kpmm" value="{{ old('kpmm', $financialHighlight->kpmm) }}"
-                                       placeholder="Masukkan nominal KPMM">
+                                <input type="number" min="0" step="0.01"
+                                       class="form-control @error('pendapatan') is-invalid @enderror"
+                                       id="pendapatan" name="pendapatan" value="{{ old('pendapatan', $financialHighlight->pendapatan) }}"
+                                       placeholder="Masukkan nominal pendapatan">
                             </div>
-                            <small class="text-muted">Kewajiban Penyediaan Modal Minimum (nominal)</small>
-                            @error('kpmm')
+                            <small class="text-muted">Total pendapatan operasional</small>
+                            @error('pendapatan')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>

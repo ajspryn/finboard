@@ -47,13 +47,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/kolektibilitas-details', [DashboardController::class, 'getKolektibilitasDetails'])->name('dashboard.kolektibilitas.details');
 
     // Financial Highlights Dashboard API (accessible by all authenticated users)
-    Route::get('/api/financial-highlights/dashboard', [FinancialHighlightController::class, 'getDashboardData'])->name('financial-highlights.dashboard');
     Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
 
-    // TEMPORARY: Simple test route
-    Route::get('/test', function () {
-        return response()->json(['status' => 'ok', 'message' => 'Laravel is working']);
-    });    // Daily Activity Routes (Admin and Pengurus only)
+    // Daily Activity Routes (Admin and Pengurus only)
     Route::middleware(['role:admin,pengurus'])->group(function () {
         Route::get('/daily-activity', [DailyActivityController::class, 'index'])->name('daily.activity.index');
     });

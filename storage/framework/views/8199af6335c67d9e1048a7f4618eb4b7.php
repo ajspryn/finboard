@@ -1,1 +1,0 @@
-<?php /**PATH /Users/ajspryn/Project/finboard/resources/views/dashboard-pdf.blade.php ENDPATH**/ ?>

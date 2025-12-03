@@ -6,6 +6,29 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class FinancialHighlight extends Model
+    /**
+     * Cache TTL constants
+     */
+    const CACHE_TTL_MINUTES = 60;
+    const DASHBOARD_CACHE_TTL_MINUTES = 30;
+
+    /**
+     * Comparison types
+     */
+    const COMPARISON_TYPES = ['MOM', 'YOY'];
+    const DEFAULT_COMPARISON = 'MOM';
+
+    /**
+     * Financial fields
+     */
+    const FINANCIAL_FIELDS = [
+        'car', 'roa', 'roe', 'aset', 'pembiayaan',
+        'laba_rugi', 'biaya', 'dpk', 'fdr', 'npf',
+        'bopo', 'cash_ratio', 'kpmm',
+    ];
+
+    const CALCULATED_FIELDS = ['dpk', 'pembiayaan', 'npf', 'aset', 'fdr'];
+
 {
     protected $fillable = [
         'period_year',
@@ -17,12 +40,12 @@ class FinancialHighlight extends Model
         'pembiayaan',
         'laba_rugi',
         'biaya',
-        'pendapatan',
         'dpk',
         'fdr',
         'npf',
         'bopo',
         'cash_ratio',
+        'kpmm',
     ];
 
     protected $casts = [
@@ -35,12 +58,12 @@ class FinancialHighlight extends Model
         'pembiayaan' => 'decimal:2',
         'laba_rugi' => 'decimal:2',
         'biaya' => 'decimal:2',
-        'pendapatan' => 'decimal:2',
         'dpk' => 'decimal:2',
         'fdr' => 'decimal:4',
         'npf' => 'decimal:4',
         'bopo' => 'decimal:4',
         'cash_ratio' => 'decimal:4',
+        'kpmm' => 'decimal:2',
     ];
 
     /**
