@@ -3,11 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\FinancialHighlight;
+use App\Services\FinancialCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class FinancialHighlightController extends Controller
 {
+    protected $cacheService;
+
+    public function __construct(FinancialCacheService $cacheService)
+    {
+        $this->cacheService = $cacheService;
+    }
     /**
      * Display financial highlights management page
      */
@@ -142,6 +149,14 @@ class FinancialHighlightController extends Controller
             $filterMonth = $request->get('month');
             $filterYear = $request->get('year');
 
+            // Try to get from cache first
+            $cachedData = $this->cacheService->getFinancialHighlights($filterYear, $filterMonth, $comparisonType);
+
+            if ($cachedData) {
+                return response()->json($cachedData);
+            }
+
+            // If not in cache, calculate and cache
             // Get data for the specified period or latest if no filters
             $query = FinancialHighlight::query();
 

@@ -44,6 +44,40 @@ class FinancialHighlight extends Model
     ];
 
     /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($model) {
+            // Dispatch real-time update event
+            $cacheService = app(\App\Services\FinancialCacheService::class);
+            $cacheService->updateDataWithBroadcast('highlights', [
+                'period_year' => $model->period_year,
+                'period_month' => $model->period_month,
+                'updated_fields' => $model->getChanges()
+            ], [
+                'year' => $model->period_year,
+                'month' => $model->period_month
+            ]);
+        });
+
+        static::deleted(function ($model) {
+            // Dispatch real-time update event
+            $cacheService = app(\App\Services\FinancialCacheService::class);
+            $cacheService->updateDataWithBroadcast('highlights', [
+                'period_year' => $model->period_year,
+                'period_month' => $model->period_month,
+                'action' => 'deleted'
+            ], [
+                'year' => $model->period_year,
+                'month' => $model->period_month
+            ]);
+        });
+    }
+
+    /**
      * Get financial highlight for specific period
      */
     public static function getForPeriod($year, $month)
