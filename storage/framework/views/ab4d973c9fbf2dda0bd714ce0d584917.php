@@ -635,7 +635,7 @@ function formatNominal($amount) {
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-primary border-2">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex justify-content-between align-items-center bg-label-primary">
                     <div class="card-title mb-0">
                         <h4 class="mb-0 text-primary">
                             <i class="ti ti-chart-line me-2"></i>

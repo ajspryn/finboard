@@ -31,9 +31,6 @@ return new class extends Migration
 
         // Add additional indexes to tabungans table
         Schema::table('tabungans', function (Blueprint $table) {
-            // Index for AO-based queries
-            $table->index(['nmao', 'period_year', 'period_month'], 'tabungans_ao_idx');
-
             // Index for product analysis
             $table->index(['kodeprd', 'period_year', 'period_month'], 'tabungans_product_idx');
 
@@ -90,7 +87,6 @@ return new class extends Migration
 
         // Drop indexes from tabungans table
         Schema::table('tabungans', function (Blueprint $table) {
-            $table->dropIndex('tabungans_ao_idx');
             $table->dropIndex('tabungans_product_idx');
             $table->dropIndex('tabungans_location_idx');
             $table->dropIndex('tabungans_active_idx');
