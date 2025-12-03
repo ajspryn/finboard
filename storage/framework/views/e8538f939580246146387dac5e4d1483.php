@@ -5,9 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
 
-    <title>Login - FinBoard</title>
+    <title>Login PIN - Dashboard Bank</title>
 
-    <meta name="description" content="FinBoard - Login dengan Email" />
+    <meta name="description" content="Dashboard Bank - Login dengan PIN" />
     <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
 
     <!-- Favicon -->
@@ -47,7 +47,7 @@
     <div class="container-xxl">
         <div class="authentication-wrapper authentication-basic container-p-y">
             <div class="authentication-inner py-4">
-                <!-- Login -->
+                <!-- Login Card -->
                 <div class="card">
                     <div class="card-body">
                         <!-- Logo -->
@@ -67,87 +67,61 @@
                         <!-- /Logo -->
 
                         <h4 class="mb-1 pt-2 text-center">Selamat Datang! 👋</h4>
-                        <p class="mb-4 text-center">Silakan masukkan email Anda untuk melanjutkan</p>
+                        <p class="mb-4 text-center">Silakan masukkan PIN untuk mengakses dashboard</p>
 
-                        <!-- Alert Messages -->
                         <?php if(session('error')): ?>
-                            <div class="alert alert-danger alert-dismissible" role="alert">
-                                <?php echo e(session('error')); ?>
+                        <div class="alert alert-danger alert-dismissible" role="alert">
+                            <?php echo e(session('error')); ?>
 
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                         <?php endif; ?>
 
                         <?php if(session('success')): ?>
-                            <div class="alert alert-success alert-dismissible" role="alert">
-                                <?php echo e(session('success')); ?>
+                        <div class="alert alert-success alert-dismissible" role="alert">
+                            <?php echo e(session('success')); ?>
 
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                         <?php endif; ?>
 
-                        <!-- Login Form -->
-                        <form method="POST" action="<?php echo e(route('auth.send-pin')); ?>" id="loginForm">
+                        <form id="formAuthentication" class="mb-3" action="/login" method="POST">
                             <?php echo csrf_field(); ?>
-
-                            <div class="mb-6 form-control-validation">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email"
-                                       class="form-control <?php $__errorArgs = ['email'];
+                            <div class="mb-3">
+                                <label for="pin" class="form-label">PIN</label>
+                                <input type="password" class="form-control <?php $__errorArgs = ['pin'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
-unset($__errorArgs, $__bag); ?>"
-                                       id="email"
-                                       name="email"
-                                       value="<?php echo e(old('email')); ?>"
-                                       placeholder="Masukkan email Anda"
-                                       required
-                                       autofocus>
-                                <?php $__errorArgs = ['email'];
+unset($__errorArgs, $__bag); ?>" id="pin" name="pin" placeholder="Masukkan PIN Anda" autofocus maxlength="20" />
+                                <?php $__errorArgs = ['pin'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?>
-                                    <div class="invalid-feedback"><?php echo e($message); ?></div>
+                                <div class="invalid-feedback"><?php echo e($message); ?></div>
                                 <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
                             </div>
 
-                            <div class="mb-6">
-                                <button type="submit"
-                                        class="btn btn-primary d-grid w-100"
-                                        id="sendPinBtn">
-                                    <span class="spinner-border spinner-border-sm d-none me-2" role="status"></span>
-                                    <i class="ti ti-send me-2"></i>
-                                    Kirim Kode PIN
+                            <div class="mb-3">
+                                <button class="btn btn-primary d-grid w-100" type="submit">
+                                    <i class="ti ti-login me-1"></i> Login
                                 </button>
                             </div>
                         </form>
 
-                        <!-- Info Section -->
-                        <div class="text-center">
-                            <div class="border rounded p-3 bg-light mb-4">
-                                <h6 class="mb-2">
-                                    <i class="ti ti-info-circle text-info me-1"></i>
-                                    Cara Login:
-                                </h6>
-                                <ol class="text-start small mb-0">
-                                    <li>Masukkan email yang terdaftar</li>
-                                    <li>Klik "Kirim Kode PIN"</li>
-                                    <li>Periksa email Anda</li>
-                                    <li>Masukkan kode PIN 6 digit</li>
-                                </ol>
-                            </div>
-                        </div>
+                        <p class="text-center">
+                            <small class="text-muted">Dashboard Bank © <?php echo e(date('Y')); ?></small>
+                        </p>
                     </div>
                 </div>
-                <!-- /Login -->
+                <!-- /Login Card -->
             </div>
         </div>
     </div>
@@ -166,22 +140,12 @@ unset($__errorArgs, $__bag); ?>
     <script src="/template/assets/js/main.js"></script>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            const submitBtn = document.getElementById('sendPinBtn');
-            const spinner = submitBtn.querySelector('.spinner-border');
-
-            // Show loading state
-            submitBtn.disabled = true;
-            spinner.classList.remove('d-none');
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Mengirim...';
-        });
-
-        // Auto-focus email field
+        // Auto-focus on PIN input
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('email').focus();
+            document.getElementById('pin').focus();
         });
     </script>
 </body>
 
 </html>
-<?php /**PATH /Users/ajspryn/Project/finboard/resources/views/auth/email.blade.php ENDPATH**/ ?>
+<?php /**PATH /Users/ajspryn/Project/finboard/resources/views/auth/pin.blade.php ENDPATH**/ ?>

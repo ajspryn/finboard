@@ -189,6 +189,99 @@ FinBoard telah dioptimasi dengan fitur-fitur performance terdepan:
 
 Lihat [`BACKEND_PERFORMANCE_README.md`](BACKEND_PERFORMANCE_README.md) untuk dokumentasi lengkap.
 
+## 🖥️ Hosting Performance Issues
+
+Jika aplikasi lambat di hosting environment, ikuti langkah-langkah berikut:
+
+### 🚀 Quick Fix untuk Hosting
+
+```bash
+# Jalankan diagnosis lengkap
+./diagnose-hosting.sh
+
+# Terapkan optimasi cepat
+./optimize-hosting.sh
+
+# Restart web server (sesuaikan dengan hosting Anda)
+sudo systemctl restart nginx
+sudo systemctl restart php8.1-fpm
+```
+
+### 🔧 Common Hosting Issues
+
+#### 1. **OPcache Tidak Enabled**
+
+```ini
+# Tambahkan ke php.ini atau .user.ini
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.max_accelerated_files=7963
+opcache.revalidate_freq=0
+```
+
+#### 2. **Memory Limit Terlalu Rendah**
+
+```ini
+memory_limit=256M
+max_execution_time=300
+```
+
+#### 3. **Cache Tidak Optimal**
+
+```bash
+# Clear dan rebuild cache
+php artisan cache:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+#### 4. **Database Connection Slow**
+
+- Pastikan menggunakan connection pooling
+- Cek database server location (gunakan local jika memungkinkan)
+- Optimalkan queries dengan indexes
+
+#### 5. **Static Files Tidak Cached**
+
+- Setup proper caching headers di web server
+- Gunakan CDN untuk assets
+- Enable gzip compression
+
+### 📊 Performance Monitoring
+
+#### Telescope Dashboard
+
+Akses `/telescope` untuk monitoring real-time:
+
+- Request performance
+- Database queries
+- Cache operations
+- Exception tracking
+
+#### Health Check Endpoint
+
+```bash
+curl https://your-domain.com/api/health
+```
+
+#### Log Monitoring
+
+```bash
+tail -f storage/logs/laravel.log
+```
+
+### 📖 Advanced Hosting Guide
+
+Lihat [`HOSTING_PERFORMANCE_GUIDE.md`](HOSTING_PERFORMANCE_GUIDE.md) untuk:
+
+- Web server configuration (Nginx/Apache)
+- Database optimization
+- Redis cluster setup
+- CDN configuration
+- SSL optimization
+- Queue system setup
+
 ### 7. Setup WebSocket untuk Real-time Updates (Opsional)
 
 Untuk fitur real-time updates, setup WebSocket server:
