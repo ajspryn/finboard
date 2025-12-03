@@ -5371,8 +5371,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         if (year) apiUrl += `&year=${year}`;
 
         fetch(apiUrl)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                if (data.error) {
+                    throw new Error(data.message || data.error);
+                }
+
                 if (!data.data) {
                     container.innerHTML = `
                         <div class="text-center py-4">
@@ -5553,6 +5562,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <i class="ti ti-alert-circle text-danger" style="font-size: 3rem;"></i>
                         <h5 class="text-danger mt-2">Error memuat data</h5>
                         <p class="text-muted">Terjadi kesalahan saat memuat financial highlights.</p>
+                        <small class="text-muted">${error.message}</small>
                     </div>
                 `;
             });

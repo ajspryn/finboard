@@ -102,18 +102,23 @@ class FinancialHighlight extends Model
      */
     public static function calculateDpk($year, $month)
     {
-        $tabunganTotal = DB::table('tabungans')
-            ->where('period_year', $year)
-            ->where('period_month', $month)
-            ->sum('sahirrp');
+        try {
+            $tabunganTotal = DB::table('tabungans')
+                ->where('period_year', $year)
+                ->where('period_month', $month)
+                ->sum('sahirrp') ?? 0;
 
-        $depositoTotal = DB::table('depositos')
-            ->where('period_year', $year)
-            ->where('period_month', $month)
-            ->where('kdprd', '!=', '41') // Exclude ABP (Arisan Berjangka Pasiva)
-            ->sum('nomrp');
+            $depositoTotal = DB::table('depositos')
+                ->where('period_year', $year)
+                ->where('period_month', $month)
+                ->where('kdprd', '!=', '41') // Exclude ABP (Arisan Berjangka Pasiva)
+                ->sum('nomrp') ?? 0;
 
-        return $tabunganTotal + $depositoTotal;
+            return $tabunganTotal + $depositoTotal;
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating DPK for {$year}-{$month}: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -121,10 +126,15 @@ class FinancialHighlight extends Model
      */
     public static function calculatePembiayaan($year, $month)
     {
-        return DB::table('pembiayaans')
-            ->where('period_year', $year)
-            ->where('period_month', $month)
-            ->sum('osmdlc');
+        try {
+            return DB::table('pembiayaans')
+                ->where('period_year', $year)
+                ->where('period_month', $month)
+                ->sum('osmdlc') ?? 0;
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating Pembiayaan for {$year}-{$month}: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -132,18 +142,23 @@ class FinancialHighlight extends Model
      */
     public static function calculateNpf($year, $month)
     {
-        $totalFinancing = DB::table('pembiayaans')
-            ->where('period_year', $year)
-            ->where('period_month', $month)
-            ->sum('osmdlc');
+        try {
+            $totalFinancing = DB::table('pembiayaans')
+                ->where('period_year', $year)
+                ->where('period_month', $month)
+                ->sum('osmdlc') ?? 0;
 
-        $npfFinancing = DB::table('pembiayaans')
-            ->where('period_year', $year)
-            ->where('period_month', $month)
-            ->whereIn('colbaru', [3, 4, 5]) // Substandard, Doubtful, Loss
-            ->sum('osmdlc');
+            $npfFinancing = DB::table('pembiayaans')
+                ->where('period_year', $year)
+                ->where('period_month', $month)
+                ->whereIn('colbaru', [3, 4, 5]) // Substandard, Doubtful, Loss
+                ->sum('osmdlc') ?? 0;
 
-        return $totalFinancing > 0 ? ($npfFinancing / $totalFinancing) * 100 : 0;
+            return $totalFinancing > 0 ? ($npfFinancing / $totalFinancing) * 100 : 0;
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating NPF for {$year}-{$month}: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -152,10 +167,15 @@ class FinancialHighlight extends Model
      */
     public static function calculateAset($year, $month)
     {
-        $pembiayaan = self::calculatePembiayaan($year, $month);
-        $dpk = self::calculateDpk($year, $month);
+        try {
+            $pembiayaan = self::calculatePembiayaan($year, $month);
+            $dpk = self::calculateDpk($year, $month);
 
-        return $pembiayaan + $dpk;
+            return $pembiayaan + $dpk;
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating Aset for {$year}-{$month}: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -163,10 +183,15 @@ class FinancialHighlight extends Model
      */
     public static function calculateFdr($year, $month)
     {
-        $pembiayaan = self::calculatePembiayaan($year, $month);
-        $dpk = self::calculateDpk($year, $month);
+        try {
+            $pembiayaan = self::calculatePembiayaan($year, $month);
+            $dpk = self::calculateDpk($year, $month);
 
-        return $dpk > 0 ? ($pembiayaan / $dpk) * 100 : 0;
+            return $dpk > 0 ? ($pembiayaan / $dpk) * 100 : 0;
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating FDR for {$year}-{$month}: " . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -180,19 +205,24 @@ class FinancialHighlight extends Model
         }
 
         // Calculate from database
-        switch ($field) {
-            case 'dpk':
-                return self::calculateDpk($this->period_year, $this->period_month);
-            case 'pembiayaan':
-                return self::calculatePembiayaan($this->period_year, $this->period_month);
-            case 'npf':
-                return self::calculateNpf($this->period_year, $this->period_month);
-            case 'aset':
-                return self::calculateAset($this->period_year, $this->period_month);
-            case 'fdr':
-                return self::calculateFdr($this->period_year, $this->period_month);
-            default:
-                return null;
+        try {
+            switch ($field) {
+                case 'dpk':
+                    return self::calculateDpk($this->period_year, $this->period_month);
+                case 'pembiayaan':
+                    return self::calculatePembiayaan($this->period_year, $this->period_month);
+                case 'npf':
+                    return self::calculateNpf($this->period_year, $this->period_month);
+                case 'aset':
+                    return self::calculateAset($this->period_year, $this->period_month);
+                case 'fdr':
+                    return self::calculateFdr($this->period_year, $this->period_month);
+                default:
+                    return 0;
+            }
+        } catch (\Exception $e) {
+            \Log::warning("Error calculating field {$field}: " . $e->getMessage());
+            return 0;
         }
     }
 }

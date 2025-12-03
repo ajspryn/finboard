@@ -137,81 +137,110 @@ class FinancialHighlightController extends Controller
      */
     public function getDashboardData(Request $request)
     {
-        $comparisonType = $request->get('comparison', 'MOM'); // MOM or YOY
-        $filterMonth = $request->get('month');
-        $filterYear = $request->get('year');
+        try {
+            $comparisonType = $request->get('comparison', 'MOM'); // MOM or YOY
+            $filterMonth = $request->get('month');
+            $filterYear = $request->get('year');
 
-        // Get data for the specified period or latest if no filters
-        $query = FinancialHighlight::query();
+            // Get data for the specified period or latest if no filters
+            $query = FinancialHighlight::query();
 
-        if ($filterMonth && $filterYear) {
-            $query->where('period_month', $filterMonth)
-                ->where('period_year', $filterYear);
-        }
+            if ($filterMonth && $filterYear) {
+                $query->where('period_month', $filterMonth)
+                    ->where('period_year', $filterYear);
+            }
 
-        $latest = $query->orderBy('period_year', 'desc')
-            ->orderBy('period_month', 'desc')
-            ->first();
-
-        // If filtered period has no data, fallback to latest available data
-        if (!$latest && $filterMonth && $filterYear) {
-            $latest = FinancialHighlight::orderBy('period_year', 'desc')
+            $latest = $query->orderBy('period_year', 'desc')
                 ->orderBy('period_month', 'desc')
                 ->first();
-        }
 
-        if (!$latest) {
-            return response()->json([
-                'data' => null,
-                'comparison' => null,
-                'changes' => [],
-                'comparison_type' => $comparisonType,
-                'period' => null
-            ]);
-        }
-
-        // Get comparison data
-        $comparison = FinancialHighlight::getPreviousPeriod(
-            $latest->period_year,
-            $latest->period_month,
-            $comparisonType
-        );
-
-        // Calculate percentage changes
-        $changes = [];
-        $fields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'biaya', 'dpk', 'fdr', 'npf', 'bopo', 'cash_ratio', 'kpmm'];
-
-        foreach ($fields as $field) {
-            $changes[$field] = $latest->getPercentageChange($field, $comparison);
-        }
-
-        // Prepare data with calculated fields
-        $data = $latest->toArray();
-        $calculatedFields = ['dpk', 'pembiayaan', 'npf', 'aset', 'fdr'];
-        foreach ($calculatedFields as $field) {
-            if ($data[$field] === null) {
-                $data[$field] = $latest->getCalculatedField($field);
+            // If filtered period has no data, fallback to latest available data
+            if (!$latest && $filterMonth && $filterYear) {
+                $latest = FinancialHighlight::orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc')
+                    ->first();
             }
-        }
 
-        // Prepare comparison data with calculated fields
-        $comparisonData = null;
-        if ($comparison) {
-            $comparisonData = $comparison->toArray();
+            if (!$latest) {
+                return response()->json([
+                    'data' => null,
+                    'comparison' => null,
+                    'changes' => [],
+                    'comparison_type' => $comparisonType,
+                    'period' => null
+                ]);
+            }
+
+            // Get comparison data
+            $comparison = FinancialHighlight::getPreviousPeriod(
+                $latest->period_year,
+                $latest->period_month,
+                $comparisonType
+            );
+
+            // Calculate percentage changes
+            $changes = [];
+            $fields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'biaya', 'dpk', 'fdr', 'npf', 'bopo', 'cash_ratio', 'kpmm'];
+
+            foreach ($fields as $field) {
+                $changes[$field] = $latest->getPercentageChange($field, $comparison);
+            }
+
+            // Prepare data with calculated fields
+            $data = $latest->toArray();
+            $calculatedFields = ['dpk', 'pembiayaan', 'npf', 'aset', 'fdr'];
             foreach ($calculatedFields as $field) {
-                if ($comparisonData[$field] === null) {
-                    $comparisonData[$field] = $comparison->getCalculatedField($field);
+                if ($data[$field] === null) {
+                    $data[$field] = $latest->getCalculatedField($field);
                 }
             }
-        }
 
-        return response()->json([
-            'data' => $data,
-            'comparison' => $comparisonData,
-            'changes' => $changes,
-            'comparison_type' => $comparisonType,
-            'period' => $latest->period_year . '-' . str_pad($latest->period_month, 2, '0', STR_PAD_LEFT)
-        ]);
+            // Ensure all required fields have values
+            $requiredFields = ['car', 'roa', 'roe', 'aset', 'pembiayaan', 'laba_rugi', 'biaya', 'dpk', 'fdr', 'npf', 'bopo', 'cash_ratio', 'kpmm'];
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field]) || $data[$field] === null) {
+                    $data[$field] = 0;
+                }
+            }
+
+            // Prepare comparison data with calculated fields
+            $comparisonData = null;
+            if ($comparison) {
+                $comparisonData = $comparison->toArray();
+                foreach ($calculatedFields as $field) {
+                    if ($comparisonData[$field] === null) {
+                        $comparisonData[$field] = $comparison->getCalculatedField($field);
+                    }
+                }
+
+                // Ensure all required fields have values in comparison data
+                foreach ($requiredFields as $field) {
+                    if (!isset($comparisonData[$field]) || $comparisonData[$field] === null) {
+                        $comparisonData[$field] = 0;
+                    }
+                }
+            }
+
+            return response()->json([
+                'data' => $data,
+                'comparison' => $comparisonData,
+                'changes' => $changes,
+                'comparison_type' => $comparisonType,
+                'period' => $latest->period_year . '-' . str_pad($latest->period_month, 2, '0', STR_PAD_LEFT)
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in getDashboardData: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'user_role' => auth()->user()->role,
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat memuat data financial highlights',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
