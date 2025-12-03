@@ -46,6 +46,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/customer-details', [DashboardController::class, 'getCustomerDetails'])->name('dashboard.customer.details');
     Route::get('/dashboard/kolektibilitas-details', [DashboardController::class, 'getKolektibilitasDetails'])->name('dashboard.kolektibilitas.details');
 
+    // Financial Highlights Dashboard API (accessible by all authenticated users)
+    Route::get('/api/financial-highlights/dashboard', [FinancialHighlightController::class, 'getDashboardData'])->name('financial-highlights.dashboard');
+    Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
+
     // Daily Activity Routes (Admin and Pengurus only)
     Route::middleware(['role:admin,pengurus'])->group(function () {
         Route::get('/daily-activity', [DailyActivityController::class, 'index'])->name('daily.activity.index');
@@ -65,10 +69,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/user-settings/{user}', [UserSettingsController::class, 'update'])->name('user.settings.update');
         Route::delete('/user-settings/{user}', [UserSettingsController::class, 'destroy'])->name('user.settings.destroy');
 
-        // Financial Highlights Routes
+        // Financial Highlights Management Routes (Admin only)
         Route::resource('financial-highlights', FinancialHighlightController::class);
-        Route::get('/api/financial-highlights/dashboard', [FinancialHighlightController::class, 'getDashboardData'])->name('financial-highlights.dashboard');
-        Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
     });
 
     // Funding Routes (Admin and Funding roles)
