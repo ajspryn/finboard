@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Deposito extends Model
 {
+    use Searchable;
     protected $fillable = [
         'nodep',
         'nocif',
@@ -67,4 +69,19 @@ class Deposito extends Model
         'tgljtempo' => 'date',
         'tgllhr' => 'date',
     ];
+
+    /**
+     * Get the fields that should be searched
+     */
+    protected function getSearchFields(): array
+    {
+        return [
+            'nodep',
+            'nocif',
+            'nobilyet',
+            'nama',
+            'noid',
+            'hp',
+        ];
+    }
 }

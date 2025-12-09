@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Tabungan extends Model
 {
+    use Searchable;
     protected $fillable = [
         'notab',
         'nocif',
@@ -40,4 +42,19 @@ class Tabungan extends Model
         'tgltrnakh' => 'date',
         'tgllhr' => 'date',
     ];
+
+    /**
+     * Get the fields that should be searched
+     */
+    protected function getSearchFields(): array
+    {
+        return [
+            'notab',
+            'nocif',
+            'fnama',
+            'namaqq',
+            'noid',
+            'hp',
+        ];
+    }
 }

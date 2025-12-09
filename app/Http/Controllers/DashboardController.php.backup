@@ -24,29 +24,36 @@ class DashboardController extends Controller
         $startDay = $request->input('start_day');
         $endDay = $request->input('end_day');
         $filterMonth = $request->input('month', date('m')); // Default bulan berjalan
-        $filterYear = $request->input('year', date('Y'));   // Default tahun berjalan
+        $filterYear = $request->input('year'); // Tidak ada default tahun, jika kosong maka tampilkan semua tahun
 
         // Build base query with combined filters
         $query = Pembiayaan::query();
 
-        // Step 1: Filter by period_month dan period_year - WAJIB
+        // Step 1: Filter by period_month - WAJIB
         $query->where('period_month', $filterMonth);
-        $query->where('period_year', $filterYear);
+
+        // Step 2: Filter by period_year - OPSIONAL (jika tahun dipilih)
+        if (!empty($filterYear)) {
+            $query->where('period_year', $filterYear);
+        }
 
         // Step 2: Filter by tanggal range (tgleff) - OPSIONAL
         if ($startDay && $endDay) {
             // Jika ada kedua tanggal, filter range
-            $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-            $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+            $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
             $query->whereDate('tgleff', '>=', $startDate)
                 ->whereDate('tgleff', '<=', $endDate);
         } elseif ($startDay) {
             // Hanya ada start day
-            $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
             $query->whereDate('tgleff', '>=', $startDate);
         } elseif ($endDay) {
             // Hanya ada end day
-            $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
             $query->whereDate('tgleff', '<=', $endDate);
         }
 
@@ -72,16 +79,21 @@ class DashboardController extends Controller
 
         // Funding data (Real dari tabel tabungans dan depositos)
         // Build query dengan filter yang sama seperti lending
-        $tabunganQuery = Tabungan::where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+        $tabunganQuery = Tabungan::where('period_month', $filterMonth);
+        if (!empty($filterYear)) {
+            $tabunganQuery->where('period_year', $filterYear);
+        }
 
-        $depositoQuery = Deposito::where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+        $depositoQuery = Deposito::where('period_month', $filterMonth);
+        if (!empty($filterYear)) {
+            $depositoQuery->where('period_year', $filterYear);
+        }
 
         // Apply date range filter jika ada (menggunakan tgltrnakh untuk tabungan, tglbuka untuk deposito)
         if ($startDay && $endDay) {
-            $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-            $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+            $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
 
             $tabunganQuery->whereDate('tgltrnakh', '>=', $startDate)
                 ->whereDate('tgltrnakh', '<=', $endDate);
@@ -89,12 +101,14 @@ class DashboardController extends Controller
             $depositoQuery->whereDate('tglbuka', '>=', $startDate)
                 ->whereDate('tglbuka', '<=', $endDate);
         } elseif ($startDay) {
-            $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
 
             $tabunganQuery->whereDate('tgltrnakh', '>=', $startDate);
             $depositoQuery->whereDate('tglbuka', '>=', $startDate);
         } elseif ($endDay) {
-            $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+            $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+            $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
 
             $tabunganQuery->whereDate('tgltrnakh', '<=', $endDate);
             $depositoQuery->whereDate('tglbuka', '<=', $endDate);
@@ -109,55 +123,78 @@ class DashboardController extends Controller
 
         // Calculate growth from previous month
         $prevMonth = $filterMonth == '01' ? '12' : str_pad($filterMonth - 1, 2, '0', STR_PAD_LEFT);
-        $prevYear = $filterMonth == '01' ? $filterYear - 1 : $filterYear;
+        $prevYear = $filterMonth == '01' ? (!empty($filterYear) ? $filterYear - 1 : null) : $filterYear;
 
-        $prevTotalTabungan = Tabungan::where('period_month', $prevMonth)
-            ->where('period_year', $prevYear)
-            ->sum('sahirrp');
+        $prevTabunganQuery = Tabungan::where('period_month', $prevMonth);
+        if (!empty($prevYear)) {
+            $prevTabunganQuery->where('period_year', $prevYear);
+        }
 
-        $prevTotalDeposito = Deposito::where('period_month', $prevMonth)
-            ->where('period_year', $prevYear)
-            ->sum('nomrp');
+        $prevDepositoQuery = Deposito::where('period_month', $prevMonth);
+        if (!empty($prevYear)) {
+            $prevDepositoQuery->where('period_year', $prevYear);
+        }
+
+        $prevTotalTabungan = (clone $prevTabunganQuery)->sum('sahirrp');
+        $prevTotalDeposito = (clone $prevDepositoQuery)->sum('nomrp');
 
         $prevTotalFunding = $prevTotalTabungan + $prevTotalDeposito;
         $fundingGrowth = $prevTotalFunding > 0 ? (($totalFunding - $prevTotalFunding) / $prevTotalFunding) * 100 : 0;
 
         // Hitung Pencairan Deposito
         // Deposito yang ada di bulan lalu tapi tidak ada di bulan sekarang (sudah dicairkan)
+        $prevDepositoQuery = DB::table('depositos')->where('period_month', $prevMonth);
+        if (!empty($prevYear)) {
+            $prevDepositoQuery->where('period_year', $prevYear);
+        }
+
+        $currDepositoQuery = DB::table('depositos')->where('period_month', $filterMonth);
+        if (!empty($filterYear)) {
+            $currDepositoQuery->where('period_year', $filterYear);
+        }
+
         $depositoCairkan = DB::table('depositos as prev')
             ->leftJoin('depositos as curr', function ($join) use ($filterMonth, $filterYear) {
                 $join->on('prev.nobilyet', '=', 'curr.nobilyet')
-                    ->where('curr.period_month', $filterMonth)
-                    ->where('curr.period_year', $filterYear);
+                    ->where('curr.period_month', $filterMonth);
+                if (!empty($filterYear)) {
+                    $join->where('curr.period_year', $filterYear);
+                }
             })
-            ->where('prev.period_month', $prevMonth)
-            ->where('prev.period_year', $prevYear)
-            ->whereNull('curr.nobilyet') // Tidak ada di bulan sekarang
+            ->where('prev.period_month', $prevMonth);
+        if (!empty($prevYear)) {
+            $depositoCairkan = $depositoCairkan->where('prev.period_year', $prevYear);
+        }
+        $depositoCairkan = $depositoCairkan->whereNull('curr.nobilyet') // Tidak ada di bulan sekarang
             ->select(
                 DB::raw('COUNT(*) as jumlah_pencairan'),
                 DB::raw('SUM(prev.nomrp) as total_pencairan')
             )
             ->first();
+            ->first();
 
         $jumlahPencairan = $depositoCairkan->jumlah_pencairan ?? 0;
         $totalPencairan = $depositoCairkan->total_pencairan ?? 0;
 
-        // Calculate pencairan growth from previous month
-        $prevPrevMonth = $prevMonth == '01' ? '12' : str_pad($prevMonth - 1, 2, '0', STR_PAD_LEFT);
-        $prevPrevYear = $prevMonth == '01' ? $prevYear - 1 : $prevYear;
+        // Calculate pencairan growth from previous month (hanya jika tahun dipilih)
+        $pencairanGrowth = 0; // Default 0 jika tidak ada tahun yang dipilih
+        if (!empty($filterYear)) {
+            $prevPrevMonth = $prevMonth == '01' ? '12' : str_pad($prevMonth - 1, 2, '0', STR_PAD_LEFT);
+            $prevPrevYear = $prevMonth == '01' ? $prevYear - 1 : $prevYear;
 
-        $prevPencairan = DB::table('depositos as prev_prev')
-            ->leftJoin('depositos as prev_curr', function ($join) use ($prevMonth, $prevYear) {
-                $join->on('prev_prev.nobilyet', '=', 'prev_curr.nobilyet')
-                    ->where('prev_curr.period_month', $prevMonth)
-                    ->where('prev_curr.period_year', $prevYear);
-            })
-            ->where('prev_prev.period_month', $prevPrevMonth)
-            ->where('prev_prev.period_year', $prevPrevYear)
-            ->whereNull('prev_curr.nobilyet')
-            ->sum('prev_prev.nomrp');
+            $prevPencairan = DB::table('depositos as prev_prev')
+                ->leftJoin('depositos as prev_curr', function ($join) use ($prevMonth, $prevYear) {
+                    $join->on('prev_prev.nobilyet', '=', 'prev_curr.nobilyet')
+                        ->where('prev_curr.period_month', $prevMonth)
+                        ->where('prev_curr.period_year', $prevYear);
+                })
+                ->where('prev_prev.period_month', $prevPrevMonth)
+                ->where('prev_prev.period_year', $prevPrevYear)
+                ->whereNull('prev_curr.nobilyet')
+                ->sum('prev_prev.nomrp');
 
-        $pencairanGrowth = $prevPencairan > 0 ? (($totalPencairan - $prevPencairan) / $prevPencairan) * 100 : 0;
+            $pencairanGrowth = $prevPencairan > 0 ? (($totalPencairan - $prevPencairan) / $prevPencairan) * 100 : 0;
+        }
 
         // Calculate percentage composition
         $tabunganPct = $totalFunding > 0 ? round(($totalTabungan / $totalFunding) * 100, 1) : 0;
@@ -252,20 +289,22 @@ class DashboardController extends Controller
         $nasabahBothFunding = $allNasabahFunding;
 
         // Top 50 nasabah dengan pinjaman terbesar
-        $nasabahLending = Pembiayaan::where('period_month', $filterMonth)
-            ->where('period_year', $filterYear)
-            ->when($startDay && $endDay, function ($query) use ($filterYear, $filterMonth, $startDay, $endDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+        $nasabahLending = Pembiayaan::where('period_month', $filterMonth);
+        if (!empty($filterYear)) {
+            $nasabahLending->where('period_year', $filterYear);
+        }
+        $nasabahLending = $nasabahLending->when($startDay && $endDay, function ($query) use ($filterYear, $filterMonth, $startDay, $endDay) {
+                $startDate = (!empty($filterYear) ? $filterYear : date('Y')) . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                $endDate = (!empty($filterYear) ? $filterYear : date('Y')) . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
                 return $query->whereDate('tgleff', '>=', $startDate)
                     ->whereDate('tgleff', '<=', $endDate);
             })
             ->when($startDay && !$endDay, function ($query) use ($filterYear, $filterMonth, $startDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                $startDate = (!empty($filterYear) ? $filterYear : date('Y')) . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
                 return $query->whereDate('tgleff', '>=', $startDate);
             })
             ->when(!$startDay && $endDay, function ($query) use ($filterYear, $filterMonth, $endDay) {
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                $endDate = (!empty($filterYear) ? $filterYear : date('Y')) . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
                 return $query->whereDate('tgleff', '<=', $endDate);
             })
             ->select(
@@ -2089,21 +2128,28 @@ class DashboardController extends Controller
         $baseQuery = function () use ($startDay, $endDay, $filterMonth, $filterYear) {
             $query = Pembiayaan::query();
 
-            // Step 1: Filter by period_month dan period_year - WAJIB
+            // Step 1: Filter by period_month - WAJIB
             $query->where('period_month', $filterMonth);
-            $query->where('period_year', $filterYear);
 
-            // Step 2: Filter by tanggal range (tgleff) - OPSIONAL
+            // Step 2: Filter by period_year - OPSIONAL (jika tahun dipilih)
+            if (!empty($filterYear)) {
+                $query->where('period_year', $filterYear);
+            }
+
+            // Step 3: Filter by tanggal range (tgleff) - OPSIONAL
             if ($startDay && $endDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+                $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
                 $query->whereDate('tgleff', '>=', $startDate)
                     ->whereDate('tgleff', '<=', $endDate);
             } elseif ($startDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+                $startDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
                 $query->whereDate('tgleff', '>=', $startDate);
             } elseif ($endDay) {
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                $yearForDate = !empty($filterYear) ? $filterYear : date('Y');
+                $endDate = $yearForDate . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
                 $query->whereDate('tgleff', '<=', $endDate);
             }
 

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Pembiayaan extends Model
 {
+    use Searchable;
     protected $fillable = [
         'period_month',
         'period_year',
@@ -72,4 +74,19 @@ class Pembiayaan extends Model
         'angsmgn' => 'decimal:2',
         'plafon' => 'decimal:2',
     ];
+
+    /**
+     * Get the fields that should be searched
+     */
+    protected function getSearchFields(): array
+    {
+        return [
+            'nokontrak',
+            'nama',
+            'nmao',
+            'alamat',
+            'fnama',
+            'nocif',
+        ];
+    }
 }

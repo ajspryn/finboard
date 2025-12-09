@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class FinancialHighlight extends Model
 {
+    use Searchable;
     protected $fillable = [
         'period_year',
         'period_month',
@@ -258,5 +260,16 @@ class FinancialHighlight extends Model
             \Log::warning("Error calculating field {$field}: " . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Get the fields that should be searched
+     */
+    protected function getSearchFields(): array
+    {
+        return [
+            'period_year',
+            'period_month',
+        ];
     }
 }
