@@ -1285,21 +1285,35 @@ function formatNominal($amount) {
                                         <div class="text-end">
                                             <small class="text-muted d-block">vs Bulan Lalu</small>
                                             <?php
-                                                $isNasabahTambah = $kolektibilitas['jumlah_growth'] >= 0;
+                                                $growthPercent = $kolektibilitas['jumlah_growth'];
                                                 $isKolTinggi = $kolektibilitas['kategori'] >= 2;
-                                                $colorClass = $isNasabahTambah ? ($isKolTinggi ? 'text-danger' : 'text-success') : 'text-success';
-                                                $icon = $isNasabahTambah ? 'ti-trending-up' : 'ti-trending-down';
+
+                                                if ($growthPercent == 0) {
+                                                    // Sama dengan bulan lalu
+                                                    $colorClass = 'text-dark';
+                                                    $icon = 'ti-minus';
+                                                    $prefix = '';
+                                                } elseif ($growthPercent > 0) {
+                                                    // Naik
+                                                    $colorClass = $isKolTinggi ? 'text-danger' : 'text-success';
+                                                    $icon = 'ti-trending-up';
+                                                    $prefix = '+';
+                                                } else {
+                                                    // Turun
+                                                    $colorClass = 'text-success';
+                                                    $icon = 'ti-trending-down';
+                                                    $prefix = '';
+                                                }
 
                                                 // Hitung jumlah sebelumnya
                                                 $currentJumlah = $kolektibilitas['current_jumlah'];
-                                                $growthPercent = $kolektibilitas['jumlah_growth'];
                                                 $previousJumlah = $growthPercent != 0 && (1 + $growthPercent/100) != 0 ?
                                                     round($currentJumlah / (1 + $growthPercent/100)) :
                                                     $currentJumlah;
                                             ?>
                                             <small class="<?php echo e($colorClass); ?> fw-medium">
                                                 <i class="ti <?php echo e($icon); ?> ti-xs"></i>
-                                                <?php echo e($isNasabahTambah ? '+' : ''); ?><?php echo e(number_format(abs($growthPercent), 1)); ?>%
+                                                <?php echo e($prefix); ?><?php echo e(number_format(abs($growthPercent), 1)); ?>%
                                                 (<?php echo e(number_format($previousJumlah)); ?> → <?php echo e(number_format($currentJumlah)); ?>)
                                             </small>
                                         </div>
@@ -6311,7 +6325,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 // Group indicators by column (organized by banking logical order)
                 const leftColumn = indicators.slice(0, 3); // Pendapatan, Biaya, Laba/Rugi
                 const centerColumn = indicators.slice(3, 6); // Aset, DPK, Pembiayaan
-                const rightColumn = indicators.slice(6, 13); // Semua Rasio (CAR, ROA, ROE, Cash Ratio, NPF, FDR, BOPO)
+                const ratioModal = indicators.slice(6, 9); // CAR, ROA, ROE
+                const ratioLiquidity = indicators.slice(9, 12); // Cash Ratio, NPF, FDR
+                const ratioEfficiency = indicators.slice(12, 13); // BOPO
 
                 let html = `
                     <div class="row g-3">
@@ -6375,9 +6391,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                     `;
                 }
 
-                // Render left column (Laba Rugi)
+                // Render first row: Laba Rugi and Posisi Keuangan
                 html += `
-                        <div class="col-lg-4 col-md-12">
+                        <div class="col-lg-6 col-md-12">
                             <div class="mb-3">
                                 <small class="category-header">💰 Laba Rugi</small>
                             </div>
@@ -6392,15 +6408,34 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 html += `
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-12">
+                        <div class="col-lg-6 col-md-12">
                             <div class="mb-3">
                                 <small class="category-header">🏦 Posisi Keuangan</small>
                             </div>
                             <div class="row g-3">
                 `;
 
-                // Render center column (Posisi Keuangan)
+                // Render Posisi Keuangan
                 centerColumn.forEach(indicator => {
+                    const value = highlights[indicator.key];
+                    const change = changes[indicator.key];
+                    html += renderIndicatorCard(indicator, value, change);
+                });
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-lg-4 col-md-12">
+                            <div class="mb-3">
+                                <small class="category-header">📊 Rasio Modal & Profitabilitas</small>
+                            </div>
+                            <div class="row g-3">
+                `;
+
+                // Render Rasio Modal & Profitabilitas
+                ratioModal.forEach(indicator => {
                     const value = highlights[indicator.key];
                     const change = changes[indicator.key];
                     html += renderIndicatorCard(indicator, value, change);
@@ -6411,13 +6446,30 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="col-lg-4 col-md-12">
                             <div class="mb-3">
-                                <small class="category-header">📊 Rasio Kinerja</small>
+                                <small class="category-header">📊 Rasio Likuiditas & Risiko</small>
                             </div>
                             <div class="row g-3">
                 `;
 
-                // Render right column (Rasio Kinerja)
-                rightColumn.forEach(indicator => {
+                // Render Rasio Likuiditas & Risiko
+                ratioLiquidity.forEach(indicator => {
+                    const value = highlights[indicator.key];
+                    const change = changes[indicator.key];
+                    html += renderIndicatorCard(indicator, value, change);
+                });
+
+                html += `
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-12">
+                            <div class="mb-3">
+                                <small class="category-header">📊 Rasio Efisiensi</small>
+                            </div>
+                            <div class="row g-3">
+                `;
+
+                // Render Rasio Efisiensi
+                ratioEfficiency.forEach(indicator => {
                     const value = highlights[indicator.key];
                     const change = changes[indicator.key];
                     html += renderIndicatorCard(indicator, value, change);

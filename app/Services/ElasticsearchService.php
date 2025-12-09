@@ -150,7 +150,7 @@ class ElasticsearchService
                     'id' => $id,
                     'body' => $data,
                ]);
-               Log::debug("Document indexed: {$indexName}:{$id}", $response);
+               Log::debug("Document indexed: {$indexName}:{$id}");
 
                return true;
           } catch (\Exception $e) {
@@ -175,7 +175,7 @@ class ElasticsearchService
                          'doc' => $data,
                     ],
                ]);
-               Log::debug("Document updated: {$indexName}:{$id}", $response);
+               Log::debug("Document updated: {$indexName}:{$id}");
 
                return true;
           } catch (\Exception $e) {
@@ -197,7 +197,7 @@ class ElasticsearchService
                     'index' => $this->getIndexName($indexName),
                     'id' => $id,
                ]);
-               Log::debug("Document deleted: {$indexName}:{$id}", $response);
+               Log::debug("Document deleted: {$indexName}:{$id}");
 
                return true;
           } catch (\Exception $e) {

@@ -78,7 +78,7 @@
                             <label for="aset" class="form-label">Total Aset <span class="badge bg-secondary">Manual</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number" min="0"
+                                <input type="number" min="0" step="0.01"
                                        class="form-control @error('aset') is-invalid @enderror"
                                        id="aset" name="aset" value="{{ old('aset', $financialHighlight->aset) }}"
                                        placeholder="Masukkan total aset">
@@ -94,7 +94,7 @@
                             <label for="pembiayaan" class="form-label">Total Pembiayaan <span class="badge bg-info">Otomatis</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number" min="0" readonly
+                                <input type="number" min="0" step="0.01" readonly
                                        class="form-control bg-light"
                                        id="pembiayaan" name="pembiayaan" value="{{ old('pembiayaan', $financialHighlight->getCalculatedField('pembiayaan')) }}"
                                        placeholder="Dihitung otomatis">
@@ -107,7 +107,7 @@
                             <label for="laba_rugi" class="form-label">Laba/Rugi</label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number"
+                                <input type="number" step="0.01"
                                        class="form-control @error('laba_rugi') is-invalid @enderror"
                                        id="laba_rugi" name="laba_rugi" value="{{ old('laba_rugi', $financialHighlight->laba_rugi) }}"
                                        placeholder="Contoh: 25000000">
@@ -123,7 +123,7 @@
                             <label for="biaya" class="form-label">Biaya</label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number"
+                                <input type="number" step="0.01"
                                        class="form-control @error('biaya') is-invalid @enderror"
                                        id="biaya" name="biaya" value="{{ old('biaya', $financialHighlight->biaya) }}"
                                        placeholder="Masukkan total biaya">
@@ -139,7 +139,7 @@
                             <label for="dpk" class="form-label">DPK (Dana Pihak Ketiga) <span class="badge bg-info">Otomatis</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">Rp</span>
-                                <input type="number" min="0" readonly
+                                <input type="number" min="0" step="0.01" readonly
                                        class="form-control bg-light"
                                        id="dpk" name="dpk" value="{{ old('dpk', $financialHighlight->getCalculatedField('dpk')) }}"
                                        placeholder="Dihitung otomatis">
@@ -151,7 +151,7 @@
                         <div class="col-md-6 mb-3">
                             <label for="fdr" class="form-label">FDR (Financing to Deposit Ratio) <span class="badge bg-info">Otomatis</span></label>
                             <div class="input-group">
-                                <input type="number" step="0.01" min="0" max="500" readonly
+                                <input type="number" step="0.01" min="0" readonly
                                        class="form-control bg-light @error('fdr') is-invalid @enderror"
                                        id="fdr" name="fdr" value="{{ old('fdr', $financialHighlight->fdr ?: $financialHighlight->getCalculatedField('fdr')) }}"
                                        placeholder="Akan dihitung otomatis">

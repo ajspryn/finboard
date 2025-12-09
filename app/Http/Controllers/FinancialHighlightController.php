@@ -52,7 +52,7 @@ class FinancialHighlightController extends Controller
             'biaya' => 'nullable|numeric',
             'pendapatan' => 'nullable|numeric',
             'dpk' => 'nullable|numeric|min:0',
-            'fdr' => 'nullable|numeric|min:0|max:200',
+            'fdr' => 'nullable|numeric|min:0',
             'npf' => 'nullable|numeric|min:0|max:100',
             'bopo' => 'nullable|numeric|min:0|max:200',
         ]);
@@ -96,6 +96,12 @@ class FinancialHighlightController extends Controller
      */
     public function update(Request $request, FinancialHighlight $financialHighlight)
     {
+        \Log::info('FinancialHighlight update called', [
+            'id' => $financialHighlight->id,
+            'request_data' => $request->all(),
+            'method' => $request->method(),
+        ]);
+
         $request->validate([
             'car' => 'nullable|numeric|min:0|max:100',
             'roa' => 'nullable|numeric|min:-100|max:100',
@@ -106,11 +112,13 @@ class FinancialHighlightController extends Controller
             'biaya' => 'nullable|numeric',
             'pendapatan' => 'nullable|numeric',
             'dpk' => 'nullable|numeric|min:0',
-            'fdr' => 'nullable|numeric|min:0|max:200',
+            'fdr' => 'nullable|numeric|min:0',
             'npf' => 'nullable|numeric|min:0|max:100',
             'bopo' => 'nullable|numeric|min:0|max:200',
             'cash_ratio' => 'nullable|numeric|min:0|max:200',
         ]);
+
+        \Log::info('Validation passed');
 
         $data = $request->all();
 
@@ -120,11 +128,25 @@ class FinancialHighlightController extends Controller
             if (empty($data[$field])) {
                 $method = 'calculate' . ucfirst($field);
                 $data[$field] = FinancialHighlight::$method($financialHighlight->period_year, $financialHighlight->period_month);
+                \Log::info("Calculated {$field}: {$data[$field]}");
             }
         }
 
-        $financialHighlight->update($data);
+        \Log::info('About to update with data', $data);
 
+        try {
+            $financialHighlight->update($data);
+            \Log::info('Update completed successfully');
+        } catch (\Exception $e) {
+            \Log::error('Update failed', [
+                'error' => $e->getMessage(),
+                'data' => $data,
+                'id' => $financialHighlight->id
+            ]);
+            return back()->withErrors(['update' => 'Gagal memperbarui data: ' . $e->getMessage()]);
+        }
+
+        \Log::info('Redirecting to index with success message');
         return redirect()->route('financial-highlights.index')
             ->with('success', 'Data financial highlight berhasil diperbarui.');
     }
