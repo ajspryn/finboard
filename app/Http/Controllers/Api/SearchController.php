@@ -43,11 +43,14 @@ class SearchController extends Controller
 
         $results = Pembiayaan::search($query, $options);
 
+        // Remove duplicates based on content (nokontrak) and keep the most recent one
+        $uniqueResults = $this->removeContentDuplicates($results['hits'], 'nokontrak');
+
         return response()->json([
             'success' => true,
             'query' => $query,
-            'total' => $results['total'],
-            'results' => collect($results['hits'])->map(function ($pembiayaan) {
+            'total' => $uniqueResults->count(),
+            'results' => $uniqueResults->map(function ($pembiayaan) {
                 return [
                     'id' => $pembiayaan->id,
                     'nokontrak' => $pembiayaan->nokontrak,
@@ -95,11 +98,14 @@ class SearchController extends Controller
 
         $results = Tabungan::search($query, $options);
 
+        // Remove duplicates based on content (notab) and keep the most recent one
+        $uniqueResults = $this->removeContentDuplicates($results['hits'], 'notab');
+
         return response()->json([
             'success' => true,
             'query' => $query,
-            'total' => $results['total'],
-            'results' => collect($results['hits'])->map(function ($tabungan) {
+            'total' => $uniqueResults->count(),
+            'results' => $uniqueResults->map(function ($tabungan) {
                 return [
                     'id' => $tabungan->id,
                     'notab' => $tabungan->notab,
@@ -147,11 +153,14 @@ class SearchController extends Controller
 
         $results = Deposito::search($query, $options);
 
+        // Remove duplicates based on content (nodep) and keep the most recent one
+        $uniqueResults = $this->removeContentDuplicates($results['hits'], 'nodep');
+
         return response()->json([
             'success' => true,
             'query' => $query,
-            'total' => $results['total'],
-            'results' => collect($results['hits'])->map(function ($deposito) {
+            'total' => $uniqueResults->count(),
+            'results' => $uniqueResults->map(function ($deposito) {
                 return [
                     'id' => $deposito->id,
                     'nodep' => $deposito->nodep,
@@ -199,11 +208,20 @@ class SearchController extends Controller
 
         $results = FinancialHighlight::search($query ?: '*', $options);
 
+        // Remove duplicates based on content (period_year + period_month) and keep the most recent one
+        $uniqueResults = collect($results['hits'])->groupBy(function ($item) {
+            return $item->period_year . '-' . $item->period_month;
+        })->map(function ($group) {
+            return $group->sortByDesc(function ($item) {
+                return $item->updated_at ?? $item->created_at ?? '1970-01-01';
+            })->first();
+        })->values();
+
         return response()->json([
             'success' => true,
             'query' => $query,
-            'total' => $results['total'],
-            'results' => collect($results['hits'])->map(function ($highlight) {
+            'total' => $uniqueResults->count(),
+            'results' => $uniqueResults->map(function ($highlight) {
                 return [
                     'id' => $highlight->id,
                     'period_year' => $highlight->period_year,
@@ -268,9 +286,11 @@ class SearchController extends Controller
             switch ($searchType) {
                 case 'pembiayaan':
                     $searchResults = Pembiayaan::search($query, $options);
+                    // Remove duplicates based on content (nokontrak) and keep the most recent one
+                    $uniqueHits = $this->removeContentDuplicates($searchResults['hits'], 'nokontrak');
                     $results['pembiayaan'] = [
-                        'total' => $searchResults['total'],
-                        'results' => collect($searchResults['hits'])->take(5)->map(function ($item) {
+                        'total' => $uniqueHits->count(),
+                        'results' => $uniqueHits->take(5)->map(function ($item) {
                             return [
                                 'id' => $item->id,
                                 'nokontrak' => $item->nokontrak,
@@ -284,9 +304,11 @@ class SearchController extends Controller
 
                 case 'tabungan':
                     $searchResults = Tabungan::search($query, $options);
+                    // Remove duplicates based on content (notab) and keep the most recent one
+                    $uniqueHits = $this->removeContentDuplicates($searchResults['hits'], 'notab');
                     $results['tabungan'] = [
-                        'total' => $searchResults['total'],
-                        'results' => collect($searchResults['hits'])->take(5)->map(function ($item) {
+                        'total' => $uniqueHits->count(),
+                        'results' => $uniqueHits->take(5)->map(function ($item) {
                             return [
                                 'id' => $item->id,
                                 'notab' => $item->notab,
@@ -300,9 +322,11 @@ class SearchController extends Controller
 
                 case 'deposito':
                     $searchResults = Deposito::search($query, $options);
+                    // Remove duplicates based on content (nodep) and keep the most recent one
+                    $uniqueHits = $this->removeContentDuplicates($searchResults['hits'], 'nodep');
                     $results['deposito'] = [
-                        'total' => $searchResults['total'],
-                        'results' => collect($searchResults['hits'])->take(5)->map(function ($item) {
+                        'total' => $uniqueHits->count(),
+                        'results' => $uniqueHits->take(5)->map(function ($item) {
                             return [
                                 'id' => $item->id,
                                 'nodep' => $item->nodep,
@@ -316,9 +340,17 @@ class SearchController extends Controller
 
                 case 'financial_highlight':
                     $searchResults = FinancialHighlight::search($query ?: '*', $options);
+                    // Remove duplicates based on content (period_year + period_month) and keep the most recent one
+                    $uniqueHits = collect($searchResults['hits'])->groupBy(function ($item) {
+                        return $item->period_year . '-' . $item->period_month;
+                    })->map(function ($group) {
+                        return $group->sortByDesc(function ($item) {
+                            return $item->updated_at ?? $item->created_at ?? '1970-01-01';
+                        })->first();
+                    })->values();
                     $results['financial_highlight'] = [
-                        'total' => $searchResults['total'],
-                        'results' => collect($searchResults['hits'])->take(5)->map(function ($item) {
+                        'total' => $uniqueHits->count(),
+                        'results' => $uniqueHits->take(5)->map(function ($item) {
                             return [
                                 'id' => $item->id,
                                 'period' => $item->period_year . '-' . str_pad($item->period_month, 2, '0', STR_PAD_LEFT),
@@ -416,5 +448,18 @@ class SearchController extends Controller
             'success' => true,
             'data' => $highlight
         ]);
+    }
+
+    /**
+     * Remove duplicates based on content field and keep the most recent one
+     */
+    private function removeContentDuplicates($hits, $contentField)
+    {
+        return collect($hits)->groupBy($contentField)->map(function ($group) {
+            // Sort by updated_at descending (most recent first) and take the first one
+            return $group->sortByDesc(function ($item) {
+                return $item->updated_at ?? $item->created_at ?? '1970-01-01';
+            })->first();
+        })->values();
     }
 }
