@@ -88,7 +88,7 @@
                     <li class="menu-item {{ request()->is('daily-activity') ? 'active' : '' }}">
                         <a href="/daily-activity" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-calendar-event"></i>
-                            <div data-i18n="DailyActivity">Daily Activity Karyawan</div>
+                            <div data-i18n="Daily Activity">Daily Activity Karyawan</div>
                         </a>
                     </li>
                     @endif
@@ -100,24 +100,20 @@
                     </li>
 
                     <!-- Upload Data (admin dan lending) -->
-                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'lending')
                     <li class="menu-item {{ request()->is('upload') ? 'active' : '' }}">
                         <a href="/upload" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-upload"></i>
-                            <div data-i18n="Upload Pembiayaan">Upload Pembiayaan</div>
+                            <div data-i18n="Upload">Upload</div>
                         </a>
                     </li>
-                    @endif
 
-                    <!-- Upload Funding (admin dan funding) -->
-                    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'funding')
-                    <li class="menu-item {{ request()->is('funding') ? 'active' : '' }}">
-                        <a href="/funding" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-file-upload"></i>
-                            <div data-i18n="Upload Tabungan & Deposito">Upload Tabungan & Deposito</div>
+                    <li class="menu-item {{ request()->is('financial-highlights*') ? 'active' : '' }}">
+                        <a href="/financial-highlights" class="menu-link">
+                            <i class="menu-icon tf-icons ti ti-chart-line"></i>
+                            <div data-i18n="Financial Highlights">Financial Highlights</div>
                         </a>
                     </li>
-                    @endif
+
                     @endif
 
 
@@ -132,14 +128,7 @@
                     <li class="menu-item {{ request()->is('user-settings') ? 'active' : '' }}">
                         <a href="/user-settings" class="menu-link">
                             <i class="menu-icon tf-icons ti ti-user-cog"></i>
-                            <div data-i18n="UserSettings">Pengaturan User</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item {{ request()->is('financial-highlights*') ? 'active' : '' }}">
-                        <a href="/financial-highlights" class="menu-link">
-                            <i class="menu-icon tf-icons ti ti-chart-line"></i>
-                            <div data-i18n="FinancialHighlights">Financial Highlights</div>
+                            <div data-i18n="User Settings">Pengaturan User</div>
                         </a>
                     </li>
                     @endif

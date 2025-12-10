@@ -35,9 +35,9 @@ class FundingController extends Controller
         $uploadHistory = collect();
 
         // Get distinct periods from tabungan
-        $tabunganPeriods = Tabungan::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(sahirrp) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
-            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+        $tabunganPeriods = Tabungan::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(sahirrp) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -51,9 +51,9 @@ class FundingController extends Controller
             });
 
         // Get distinct periods from deposito
-        $depositoPeriods = Deposito::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(nomrp) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
-            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+        $depositoPeriods = Deposito::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(nomrp) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -67,9 +67,9 @@ class FundingController extends Controller
             });
 
         // Get distinct periods from linkage
-        $linkagePeriods = Linkage::selectRaw("DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as count, SUM(os) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("strftime('%Y', created_at), strftime('%m', created_at)")
-            ->orderByRaw("strftime('%Y', created_at) DESC, strftime('%m', created_at) DESC")
+        $linkagePeriods = Linkage::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(os) as total_saldo, MAX(created_at) as last_upload")
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -121,8 +121,29 @@ class FundingController extends Controller
         return view('funding.index', compact('lastUpload', 'totalData', 'stats', 'uploadHistory'));
     }
 
+    public function clear(Request $request)
+    {
+        try {
+            $countTabungan = Tabungan::count();
+            $countDeposito = Deposito::count();
+            $countLinkage = Linkage::count();
+            $totalCount = $countTabungan + $countDeposito + $countLinkage;
+
+            Tabungan::truncate();
+            Deposito::truncate();
+            Linkage::truncate();
+
+            return redirect()->back()->with('success', "Berhasil menghapus {$totalCount} data funding (Tabungan: {$countTabungan}, Deposito: {$countDeposito}, Linkage: {$countLinkage}).");
+        } catch (\Exception $e) {
+            Log::error('Clear Funding Data Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+        }
+    }
+
     public function upload(Request $request)
     {
+        ini_set('max_execution_time', 300); // Increase to 5 minutes
+
         $request->validate([
             'month' => 'required|in:01,02,03,04,05,06,07,08,09,10,11,12',
             'year' => 'required|digits:4|integer|min:2020|max:2030',
@@ -275,6 +296,8 @@ class FundingController extends Controller
         $errors = 0;
         $errorDetails = [];
         $lineNumber = 1;
+        $batchData = [];
+        $batchSize = 100;
 
         while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
             $lineNumber++;
@@ -364,6 +387,8 @@ class FundingController extends Controller
                         'kodeloc' => $data['kodeloc'] ?? null,
                         'period_month' => $month,
                         'period_year' => $year,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
 
@@ -414,6 +439,8 @@ class FundingController extends Controller
                         'namapt' => $data['namapt'] ?? null,
                         'period_month' => $month,
                         'period_year' => $year,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
 
@@ -432,6 +459,8 @@ class FundingController extends Controller
                         'osmdlc' => $this->parseNumeric($data['os'] ?? 0),
                         'period_month' => $month,
                         'period_year' => $year,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
 
@@ -450,28 +479,46 @@ class FundingController extends Controller
                         'os' => $this->parseNumeric($data['os'] ?? 0),
                         'period_month' => $month,
                         'period_year' => $year,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
 
-                // Save ke tabel yang sesuai
-                if ($jenis === 'TABUNGAN') {
-                    Tabungan::create($fundingData);
-                    $imported++;
-                } elseif ($jenis === 'DEPOSITO') {
-                    Deposito::create($fundingData);
-                    $imported++;
-                } elseif ($jenis === 'PEMBIAYAAN') {
-                    Pembiayaan::create($fundingData);
-                    $imported++;
-                } elseif ($jenis === 'LINKAGE') {
-                    Linkage::create($fundingData);
-                    $imported++;
+                $batchData[] = $fundingData;
+
+                // Insert in batches
+                if (count($batchData) >= $batchSize) {
+                    if ($jenis === 'TABUNGAN') {
+                        Tabungan::insert($batchData);
+                    } elseif ($jenis === 'DEPOSITO') {
+                        Deposito::insert($batchData);
+                    } elseif ($jenis === 'PEMBIAYAAN') {
+                        Pembiayaan::insert($batchData);
+                    } elseif ($jenis === 'LINKAGE') {
+                        Linkage::insert($batchData);
+                    }
+                    $imported += count($batchData);
+                    $batchData = [];
                 }
             } catch (\Exception $e) {
                 $errors++;
                 $errorDetails[] = "{$jenis} Baris {$lineNumber}: " . $e->getMessage();
                 Log::error("Error importing {$jenis} line {$lineNumber}: " . $e->getMessage());
             }
+        }
+
+        // Insert remaining batch
+        if (!empty($batchData)) {
+            if ($jenis === 'TABUNGAN') {
+                Tabungan::insert($batchData);
+            } elseif ($jenis === 'DEPOSITO') {
+                Deposito::insert($batchData);
+            } elseif ($jenis === 'PEMBIAYAAN') {
+                Pembiayaan::insert($batchData);
+            } elseif ($jenis === 'LINKAGE') {
+                Linkage::insert($batchData);
+            }
+            $imported += count($batchData);
         }
 
         fclose($handle);

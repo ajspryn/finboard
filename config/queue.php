@@ -43,6 +43,16 @@ return [
             'after_commit' => false,
         ],
 
+        'uploads' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'uploads',
+            'retry_after' => 600, // 10 minutes for large file processing
+            'timeout' => 600, // 10 minutes job timeout
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

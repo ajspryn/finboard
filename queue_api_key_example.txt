@@ -1,0 +1,5 @@
+# Tambahkan ke file .env Anda
+QUEUE_API_KEY=your-very-secure-random-key-here-123456789
+
+# Contoh key yang aman:
+# QUEUE_API_KEY=sk-queue-abc123def456ghi789jkl012mno345pqr678stu901vwx

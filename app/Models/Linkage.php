@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Linkage extends Model
 {
+    use Searchable;
+
     protected $fillable = [
         'nokontrak',
         'nocif',

@@ -869,6 +869,10 @@ function formatNominal($amount) {
                         <a href="{{ route('financial-highlights.index') }}" class="btn btn-primary btn-sm">
                             <i class="ti ti-settings me-1"></i>Kelola
                         </a>
+                        <!-- Export PDF Button -->
+                        <a href="{{ route('export.dashboard', request()->query()) }}" class="btn btn-success btn-sm" target="_blank">
+                            <i class="ti ti-file-text me-1"></i>Export PDF
+                        </a>
                     </div>
                 </div>
                 <div class="card-body">

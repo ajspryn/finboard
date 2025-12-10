@@ -300,7 +300,7 @@ class DashboardController extends Controller
         ];
 
         // Monthly trends - Group by month from tgleff
-        // Use strftime for SQLite compatibility
+        // Use DATE_FORMAT for MySQL compatibility
         // Monthly trends should show period-based data, not tgleff
         $monthlyData = Pembiayaan::select(
             'period_year',
@@ -1014,7 +1014,7 @@ class DashboardController extends Controller
                 ->where('jw', '>', 0)
                 ->where('angs_ke', '>=', 1)
                 ->where('osmdlc', '<=', 2000000)
-                ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$year . '-' . $monthStr])
+                ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
                 ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as nominal')
                 ->first();
 
@@ -1028,7 +1028,7 @@ class DashboardController extends Controller
                 ->whereRaw('angs_ke >= jw')
                 ->where('jw', '>', 0)
                 ->where('osmdlc', '<=', 2000000)
-                ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$year . '-' . $monthStr])
+                ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
                 ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as nominal')
                 ->first();
 
@@ -1127,7 +1127,7 @@ class DashboardController extends Controller
                     ->where('jw', '>', 0)
                     ->where('angs_ke', '>=', 1)
                     ->where('osmdlc', '<=', 2000000)
-                    ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$year . '-' . $monthStr])
+                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
                     ->selectRaw('DISTINCT nokontrak')
                     ->pluck('nokontrak')
                     ->toArray();
@@ -1153,7 +1153,7 @@ class DashboardController extends Controller
                     ->whereRaw('angs_ke >= jw')
                     ->where('jw', '>', 0)
                     ->where('osmdlc', '<=', 2000000)
-                    ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$year . '-' . $monthStr])
+                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
                     ->selectRaw('DISTINCT nokontrak')
                     ->pluck('nokontrak')
                     ->toArray();
@@ -2457,7 +2457,7 @@ class DashboardController extends Controller
                     ->where('jw', '>', 0)
                     ->where('angs_ke', '>=', 1) // Minimal 1x bayar
                     ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
-                    ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
+                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
 
                 $title = 'Pelunasan Cepat (Lunas Sebelum Tenor Selesai)';
                 break;
@@ -2484,7 +2484,7 @@ class DashboardController extends Controller
                     ->whereRaw('angs_ke >= jw')
                     ->where('jw', '>', 0)
                     ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
-                    ->whereRaw("strftime('%Y-%m', tgleff) != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
+                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
 
                 $title = 'Nasabah Lunas (Lunas Tepat Waktu)';
                 break;
@@ -2694,8 +2694,8 @@ class DashboardController extends Controller
                 ->where('kodeaoh', $kodeaoh)
                 ->where('period_month', $monthStr)
                 ->where('period_year', $currentYear)
-                ->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
-                ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear])
+                ->whereRaw("MONTH(tglbuka) = ?", [$monthStr])
+                ->whereRaw("YEAR(tglbuka) = ?", [$currentYear])
                 ->where('stsrec', 'A')
                 ->get();
 
@@ -2761,7 +2761,7 @@ class DashboardController extends Controller
         // Calculate totals - sum of all depositos opened throughout the year
         $allOpenedDepositos = DB::table('depositos')
             ->where('kodeaoh', $kodeaoh)
-            ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear])
+            ->whereRaw("YEAR(tglbuka) = ?", [$currentYear])
             ->where('stsrec', 'A')
             ->get();
 
@@ -2851,8 +2851,8 @@ class DashboardController extends Controller
             if ($category !== 'pencairan') {
                 $query->where('period_month', $monthStr)
                     ->where('period_year', $currentYear)
-                    ->whereRaw("strftime('%m', tglbuka) = ?", [$monthStr])
-                    ->whereRaw("strftime('%Y', tglbuka) = ?", [$currentYear]);
+                    ->whereRaw("MONTH(tglbuka) = ?", [$monthStr])
+                    ->whereRaw("YEAR(tglbuka) = ?", [$currentYear]);
             } else {
                 // For pencairan, just filter by period
                 $query->where('period_month', $monthStr)

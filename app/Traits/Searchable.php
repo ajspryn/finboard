@@ -9,20 +9,31 @@ use Illuminate\Support\Facades\App;
 trait Searchable
 {
      /**
+      * Flag to disable Elasticsearch indexing during bulk operations
+      */
+     public static $disableElasticsearchIndexing = false;
+
+     /**
       * Boot the Searchable trait for a model.
       */
      public static function bootSearchable()
      {
           static::created(function (Model $model) {
-               $model->elasticsearchIndex();
+               if (!static::$disableElasticsearchIndexing) {
+                    $model->elasticsearchIndex();
+               }
           });
 
           static::updated(function (Model $model) {
-               $model->elasticsearchUpdate();
+               if (!static::$disableElasticsearchIndexing) {
+                    $model->elasticsearchUpdate();
+               }
           });
 
           static::deleted(function (Model $model) {
-               $model->elasticsearchDelete();
+               if (!static::$disableElasticsearchIndexing) {
+                    $model->elasticsearchDelete();
+               }
           });
      }
 

@@ -137,37 +137,6 @@
         </div>
     </div>
 
-    <!-- Statistics per Jenis -->
-    @if($stats->count() > 0)
-    <div class="row mb-4">
-        @foreach($stats as $stat)
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div class="card-info">
-                            <p class="card-text mb-1">{{ $stat->jenis ?? 'Lainnya' }}</p>
-                            <div class="d-flex align-items-end mb-2">
-                                <h4 class="mb-0 me-2">{{ number_format($stat->jumlah) }}</h4>
-                                <small class="text-muted">rekening</small>
-                            </div>
-                            <small class="text-success fw-medium">
-                                Rp {{ number_format($stat->total_saldo / 1000000000, 2) }} Miliar
-                            </small>
-                        </div>
-                        <div class="avatar">
-                            <span class="avatar-initial rounded bg-label-{{ $stat->jenis === 'TABUNGAN' ? 'info' : ($stat->jenis === 'DEPOSITO' ? 'success' : 'warning') }}">
-                                <i class="ti ti-wallet ti-md"></i>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @endforeach
-    </div>
-    @endif
-
     <!-- Upload History Table -->
     @if($uploadHistory->count() > 0)
     <div class="row mb-4">
@@ -247,6 +216,15 @@
                     <h5 class="mb-0">
                         <i class="ti ti-file-upload me-2"></i>Upload File CSV
                     </h5>
+                    <div>
+                        <form id="clearForm" action="{{ route('funding.clear') }}" method="POST" style="display: inline;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmClear()">
+                                <i class="ti ti-trash me-1"></i>Hapus Semua Data
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 <div class="card-body">
                     <form id="uploadForm" action="{{ route('funding.upload') }}" method="POST" enctype="multipart/form-data">
@@ -696,5 +674,11 @@
         // Initialize
         updateSubmitButton();
     });
+
+    function confirmClear() {
+        if (confirm('Apakah Anda yakin ingin menghapus SEMUA data funding (Tabungan, Deposito, dan Linkage)? Tindakan ini tidak dapat dibatalkan!')) {
+            document.getElementById('clearForm').submit();
+        }
+    }
 </script>
 @endsection

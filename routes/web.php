@@ -4,10 +4,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UploadController;
-use App\Http\Controllers\FundingController;
 use App\Http\Controllers\DailyActivityController;
 use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\FinancialHighlightController;
+use App\Http\Controllers\ExportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,6 +48,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Financial Highlights Dashboard API (accessible by all authenticated users)
     Route::get('/api/financial-highlights/dashboard', [FinancialHighlightController::class, 'getDashboardData'])->name('financial-highlights.dashboard');
+
+    // Export Routes
+    Route::get('/export/dashboard', [ExportController::class, 'exportDashboard'])->name('export.dashboard');
     Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
 
     // TEMPORARY: Simple test route
@@ -74,12 +77,6 @@ Route::middleware(['auth'])->group(function () {
 
         // Financial Highlights Management Routes (Admin only)
         Route::resource('financial-highlights', FinancialHighlightController::class);
-    });
-
-    // Funding Routes (Admin and Funding roles)
-    Route::middleware(['role:admin,funding'])->group(function () {
-        Route::get('/funding', [FundingController::class, 'index'])->name('funding.index');
-        Route::post('/funding/upload', [FundingController::class, 'upload'])->name('funding.upload');
     });
 });
 

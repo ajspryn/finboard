@@ -25,6 +25,22 @@ return [
 
      /*
     |--------------------------------------------------------------------------
+    | Connection Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Connection settings for Elasticsearch client
+    |
+    */
+
+     'connection' => [
+          'timeout' => env('ELASTICSEARCH_TIMEOUT', 30), // Connection timeout in seconds
+          'connect_timeout' => env('ELASTICSEARCH_CONNECT_TIMEOUT', 5), // Connect timeout in seconds
+          'retry_on_timeout' => env('ELASTICSEARCH_RETRY_ON_TIMEOUT', true),
+          'retries' => env('ELASTICSEARCH_RETRIES', 2),
+     ],
+
+     /*
+    |--------------------------------------------------------------------------
     | Default Index Configuration
     |--------------------------------------------------------------------------
     |

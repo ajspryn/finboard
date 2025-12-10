@@ -123,4 +123,28 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Queue API Key
+    |--------------------------------------------------------------------------
+    |
+    | API key for external queue processing services (web cron, etc.)
+    | Set this in your .env file for security.
+    |
+    */
+
+    'queue_api_key' => env('QUEUE_API_KEY', 'your-secret-queue-key-change-this'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Secret
+    |--------------------------------------------------------------------------
+    |
+    | Secret for webhook authentication from external services
+    | Set this in your .env file for security.
+    |
+    */
+
+    'webhook_secret' => env('WEBHOOK_SECRET', 'your-webhook-secret-change-this'),
+
 ];
