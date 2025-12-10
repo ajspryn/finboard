@@ -25,3 +25,7 @@ yarn-error.log
 # Laravel cache files
 bootstrap/cache/*
 !bootstrap/cache/.gitkeep
+
+# Database files
+database/*.sqlite
+database/*.db
