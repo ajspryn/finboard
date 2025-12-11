@@ -734,7 +734,6 @@ class ProcessCsvUpload implements ShouldQueue
             if ($deletedCount > 0) {
                 Log::info("Deleted {$deletedCount} existing {$jenis} records for period {$month}/{$year}");
             }
-
         } catch (\Exception $e) {
             Log::error("Error deleting existing data for {$jenis} period {$month}/{$year}: " . $e->getMessage());
             throw $e;
