@@ -161,7 +161,19 @@ class UploadController extends Controller
         }
 
         // Sort by created_at descending and paginate
-        $uploadHistory = $combinedUploads->sortByDesc('created_at')->paginate(10);
+        $sortedUploads = $combinedUploads->sortByDesc('created_at')->values();
+        $perPage = 10;
+        $currentPage = request()->get('page', 1);
+        $offset = ($currentPage - 1) * $perPage;
+
+        $paginatedItems = $sortedUploads->slice($offset, $perPage);
+        $uploadHistory = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedItems,
+            $sortedUploads->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
 
         return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory'));
     }
