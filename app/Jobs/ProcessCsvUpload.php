@@ -141,6 +141,9 @@ class ProcessCsvUpload implements ShouldQueue
 
     private function processCsvFile($filePath, $jenis, $month, $year)
     {
+        // Delete existing data for this period before importing new data
+        $this->deleteExistingDataForPeriod($jenis, $month, $year);
+
         $handle = fopen($filePath, 'r');
         $header = fgetcsv($handle, 1000, ',', '"', '\\');
         $imported = 0;
@@ -163,17 +166,7 @@ class ProcessCsvUpload implements ShouldQueue
                     $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
                     $record = $this->validateAndConvertData($csvRow, $lineNumber);
 
-                    // Check for duplicates
-                    $exists = Pembiayaan::where('nokontrak', $record['nokontrak'])
-                        ->where('period_month', $month)
-                        ->where('period_year', $year)
-                        ->exists();
-
-                    if ($exists) {
-                        $errors++;
-                        $errorDetails[] = "PEMBIAYAAN Baris {$lineNumber}: No kontrak {$record['nokontrak']} sudah ada";
-                        continue;
-                    }
+                    // No duplicate check needed since we delete existing data first
                 } elseif ($jenis === 'TABUNGAN') {
                     $record = [
                         'nocif' => $data[0] ?? '',
@@ -305,6 +298,9 @@ class ProcessCsvUpload implements ShouldQueue
      */
     private function processCsvFileOptimized($filePath, $jenis, $month, $year)
     {
+        // Delete existing data for this period before importing new data
+        $this->deleteExistingDataForPeriod($jenis, $month, $year);
+
         $handle = fopen($filePath, 'r');
         $header = fgetcsv($handle, 1000, ',', '"', '\\');
         $imported = 0;
@@ -379,8 +375,7 @@ class ProcessCsvUpload implements ShouldQueue
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             $record = $this->validateAndConvertData($csvRow, $lineNumber);
 
-            // Skip duplicate check for performance - assume data is clean
-            // If duplicates exist, they will be handled by database constraints
+            // No duplicate check needed since we delete existing data first
             return $record;
         } elseif ($jenis === 'TABUNGAN') {
             return [
@@ -708,5 +703,41 @@ class ProcessCsvUpload implements ShouldQueue
 
         $value = str_replace([',', ' '], '', $value);
         return floatval($value);
+    }
+
+    /**
+     * Delete existing data for the specified period before importing new data
+     */
+    private function deleteExistingDataForPeriod($jenis, $month, $year)
+    {
+        try {
+            $deletedCount = 0;
+
+            if ($jenis === 'PEMBIAYAAN') {
+                $deletedCount = Pembiayaan::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            } elseif ($jenis === 'TABUNGAN') {
+                $deletedCount = Tabungan::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            } elseif ($jenis === 'DEPOSITO') {
+                $deletedCount = Deposito::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            } elseif ($jenis === 'LINKAGE') {
+                $deletedCount = Linkage::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->delete();
+            }
+
+            if ($deletedCount > 0) {
+                Log::info("Deleted {$deletedCount} existing {$jenis} records for period {$month}/{$year}");
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Error deleting existing data for {$jenis} period {$month}/{$year}: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
