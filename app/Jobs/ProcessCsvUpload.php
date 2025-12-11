@@ -208,6 +208,11 @@ class ProcessCsvUpload implements ShouldQueue
                         'updated_at' => now(),
                     ];
                 } elseif ($jenis === 'DEPOSITO') {
+                    // Validate that we have the expected number of columns
+                    if (count($data) < 44) {
+                        throw new \Exception("Baris tidak lengkap, expected 44 kolom, got " . count($data));
+                    }
+
                     // Map CSV columns to database fields based on actual CSV header
                     $record = [
                         'nodep' => $data[0] ?? '',
@@ -407,103 +412,144 @@ class ProcessCsvUpload implements ShouldQueue
         if ($jenis === 'PEMBIAYAAN') {
             // Use the existing validateAndConvertData method for pembiayaan
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
-            $record = $this->validateAndConvertData($csvRow, $lineNumber);
-
-            // No duplicate check needed since we delete existing data first
-            return $record;
+            try {
+                $record = $this->validateAndConvertData($csvRow, $lineNumber);
+                return $record;
+            } catch (\Exception $e) {
+                Log::warning("Error parsing PEMBIAYAAN row {$lineNumber}: " . $e->getMessage());
+                return null; // Skip this row
+            }
         } elseif ($jenis === 'TABUNGAN') {
-            return [
-                'nocif' => $data[0] ?? '',
-                'notab' => $data[1] ?? '',
-                'kodeprd' => $data[2] ?? '',
-                'sahirrp' => $this->parseNumeric($data[3] ?? 0),
-                'fnama' => $data[4] ?? '',
-                'namaqq' => $data[5] ?? '',
-                'stsrec' => $data[6] ?? '',
-                'saldoblok' => $this->parseNumeric($data[7] ?? 0),
-                'stsrest' => $data[8] ?? '',
-                'tax' => $this->parseNumeric($data[9] ?? 0),
-                'tgltrnakh' => $this->parseDate($data[10] ?? ''),
-                'avgeom' => $this->parseNumeric($data[11] ?? 0),
-                'stspep' => $data[12] ?? '',
-                'kdrisk' => $data[13] ?? '',
-                'noid' => $data[14] ?? '',
-                'hp' => $data[15] ?? '',
-                'tgllhr' => $this->parseDate($data[16] ?? ''),
-                'nmibu' => $data[17] ?? '',
-                'ketsandi' => $data[18] ?? '',
-                'namapt' => $data[19] ?? '',
-                'kodeloc' => $data[20] ?? '',
-                'period_month' => $month,
-                'period_year' => $year,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            try {
+                return [
+                    'nocif' => $data[0] ?? '',
+                    'notab' => $data[1] ?? '',
+                    'kodeprd' => $data[2] ?? '',
+                    'sahirrp' => $this->parseNumeric($data[3] ?? 0),
+                    'fnama' => $data[4] ?? '',
+                    'namaqq' => $data[5] ?? '',
+                    'stsrec' => $data[6] ?? '',
+                    'saldoblok' => $this->parseNumeric($data[7] ?? 0),
+                    'stsrest' => $data[8] ?? '',
+                    'tax' => $this->parseNumeric($data[9] ?? 0),
+                    'tgltrnakh' => $this->parseDate($data[10] ?? ''),
+                    'avgeom' => $this->parseNumeric($data[11] ?? 0),
+                    'stspep' => $data[12] ?? '',
+                    'kdrisk' => $data[13] ?? '',
+                    'noid' => $data[14] ?? '',
+                    'hp' => $data[15] ?? '',
+                    'tgllhr' => $this->parseDate($data[16] ?? ''),
+                    'nmibu' => $data[17] ?? '',
+                    'ketsandi' => $data[18] ?? '',
+                    'namapt' => $data[19] ?? '',
+                    'kodeloc' => $data[20] ?? '',
+                    'period_month' => $month,
+                    'period_year' => $year,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            } catch (\Exception $e) {
+                Log::warning("Error parsing TABUNGAN row {$lineNumber}: " . $e->getMessage());
+                return null; // Skip this row
+            }
         } elseif ($jenis === 'DEPOSITO') {
-            return [
-                'nocif' => $data[0] ?? '',
-                'nodep' => $data[1] ?? '',
-                'kdprd' => $data[2] ?? '',
-                'nomrp' => $this->parseNumeric($data[3] ?? 0),
-                'nama' => $data[4] ?? '',
-                'stsrec' => $data[6] ?? '',
-                'aro' => $this->parseNumeric($data[7] ?? 0),
-                'nisbah' => $this->parseNumeric($data[8] ?? 0),
-                'spread' => $this->parseNumeric($data[9] ?? 0),
-                'equivrate' => $this->parseNumeric($data[10] ?? 0),
-                'komitrate' => $this->parseNumeric($data[11] ?? 0),
-                'tambahnom' => $this->parseNumeric($data[17] ?? 0),
-                'tax' => $this->parseNumeric($data[18] ?? 0),
-                'bnghtg' => $this->parseNumeric($data[19] ?? 0),
-                'nisbahrp' => $this->parseNumeric($data[20] ?? 0),
-                'tgllhr' => $this->parseDate($data[21] ?? ''),
-                'nmibu' => $data[22] ?? '',
-                'ketsandi' => $data[23] ?? '',
-                'namapt' => $data[24] ?? '',
-                'period_month' => $month,
-                'period_year' => $year,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            try {
+                return [
+                    'nodep' => $data[0] ?? '',
+                    'nocif' => $data[1] ?? '',
+                    'nobilyet' => $data[2] ?? '',
+                    'nama' => $data[3] ?? '',
+                    'nomrp' => $this->parseNumeric($data[4] ?? 0),
+                    'stsrec' => $data[5] ?? '',
+                    'kdprd' => $data[6] ?? '',
+                    'jkwaktu' => $data[7] ?? '',
+                    'jnsjkwaktu' => $data[8] ?? '',
+                    'tglbuka' => $this->parseDate($data[9] ?? ''),
+                    'tgleff' => $this->parseDate($data[10] ?? ''),
+                    'tgljtempo' => $this->parseDate($data[11] ?? ''),
+                    'aro' => $data[12] ?? '',
+                    'nisbah' => $this->parseNumeric($data[13] ?? 0),
+                    'spread' => $this->parseNumeric($data[14] ?? 0),
+                    'equivrate' => $this->parseNumeric($data[15] ?? 0),
+                    'komitrate' => $this->parseNumeric($data[16] ?? 0),
+                    'ststrn' => $data[17] ?? '',
+                    'kdwil' => $data[18] ?? '',
+                    'kodeaoh' => $data[19] ?? '',
+                    'kodeaop' => $data[20] ?? '',
+                    'noacbng' => $data[22] ?? '',
+                    'tambahnom' => $data[23] ?? '',
+                    'noid' => $data[24] ?? '',
+                    'alamat' => $data[25] ?? '',
+                    'kota' => $data[26] ?? '',
+                    'telprmh' => $data[27] ?? '',
+                    'hp' => $data[28] ?? '',
+                    'stskait' => $data[29] ?? '',
+                    'golcustbi' => $data[30] ?? '',
+                    'kelurahan' => $data[31] ?? '',
+                    'kecamatan' => $data[32] ?? '',
+                    'kdpos' => $data[33] ?? '',
+                    'kdrisk' => $data[34] ?? '',
+                    'tax' => $this->parseNumeric($data[35] ?? 0),
+                    'bnghtg' => $this->parseNumeric($data[36] ?? 0),
+                    'nisbahrp' => $this->parseNumeric($data[37] ?? 0),
+                    'stspep' => $data[38] ?? '',
+                    'tgllhr' => $this->parseDate($data[41] ?? ''),
+                    'nmibu' => $data[42] ?? '',
+                    'ketsandi' => $data[43] ?? '',
+                    'namapt' => $data[44] ?? '',
+                    'period_month' => $month,
+                    'period_year' => $year,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            } catch (\Exception $e) {
+                Log::warning("Error parsing DEPOSITO row {$lineNumber}: " . $e->getMessage());
+                return null; // Skip this row
+            }
         } elseif ($jenis === 'LINKAGE') {
-            // Validate that we have the expected number of columns
-            if (count($data) < 10) {
-                throw new \Exception("Baris tidak lengkap, expected 10 kolom, got " . count($data));
-            }
+            try {
+                // Validate that we have the expected number of columns
+                if (count($data) < 10) {
+                    throw new \Exception("Baris tidak lengkap, expected minimal 10 kolom, got " . count($data));
+                }
 
-            // Validate date fields
-            $tgleff = $data[3] ?? '';
-            $tgljt = $data[4] ?? '';
-            if (!preg_match('/^\d{8}$/', $tgleff)) {
-                throw new \Exception("Format tanggal efektif tidak valid: {$tgleff}");
-            }
-            if (!preg_match('/^\d{8}$/', $tgljt)) {
-                throw new \Exception("Format tanggal jatuh tempo tidak valid: {$tgljt}");
-            }
+                // Validate date fields with more tolerance
+                $tgleff = $data[3] ?? '';
+                $tgljt = $data[4] ?? '';
+                if (!empty($tgleff) && !preg_match('/^\d{8}$/', $tgleff)) {
+                    Log::warning("Format tanggal efektif tidak valid untuk linkage row {$lineNumber}: {$tgleff}");
+                }
+                if (!empty($tgljt) && !preg_match('/^\d{8}$/', $tgljt)) {
+                    Log::warning("Format tanggal jatuh tempo tidak valid untuk linkage row {$lineNumber}: {$tgljt}");
+                }
 
-            return [
-                'nocif' => $data[0] ?? '',
-                'nama' => $data[1] ?? '',
-                'nokontrak' => $data[2] ?? '',
-                'tgleff' => $this->parseDate($tgleff),
-                'tgljt' => $this->parseDate($tgljt),
-                'kelompok' => $data[5] ?? '',
-                'jnsakad' => $data[6] ?? '',
-                'prsnisbah' => $this->parseNumeric($data[7] ?? 0),
-                'plafon' => $this->parseNumeric($data[8] ?? 0),
-                'os' => $this->parseNumeric($data[9] ?? 0),
-                'period_month' => $month,
-                'period_year' => $year,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+                return [
+                    'nocif' => $data[0] ?? '',
+                    'nama' => $data[1] ?? '',
+                    'nokontrak' => $data[2] ?? '',
+                    'tgleff' => $this->parseDate($tgleff),
+                    'tgljt' => $this->parseDate($tgljt),
+                    'kelompok' => $data[5] ?? '',
+                    'jnsakad' => $data[6] ?? '',
+                    'prsnisbah' => $this->parseNumeric($data[7] ?? 0),
+                    'plafon' => $this->parseNumeric($data[8] ?? 0),
+                    'os' => $this->parseNumeric($data[9] ?? 0),
+                    'period_month' => $month,
+                    'period_year' => $year,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            } catch (\Exception $e) {
+                Log::warning("Error parsing LINKAGE row {$lineNumber}: " . $e->getMessage());
+                return null; // Skip this row
+            }
         }
 
         return null;
     }
 
     /**
-     * Bulk insert records with optimized database operations
+     * Bulk insert records with optimized database operations and duplicate handling
      */
     private function bulkInsertRecords($batchData, $jenis)
     {
@@ -521,7 +567,37 @@ class ProcessCsvUpload implements ShouldQueue
             } elseif ($jenis === 'DEPOSITO') {
                 Deposito::insert($batchData);
             } elseif ($jenis === 'LINKAGE') {
-                Linkage::insert($batchData);
+                // Handle duplicates for linkage table
+                $filteredData = [];
+                foreach ($batchData as $record) {
+                    $nokontrak = $record['nokontrak'] ?? '';
+                    $periodYear = $record['period_year'] ?? '';
+                    $periodMonth = $record['period_month'] ?? '';
+
+                    if (empty($nokontrak) || empty($periodYear) || empty($periodMonth)) {
+                        continue; // Skip invalid records
+                    }
+
+                    // Check if record already exists
+                    $exists = DB::table('linkages')
+                        ->where('nokontrak', $nokontrak)
+                        ->where('period_year', $periodYear)
+                        ->where('period_month', $periodMonth)
+                        ->exists();
+
+                    if (!$exists) {
+                        $filteredData[] = $record;
+                    } else {
+                        Log::info("Skipping duplicate linkage record: {$nokontrak} for {$periodYear}-{$periodMonth}");
+                    }
+                }
+
+                if (!empty($filteredData)) {
+                    Linkage::insert($filteredData);
+                    $count = count($filteredData); // Update count to reflect actual inserted records
+                } else {
+                    $count = 0;
+                }
             }
         } catch (\Exception $e) {
             Log::error("Bulk insert failed for {$jenis}: " . $e->getMessage());
@@ -533,16 +609,16 @@ class ProcessCsvUpload implements ShouldQueue
 
     private function validateAndConvertData(array $data, int $lineNumber): array
     {
-        // Convert and validate dates
+        // Convert and validate dates with tolerance
         $tgleff = $this->parseDate($data['tgleff'] ?? '');
         $tglexp = $this->parseDate($data['tglexp'] ?? '');
 
-        // Validate date ranges if both dates exist
+        // Validate date ranges if both dates exist (but don't throw exception)
         if ($tgleff && $tglexp && strtotime($tgleff) > strtotime($tglexp)) {
-            throw new \Exception('Tanggal efektif tidak boleh lebih besar dari tanggal expired');
+            Log::warning("Tanggal efektif lebih besar dari tanggal expired pada baris {$lineNumber}");
         }
 
-        // Validate and convert numeric fields
+        // Validate and convert numeric fields with tolerance
         $numericFields = [
             'jw',
             'mdlawal',
@@ -566,10 +642,12 @@ class ProcessCsvUpload implements ShouldQueue
         $validatedData = [];
         foreach ($numericFields as $field) {
             $value = $data[$field] ?? 0;
-            if (!is_numeric($value) && !empty($value)) {
-                throw new \Exception("Field '{$field}' harus berupa angka");
+            $parsedValue = $this->parseNumeric($value);
+            if (!is_numeric($parsedValue) && !empty($value)) {
+                Log::warning("Field '{$field}' tidak valid pada baris {$lineNumber}, menggunakan 0");
+                $parsedValue = 0;
             }
-            $validatedData[$field] = $field === 'plafon' ? (float)$value : (float)$value;
+            $validatedData[$field] = $parsedValue;
         }
 
         // Handle nullable integer fields
@@ -697,6 +775,9 @@ class ProcessCsvUpload implements ShouldQueue
             return null;
         }
 
+        // Remove any non-numeric characters except dashes, slashes, and dots
+        $cleanDate = preg_replace('/[^0-9\-\/\.]/', '', $dateString);
+
         // Try different date formats commonly used in CSV files
         $formats = [
             'Y-m-d',        // 2023-12-31
@@ -706,22 +787,56 @@ class ProcessCsvUpload implements ShouldQueue
             'Y/m/d',        // 2023/12/31
             'd F Y',        // 31 December 2023
             'F d, Y',       // December 31, 2023
+            'Ymd',          // 20231231
+            'dmY',          // 31122023
+            'mdY',          // 12312023
+            'ymd',          // 231231 (2-digit year)
+            'dmy',          // 311223 (2-digit year)
+            'mdy',          // 123123 (2-digit year)
         ];
 
         foreach ($formats as $format) {
-            $date = \DateTime::createFromFormat($format, $dateString);
+            $date = \DateTime::createFromFormat($format, $cleanDate);
+            if ($date !== false) {
+                // Validate the date is reasonable (not in future for birth dates, etc.)
+                $year = $date->format('Y');
+                if ($year >= 1900 && $year <= (date('Y') + 10)) {
+                    return $date->format('Y-m-d');
+                }
+            }
+        }
+
+        // Handle special cases like "0180514" -> "20180514"
+        if (preg_match('/^(\d{2})(\d{4})$/', $cleanDate, $matches)) {
+            $year = '20' . $matches[1];
+            $monthDay = $matches[2];
+            $date = \DateTime::createFromFormat('Ymd', $year . $monthDay);
+            if ($date !== false) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        // Handle cases like "180514" -> "20180514" (assuming 20xx)
+        if (preg_match('/^(\d{6})$/', $cleanDate, $matches)) {
+            $year = '20' . substr($matches[1], 0, 2);
+            $date = \DateTime::createFromFormat('Ymd', $year . substr($matches[1], 2));
             if ($date !== false) {
                 return $date->format('Y-m-d');
             }
         }
 
         // Try to parse with strtotime as fallback
-        $timestamp = strtotime($dateString);
+        $timestamp = strtotime($cleanDate);
         if ($timestamp !== false) {
-            return date('Y-m-d', $timestamp);
+            $year = date('Y', $timestamp);
+            if ($year >= 1900 && $year <= (date('Y') + 10)) {
+                return date('Y-m-d', $timestamp);
+            }
         }
 
-        throw new \Exception("Format tanggal tidak valid: {$dateString}");
+        // If all parsing fails, log warning but return null instead of throwing exception
+        Log::warning("Format tanggal tidak dapat diparsing, menggunakan null: {$dateString}");
+        return null;
     }
 
     private function getMonthName($month)
