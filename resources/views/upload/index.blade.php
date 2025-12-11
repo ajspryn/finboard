@@ -102,10 +102,13 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
                         <i class="ti ti-history me-2"></i>Riwayat Upload Data
                     </h5>
+                    <div class="text-muted small">
+                        Menampilkan {{ $uploadHistory->firstItem() }}-{{ $uploadHistory->lastItem() }} dari {{ $uploadHistory->total() }} data
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -116,8 +119,10 @@
                                     <th>Jenis</th>
                                     <th class="text-center">Jumlah Rekening</th>
                                     <th class="text-end">Total Saldo</th>
-                                    <th class="text-center">Tanggal Upload</th>
                                     <th class="text-center">Status</th>
+                                    <th class="text-center">Progress</th>
+                                    <th>Pesan</th>
+                                    <th class="text-center">Tanggal Upload</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -130,7 +135,7 @@
                                                     <i class="ti ti-calendar ti-sm"></i>
                                                 </span>
                                             </div>
-                                            <strong>{{ str_pad($upload['month'], 2, '0', STR_PAD_LEFT) }}-{{ $upload['year'] }}</strong>
+                                            <strong>{{ $upload['period'] }}</strong>
                                         </div>
                                     </td>
                                     <td>
@@ -144,127 +149,83 @@
                                         </div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-primary">{{ number_format($upload['count']) }}</span>
+                                        @if($upload['type'] === 'completed')
+                                            <span class="badge bg-primary">{{ number_format($upload['count']) }}</span>
+                                        @else
+                                            <span class="badge bg-secondary">{{ number_format($upload['processed_records']) }}</span>
+                                        @endif
                                     </td>
                                     <td class="text-end">
-                                        <strong>Rp {{ number_format($upload['total_saldo'] / 1000000000, 2) }} M</strong>
+                                        @if($upload['total_saldo'])
+                                            <strong>Rp {{ number_format($upload['total_saldo'] / 1000000000, 2) }} M</strong>
+                                        @else
+                                            <small class="text-muted">-</small>
+                                        @endif
                                     </td>
                                     <td class="text-center">
-                                        <small class="text-muted">{{ \Carbon\Carbon::parse($upload['last_upload'])->format('d/m/Y H:i') }}</small>
+                                        @if($upload['status'] === 'processing')
+                                            <span class="badge bg-warning">
+                                                <i class="ti ti-loader ti-xs me-1"></i>Memproses
+                                            </span>
+                                        @elseif($upload['status'] === 'completed')
+                                            <span class="badge bg-success">
+                                                <i class="ti ti-check ti-xs me-1"></i>Selesai
+                                            </span>
+                                        @elseif($upload['status'] === 'completed_with_errors')
+                                            <span class="badge bg-warning">
+                                                <i class="ti ti-alert-triangle ti-xs me-1"></i>Selesai dengan Error
+                                            </span>
+                                        @elseif($upload['status'] === 'failed')
+                                            <span class="badge bg-danger">
+                                                <i class="ti ti-x ti-xs me-1"></i>Gagal
+                                            </span>
+                                        @else
+                                            <span class="badge bg-secondary">{{ ucfirst($upload['status']) }}</span>
+                                        @endif
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-success">
-                                            <i class="ti ti-check ti-xs me-1"></i>Berhasil
-                                        </span>
+                                        @if($upload['type'] === 'processing' && $upload['total_records'] > 0)
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 6px; width: 60px;">
+                                                    <div class="progress-bar bg-primary" role="progressbar"
+                                                         style="width: {{ $upload['progress'] }}%">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">
+                                                    {{ $upload['processed_records'] }}/{{ $upload['total_records'] }}
+                                                </small>
+                                            </div>
+                                        @elseif($upload['type'] === 'completed')
+                                            <span class="badge bg-success">100%</span>
+                                        @else
+                                            <small class="text-muted">-</small>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 250px;">
+                                            @if($upload['status'] === 'processing')
+                                                <small class="text-muted">{{ $upload['message'] }}</small>
+                                            @elseif($upload['status'] === 'completed')
+                                                <small class="text-success">{{ $upload['message'] }}</small>
+                                            @elseif($upload['status'] === 'failed')
+                                                <small class="text-danger">{{ $upload['message'] }}</small>
+                                            @else
+                                                <small class="text-muted">{{ $upload['message'] }}</small>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <small class="text-muted">{{ \Carbon\Carbon::parse($upload['created_at'])->format('d/m/Y H:i') }}</small>
                                     </td>
                                 </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
 
-    <!-- Recent Upload Status -->
-    @if($recentUploads->count() > 0)
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="ti ti-loader me-2"></i>Status Upload (Background Processing)
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Periode</th>
-                                    <th>Type</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-center">Progress</th>
-                                    <th>Pesan</th>
-                                    <th class="text-center">Waktu</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($recentUploads as $upload)
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm me-2">
-                                                <span class="avatar-initial rounded bg-label-primary">
-                                                    <i class="ti ti-calendar ti-sm"></i>
-                                                </span>
-                                            </div>
-                                            <strong>{{ str_pad($upload->month, 2, '0', STR_PAD_LEFT) }}-{{ $upload->year }}</strong>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm me-2">
-                                                <span class="avatar-initial rounded bg-label-{{ $upload->upload_type === 'tabungan' ? 'info' : ($upload->upload_type === 'deposito' ? 'success' : ($upload->upload_type === 'linkage' ? 'warning' : 'primary')) }}">
-                                                    <i class="ti ti-{{ $upload->upload_type === 'tabungan' ? 'piggy-bank' : ($upload->upload_type === 'deposito' ? 'clock-dollar' : ($upload->upload_type === 'linkage' ? 'link' : 'building-bank')) }} ti-sm"></i>
-                                                </span>
-                                            </div>
-                                            <strong>{{ ucfirst($upload->upload_type ?? 'pembiayaan') }}</strong>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        @if($upload->status === 'processing')
-                                            <span class="badge bg-warning">
-                                                <i class="ti ti-loader ti-xs me-1"></i>Memproses
-                                            </span>
-                                        @elseif($upload->status === 'completed')
-                                            <span class="badge bg-success">
-                                                <i class="ti ti-check ti-xs me-1"></i>Selesai
-                                            </span>
-                                        @elseif($upload->status === 'failed')
-                                            <span class="badge bg-danger">
-                                                <i class="ti ti-x ti-xs me-1"></i>Gagal
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="text-center">
-                                        @if($upload->total_records > 0)
-                                            <div class="d-flex align-items-center justify-content-center">
-                                                <div class="progress flex-grow-1 me-2" style="height: 6px; width: 60px;">
-                                                    <div class="progress-bar bg-primary" role="progressbar"
-                                                         style="width: {{ $upload->total_records > 0 ? round(($upload->processed_records / $upload->total_records) * 100) : 0 }}%">
-                                                    </div>
-                                                </div>
-                                                <small class="text-muted">
-                                                    {{ $upload->processed_records }}/{{ $upload->total_records }}
-                                                </small>
-                                            </div>
-                                        @else
-                                            <small class="text-muted">-</small>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <div style="max-width: 300px;">
-                                            @if($upload->status === 'processing')
-                                                <small class="text-muted">{{ $upload->message }}</small>
-                                            @elseif($upload->status === 'completed')
-                                                <small class="text-success">{{ $upload->message }}</small>
-                                            @elseif($upload->status === 'failed')
-                                                <small class="text-danger">{{ $upload->message }}</small>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <small class="text-muted">
-                                            {{ \Carbon\Carbon::parse($upload->created_at)->format('d/m H:i') }}
-                                        </small>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    <!-- Pagination -->
+                    <div class="d-flex justify-content-center mt-3">
+                        {{ $uploadHistory->links() }}
                     </div>
                 </div>
             </div>

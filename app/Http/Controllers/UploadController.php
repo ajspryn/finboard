@@ -118,17 +118,52 @@ class UploadController extends Controller
             return (array) $item;
         }, $pembiayaanPeriods->toArray()));
 
-        $uploadHistory = collect($allPeriods)->sortByDesc(function ($item) {
-            return $item['year'] * 100 + $item['month'];
-        })->take(10);
-
         // Get recent upload statuses for pembiayaan background jobs
         $recentUploads = CsvUploadStatus::where('user_id', auth()->id())
             ->get()
-            ->sortByDesc('created_at')
-            ->take(10);
+            ->sortByDesc('created_at');
 
-        return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory', 'recentUploads'));
+        // Combine upload history and recent uploads into one collection
+        $combinedUploads = collect();
+
+        // Add completed uploads (from periods)
+        foreach ($allPeriods as $period) {
+            $combinedUploads->push([
+                'type' => 'completed',
+                'period' => str_pad($period['month'], 2, '0', STR_PAD_LEFT) . '-' . $period['year'],
+                'jenis' => $period['jenis'],
+                'count' => $period['count'],
+                'total_saldo' => $period['total_saldo'],
+                'status' => 'completed',
+                'message' => 'Upload berhasil',
+                'created_at' => $period['last_upload'],
+                'progress' => null,
+                'processed_records' => $period['count'],
+                'total_records' => $period['count']
+            ]);
+        }
+
+        // Add processing uploads (from CsvUploadStatus)
+        foreach ($recentUploads as $upload) {
+            $combinedUploads->push([
+                'type' => 'processing',
+                'period' => str_pad($upload->month, 2, '0', STR_PAD_LEFT) . '-' . $upload->year,
+                'jenis' => ucfirst($upload->upload_type ?? 'pembiayaan'),
+                'count' => $upload->processed_records ?? 0,
+                'total_saldo' => null,
+                'status' => $upload->status,
+                'message' => $upload->message,
+                'created_at' => $upload->created_at,
+                'progress' => $upload->total_records > 0 ? round(($upload->processed_records / $upload->total_records) * 100) : 0,
+                'processed_records' => $upload->processed_records ?? 0,
+                'total_records' => $upload->total_records ?? 0
+            ]);
+        }
+
+        // Sort by created_at descending and paginate
+        $uploadHistory = $combinedUploads->sortByDesc('created_at')->paginate(10);
+
+        return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory'));
     }
 
     public function upload(Request $request)
