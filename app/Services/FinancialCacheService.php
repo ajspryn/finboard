@@ -205,8 +205,19 @@ class FinancialCacheService
      */
     public function clearAllCaches(): void
     {
-        Cache::tags(['financial'])->flush();
-        Log::info('All financial caches cleared');
+        try {
+            // Try to use cache tags if supported
+            if (method_exists(Cache::store(), 'tags')) {
+                Cache::tags(['financial'])->flush();
+            } else {
+                // Fallback: flush entire cache if tags not supported
+                Cache::flush();
+            }
+            Log::info('All financial caches cleared');
+        } catch (\Exception $e) {
+            // If cache clearing fails, log the error but don't break the process
+            Log::warning('Failed to clear financial caches: ' . $e->getMessage());
+        }
     }
 
     /**

@@ -1,6 +1,23 @@
 <?php $__env->startSection('title', 'Upload Data'); ?>
 
 <?php $__env->startSection('content'); ?>
+    <!-- Flash Messages -->
+    <?php if(session('success')): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check me-2"></i><?php echo e(session('success')); ?>
+
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
+    <?php if(session('error')): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i><?php echo e(session('error')); ?>
+
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
     <!-- Statistics -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -105,8 +122,18 @@
                     <h5 class="card-title mb-0">
                         <i class="ti ti-history me-2"></i>Riwayat Upload Data
                     </h5>
-                    <div class="text-muted small">
-                        Menampilkan <?php echo e($uploadHistory->firstItem()); ?>-<?php echo e($uploadHistory->lastItem()); ?> dari <?php echo e($uploadHistory->total()); ?> data
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-muted small">
+                            Menampilkan <?php echo e($uploadHistory->firstItem()); ?>-<?php echo e($uploadHistory->lastItem()); ?> dari <?php echo e($uploadHistory->total()); ?> data
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <label for="perPageSelect" class="form-label me-2 mb-0 small">Tampilkan:</label>
+                            <select id="perPageSelect" class="form-select form-select-sm" style="width: 80px;" onchange="changePerPage(this.value)">
+                                <?php $__currentLoopData = $perPageOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $option): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($option); ?>" <?php echo e(request('per_page', 10) == $option ? 'selected' : ''); ?>><?php echo e($option); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -223,11 +250,64 @@
                         </table>
                     </div>
 
-                    <!-- Pagination -->
-                    <div class="d-flex justify-content-center mt-3">
-                        <?php echo e($uploadHistory->links()); ?>
+                    <!-- Enhanced Pagination -->
+                    <?php if($uploadHistory->hasPages()): ?>
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div class="text-muted small">
+                            Halaman <?php echo e($uploadHistory->currentPage()); ?> dari <?php echo e($uploadHistory->lastPage()); ?>
 
+                        </div>
+                        <nav aria-label="Upload history pagination">
+                            <ul class="pagination pagination-sm mb-0">
+                                
+                                <?php if($uploadHistory->onFirstPage()): ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <i class="ti ti-chevron-left"></i>
+                                        </span>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="<?php echo e($uploadHistory->previousPageUrl()); ?>" aria-label="Previous">
+                                            <i class="ti ti-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+
+                                
+                                <?php $__currentLoopData = $uploadHistory->getUrlRange(1, $uploadHistory->lastPage()); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $page => $url): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <?php if($page == $uploadHistory->currentPage()): ?>
+                                        <li class="page-item active">
+                                            <span class="page-link"><?php echo e($page); ?></span>
+                                        </li>
+                                    <?php else: ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="<?php echo e($url); ?>"><?php echo e($page); ?></a>
+                                        </li>
+                                    <?php endif; ?>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+                                
+                                <?php if($uploadHistory->hasMorePages()): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="<?php echo e($uploadHistory->nextPageUrl()); ?>" aria-label="Next">
+                                            <i class="ti ti-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <i class="ti ti-chevron-right"></i>
+                                        </span>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
+                        <div class="text-muted small">
+                            Total: <?php echo e($uploadHistory->total()); ?> data
+                        </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -841,6 +921,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize
     updateSubmitButton();
 });
+
+function changePerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1'); // Reset to first page when changing per_page
+    window.location.href = url.toString();
+}
 
 function confirmClear() {
     if (confirm('Apakah Anda yakin ingin menghapus SEMUA data (Pembiayaan, Tabungan, Deposito, dan Linkage)? Tindakan ini tidak dapat dibatalkan!')) {

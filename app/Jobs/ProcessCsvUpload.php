@@ -80,7 +80,10 @@ class ProcessCsvUpload implements ShouldQueue
             foreach ($this->filePaths as $type => $filePath) {
                 if (isset($statusRecords[$type])) {
                     $status = $statusRecords[$type];
-                    $status->update(['status' => 'processing', 'message' => "Memproses data " . ucfirst($type) . "..."]);
+                    $status->update([
+                        'status' => 'processing',
+                        'message' => "Memvalidasi dan memproses data " . ucfirst($type) . "..."
+                    ]);
 
                     // Process each file in its own transaction for better performance
                     $result = $this->processCsvFileOptimized(Storage::path($filePath), strtoupper($type), $this->month, $this->year);
@@ -145,7 +148,11 @@ class ProcessCsvUpload implements ShouldQueue
         $this->deleteExistingDataForPeriod($jenis, $month, $year);
 
         $handle = fopen($filePath, 'r');
-        $header = fgetcsv($handle, 1000, ',', '"', '\\');
+        // Skip BOM if present
+        if (fgets($handle, 4) !== "\xef\xbb\xbf") {
+            rewind($handle);
+        }
+        $header = fgetcsv($handle, 0, ',', '"');
         $imported = 0;
         $updated = 0;
         $errors = 0;
@@ -155,7 +162,7 @@ class ProcessCsvUpload implements ShouldQueue
 
         $lineNumber = 1;
 
-        while (($data = fgetcsv($handle, 1000, ',', '"', '\\')) !== false) {
+        while (($data = fgetcsv($handle, 0, ',', '"')) !== false) {
             $lineNumber++;
 
             try {
@@ -168,6 +175,11 @@ class ProcessCsvUpload implements ShouldQueue
 
                     // No duplicate check needed since we delete existing data first
                 } elseif ($jenis === 'TABUNGAN') {
+                    // Validate that we have the expected number of columns
+                    if (count($data) < 21) {
+                        throw new \Exception("Baris tidak lengkap, expected 21 kolom, got " . count($data));
+                    }
+
                     $record = [
                         'nocif' => $data[0] ?? '',
                         'notab' => $data[1] ?? '',
@@ -196,33 +208,51 @@ class ProcessCsvUpload implements ShouldQueue
                         'updated_at' => now(),
                     ];
                 } elseif ($jenis === 'DEPOSITO') {
+                    // Map CSV columns to database fields based on actual CSV header
                     $record = [
-                        'nocif' => $data[0] ?? '',
-                        'nodep' => $data[1] ?? '',
-                        'kodeprd' => $data[2] ?? '',
-                        'nomrp' => $this->parseNumeric($data[3] ?? 0),
-                        'fnama' => $data[4] ?? '',
-                        'namaqq' => $data[5] ?? '',
-                        'stsrec' => $data[6] ?? '',
-                        'aro' => $this->parseNumeric($data[7] ?? 0),
-                        'nisbah' => $this->parseNumeric($data[8] ?? 0),
-                        'spread' => $this->parseNumeric($data[9] ?? 0),
-                        'equivrate' => $this->parseNumeric($data[10] ?? 0),
-                        'komitrate' => $this->parseNumeric($data[11] ?? 0),
+                        'nodep' => $data[0] ?? '',
+                        'nocif' => $data[1] ?? '',
+                        'nobilyet' => $data[2] ?? '',
+                        'nama' => $data[3] ?? '',
+                        'nomrp' => $this->parseNumeric($data[4] ?? 0),
+                        'stsrec' => $data[5] ?? '',
+                        'kdprd' => $data[6] ?? '',
+                        'jkwaktu' => $data[7] ?? '',
+                        'jnsjkwaktu' => $data[8] ?? '',
+                        'tglbuka' => $this->parseDate($data[9] ?? ''),
+                        'tgleff' => $this->parseDate($data[10] ?? ''),
+                        'tgljtempo' => $this->parseDate($data[11] ?? ''),
                         'aro' => $this->parseNumeric($data[12] ?? 0),
                         'nisbah' => $this->parseNumeric($data[13] ?? 0),
                         'spread' => $this->parseNumeric($data[14] ?? 0),
                         'equivrate' => $this->parseNumeric($data[15] ?? 0),
                         'komitrate' => $this->parseNumeric($data[16] ?? 0),
-                        'tambahnom' => $this->parseNumeric($data[17] ?? 0),
-                        'tax' => $this->parseNumeric($data[18] ?? 0),
-                        'bnghtg' => $this->parseNumeric($data[19] ?? 0),
-                        'nisbahrp' => $this->parseNumeric($data[20] ?? 0),
-                        'tgllhr' => $this->parseDate($data[21] ?? ''),
-                        'nmibu' => $data[22] ?? '',
-                        'ketsandi' => $data[23] ?? '',
-                        'namapt' => $data[24] ?? '',
-                        'kodeloc' => $data[25] ?? '',
+                        'ststrn' => $data[17] ?? '',
+                        'kdwil' => $data[18] ?? '',
+                        'kodeaoh' => $data[19] ?? '',
+                        'kodeaop' => $data[20] ?? '',
+                        'noacbng' => $data[21] ?? '',
+                        'tambahnom' => $this->parseNumeric($data[22] ?? 0),
+                        'noid' => $data[23] ?? '', // First noid field
+                        'alamat' => $data[24] ?? '',
+                        'kota' => $data[25] ?? '',
+                        'telprmh' => $data[26] ?? '',
+                        'hp' => $data[27] ?? '', // First hp field
+                        'stskait' => $data[28] ?? '',
+                        'golcustbi' => $data[29] ?? '',
+                        'kelurahan' => $data[30] ?? '',
+                        'kecamatan' => $data[31] ?? '',
+                        'kdpos' => $data[32] ?? '',
+                        'kdrisk' => $data[33] ?? '',
+                        'tax' => $this->parseNumeric($data[34] ?? 0),
+                        'bnghtg' => $this->parseNumeric($data[35] ?? 0),
+                        'nisbahrp' => $this->parseNumeric($data[36] ?? 0),
+                        'stspep' => $data[37] ?? '',
+                        // Skip duplicate noid (38) and hp (39) fields
+                        'tgllhr' => $this->parseDate($data[40] ?? ''),
+                        'nmibu' => $data[41] ?? '',
+                        'ketsandi' => $data[42] ?? '',
+                        'namapt' => $data[43] ?? '',
                         'period_month' => $month,
                         'period_year' => $year,
                         'created_at' => now(),
@@ -302,7 +332,11 @@ class ProcessCsvUpload implements ShouldQueue
         $this->deleteExistingDataForPeriod($jenis, $month, $year);
 
         $handle = fopen($filePath, 'r');
-        $header = fgetcsv($handle, 1000, ',', '"', '\\');
+        // Skip BOM if present
+        if (fgets($handle, 4) !== "\xef\xbb\xbf") {
+            rewind($handle);
+        }
+        $header = fgetcsv($handle, 0, ',', '"');
         $imported = 0;
         $updated = 0;
         $errors = 0;
@@ -313,7 +347,7 @@ class ProcessCsvUpload implements ShouldQueue
         $lineNumber = 1;
 
         // Use generator for memory-efficient processing
-        while (($data = fgetcsv($handle, 1000, ',', '"', '\\')) !== false) {
+        while (($data = fgetcsv($handle, 0, ',', '"')) !== false) {
             $lineNumber++;
 
             try {
@@ -432,14 +466,29 @@ class ProcessCsvUpload implements ShouldQueue
                 'updated_at' => now(),
             ];
         } elseif ($jenis === 'LINKAGE') {
+            // Validate that we have the expected number of columns
+            if (count($data) < 10) {
+                throw new \Exception("Baris tidak lengkap, expected 10 kolom, got " . count($data));
+            }
+
+            // Validate date fields
+            $tgleff = $data[3] ?? '';
+            $tgljt = $data[4] ?? '';
+            if (!preg_match('/^\d{8}$/', $tgleff)) {
+                throw new \Exception("Format tanggal efektif tidak valid: {$tgleff}");
+            }
+            if (!preg_match('/^\d{8}$/', $tgljt)) {
+                throw new \Exception("Format tanggal jatuh tempo tidak valid: {$tgljt}");
+            }
+
             return [
                 'nocif' => $data[0] ?? '',
-                'nokontrak' => $data[1] ?? '',
-                'nama' => $data[2] ?? '',
-                'kelompok' => $data[3] ?? '',
-                'jnsakad' => $data[4] ?? '',
-                'tgleff' => $this->parseDate($data[5] ?? ''),
-                'tgljt' => $this->parseDate($data[6] ?? ''),
+                'nama' => $data[1] ?? '',
+                'nokontrak' => $data[2] ?? '',
+                'tgleff' => $this->parseDate($tgleff),
+                'tgljt' => $this->parseDate($tgljt),
+                'kelompok' => $data[5] ?? '',
+                'jnsakad' => $data[6] ?? '',
                 'prsnisbah' => $this->parseNumeric($data[7] ?? 0),
                 'plafon' => $this->parseNumeric($data[8] ?? 0),
                 'os' => $this->parseNumeric($data[9] ?? 0),
@@ -701,7 +750,19 @@ class ProcessCsvUpload implements ShouldQueue
             return 0;
         }
 
-        $value = str_replace([',', ' '], '', $value);
+        // Remove spaces
+        $value = str_replace(' ', '', $value);
+
+        // Check if this looks like European decimal format (comma as decimal separator)
+        // Pattern: number with single comma followed by 1-2 digits at the end
+        if (preg_match('/^-?\d+,\d{1,2}$/', $value)) {
+            // European format: replace comma with period
+            $value = str_replace(',', '.', $value);
+        } else {
+            // Remove commas (thousands separators)
+            $value = str_replace(',', '', $value);
+        }
+
         return floatval($value);
     }
 

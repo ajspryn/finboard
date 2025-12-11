@@ -3,6 +3,21 @@
 @section('title', 'Upload Data')
 
 @section('content')
+    <!-- Flash Messages -->
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check me-2"></i>{{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>{{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <!-- Statistics -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -106,8 +121,18 @@
                     <h5 class="card-title mb-0">
                         <i class="ti ti-history me-2"></i>Riwayat Upload Data
                     </h5>
-                    <div class="text-muted small">
-                        Menampilkan {{ $uploadHistory->firstItem() }}-{{ $uploadHistory->lastItem() }} dari {{ $uploadHistory->total() }} data
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-muted small">
+                            Menampilkan {{ $uploadHistory->firstItem() }}-{{ $uploadHistory->lastItem() }} dari {{ $uploadHistory->total() }} data
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <label for="perPageSelect" class="form-label me-2 mb-0 small">Tampilkan:</label>
+                            <select id="perPageSelect" class="form-select form-select-sm" style="width: 80px;" onchange="changePerPage(this.value)">
+                                @foreach($perPageOptions as $option)
+                                    <option value="{{ $option }}" {{ request('per_page', 10) == $option ? 'selected' : '' }}>{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -223,10 +248,63 @@
                         </table>
                     </div>
 
-                    <!-- Pagination -->
-                    <div class="d-flex justify-content-center mt-3">
-                        {{ $uploadHistory->links() }}
+                    <!-- Enhanced Pagination -->
+                    @if($uploadHistory->hasPages())
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div class="text-muted small">
+                            Halaman {{ $uploadHistory->currentPage() }} dari {{ $uploadHistory->lastPage() }}
+                        </div>
+                        <nav aria-label="Upload history pagination">
+                            <ul class="pagination pagination-sm mb-0">
+                                {{-- Previous Page Link --}}
+                                @if ($uploadHistory->onFirstPage())
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <i class="ti ti-chevron-left"></i>
+                                        </span>
+                                    </li>
+                                @else
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ $uploadHistory->previousPageUrl() }}" aria-label="Previous">
+                                            <i class="ti ti-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                @endif
+
+                                {{-- Pagination Elements --}}
+                                @foreach ($uploadHistory->getUrlRange(1, $uploadHistory->lastPage()) as $page => $url)
+                                    @if ($page == $uploadHistory->currentPage())
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ $page }}</span>
+                                        </li>
+                                    @else
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ $url }}">{{ $page }}</a>
+                                        </li>
+                                    @endif
+                                @endforeach
+
+                                {{-- Next Page Link --}}
+                                @if ($uploadHistory->hasMorePages())
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ $uploadHistory->nextPageUrl() }}" aria-label="Next">
+                                            <i class="ti ti-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                @else
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <i class="ti ti-chevron-right"></i>
+                                        </span>
+                                    </li>
+                                @endif
+                            </ul>
+                        </nav>
+                        <div class="text-muted small">
+                            Total: {{ $uploadHistory->total() }} data
+                        </div>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -840,6 +918,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize
     updateSubmitButton();
 });
+
+function changePerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', '1'); // Reset to first page when changing per_page
+    window.location.href = url.toString();
+}
 
 function confirmClear() {
     if (confirm('Apakah Anda yakin ingin menghapus SEMUA data (Pembiayaan, Tabungan, Deposito, dan Linkage)? Tindakan ini tidak dapat dibatalkan!')) {

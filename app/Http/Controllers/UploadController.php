@@ -8,6 +8,7 @@ use App\Models\Tabungan;
 use App\Models\Deposito;
 use App\Models\Pembiayaan;
 use App\Models\Linkage;
+use App\Services\FinancialCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -41,9 +42,12 @@ class UploadController extends Controller
         $uploadHistory = collect();
 
         // Get distinct periods from all tables
-        $tabunganPeriods = Tabungan::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(sahirrp) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
+        $tabunganPeriods = Tabungan::selectRaw("DISTINCT period_year as year, period_month as month, COUNT(*) as count, SUM(sahirrp) as total_saldo, MAX(created_at) as last_upload")
+            ->whereNotNull('period_year')
+            ->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month')
+            ->orderBy('period_year', 'DESC')
+            ->orderBy('period_month', 'DESC')
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -56,9 +60,12 @@ class UploadController extends Controller
                 ];
             });
 
-        $depositoPeriods = Deposito::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(nomrp) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
+        $depositoPeriods = Deposito::selectRaw("DISTINCT period_year as year, period_month as month, COUNT(*) as count, SUM(nomrp) as total_saldo, MAX(created_at) as last_upload")
+            ->whereNotNull('period_year')
+            ->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month')
+            ->orderBy('period_year', 'DESC')
+            ->orderBy('period_month', 'DESC')
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -71,9 +78,12 @@ class UploadController extends Controller
                 ];
             });
 
-        $linkagePeriods = Linkage::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(os) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
+        $linkagePeriods = Linkage::selectRaw("DISTINCT period_year as year, period_month as month, COUNT(*) as count, SUM(os) as total_saldo, MAX(created_at) as last_upload")
+            ->whereNotNull('period_year')
+            ->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month')
+            ->orderBy('period_year', 'DESC')
+            ->orderBy('period_month', 'DESC')
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -86,9 +96,12 @@ class UploadController extends Controller
                 ];
             });
 
-        $pembiayaanPeriods = Pembiayaan::selectRaw("DISTINCT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count, SUM(plafon) as total_saldo, MAX(created_at) as last_upload")
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
+        $pembiayaanPeriods = Pembiayaan::selectRaw("DISTINCT period_year as year, period_month as month, COUNT(*) as count, SUM(plafon) as total_saldo, MAX(created_at) as last_upload")
+            ->whereNotNull('period_year')
+            ->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month')
+            ->orderBy('period_year', 'DESC')
+            ->orderBy('period_month', 'DESC')
             ->get()
             ->map(function ($item) {
                 return (object)[
@@ -125,9 +138,11 @@ class UploadController extends Controller
 
         // Combine upload history and recent uploads into one collection
         $combinedUploads = collect();
+        $completedPeriods = collect(); // Track completed periods to avoid duplicates
 
         // Add completed uploads (from periods)
         foreach ($allPeriods as $period) {
+            $periodKey = $period['month'] . '-' . $period['year'] . '-' . $period['jenis'];
             $combinedUploads->push([
                 'type' => 'completed',
                 'period' => str_pad($period['month'], 2, '0', STR_PAD_LEFT) . '-' . $period['year'],
@@ -141,28 +156,33 @@ class UploadController extends Controller
                 'processed_records' => $period['count'],
                 'total_records' => $period['count']
             ]);
+            $completedPeriods->push($periodKey);
         }
 
-        // Add processing uploads (from CsvUploadStatus)
+        // Add processing uploads (from CsvUploadStatus) - only if not already covered by completed uploads
         foreach ($recentUploads as $upload) {
-            $combinedUploads->push([
-                'type' => 'processing',
-                'period' => str_pad($upload->month, 2, '0', STR_PAD_LEFT) . '-' . $upload->year,
-                'jenis' => ucfirst($upload->upload_type ?? 'pembiayaan'),
-                'count' => $upload->processed_records ?? 0,
-                'total_saldo' => null,
-                'status' => $upload->status,
-                'message' => $upload->message,
-                'created_at' => $upload->created_at,
-                'progress' => $upload->total_records > 0 ? round(($upload->processed_records / $upload->total_records) * 100) : 0,
-                'processed_records' => $upload->processed_records ?? 0,
-                'total_records' => $upload->total_records ?? 0
-            ]);
+            $uploadKey = $upload->month . '-' . $upload->year . '-' . strtoupper($upload->upload_type ?? 'pembiayaan');
+            if (!$completedPeriods->contains($uploadKey)) {
+                $combinedUploads->push([
+                    'type' => 'processing',
+                    'period' => str_pad($upload->month, 2, '0', STR_PAD_LEFT) . '-' . $upload->year,
+                    'jenis' => ucfirst($upload->upload_type ?? 'pembiayaan'),
+                    'count' => $upload->processed_records ?? 0,
+                    'total_saldo' => null,
+                    'status' => $upload->status,
+                    'message' => $upload->message,
+                    'created_at' => $upload->created_at,
+                    'progress' => $upload->total_records > 0 ? round(($upload->processed_records / $upload->total_records) * 100) : 0,
+                    'processed_records' => $upload->processed_records ?? 0,
+                    'total_records' => $upload->total_records ?? 0
+                ]);
+            }
         }
 
         // Sort by created_at descending and paginate
         $sortedUploads = $combinedUploads->sortByDesc('created_at')->values();
-        $perPage = 10;
+        $perPage = request()->get('per_page', 10); // Allow user to choose items per page
+        $perPage = in_array($perPage, [5, 10, 25, 50, 100]) ? $perPage : 10; // Validate per_page values
         $currentPage = request()->get('page', 1);
         $offset = ($currentPage - 1) * $perPage;
 
@@ -172,10 +192,20 @@ class UploadController extends Controller
             $sortedUploads->count(),
             $perPage,
             $currentPage,
-            ['path' => request()->url(), 'pageName' => 'page']
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+                'perPage' => $perPage
+            ]
         );
 
-        return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory'));
+        // Preserve per_page parameter in pagination URLs
+        $uploadHistory->appends(['per_page' => $perPage]);
+
+        // Add per_page options for the view
+        $perPageOptions = [5, 10, 25, 50, 100];
+
+        return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory', 'perPageOptions'));
     }
 
     public function upload(Request $request)
@@ -210,6 +240,12 @@ class UploadController extends Controller
 
         if (!empty($validationErrors)) {
             return back()->with('error', implode('<br>', $validationErrors));
+        }
+
+        // Validate CSV file types match user selection
+        $fileTypeValidationErrors = $this->validateCsvFileTypes($request, $uploadTypes);
+        if (!empty($fileTypeValidationErrors)) {
+            return back()->with('error', implode('<br>', $fileTypeValidationErrors));
         }
 
         try {
@@ -316,14 +352,23 @@ class UploadController extends Controller
             $countDeposito = Deposito::count();
             $countLinkage = Linkage::count();
             $countPembiayaan = Pembiayaan::count();
+            $countCsvUploads = CsvUploadStatus::count();
             $totalCount = $countTabungan + $countDeposito + $countLinkage + $countPembiayaan;
 
+            // Clear main data tables
             Tabungan::truncate();
             Deposito::truncate();
             Linkage::truncate();
             Pembiayaan::truncate();
 
-            return redirect()->back()->with('success', "Berhasil menghapus {$totalCount} data (Tabungan: {$countTabungan}, Deposito: {$countDeposito}, Linkage: {$countLinkage}, Pembiayaan: {$countPembiayaan}).");
+            // Clear upload history/status records
+            CsvUploadStatus::truncate();
+
+            // Clear all financial caches
+            $cacheService = app(FinancialCacheService::class);
+            $cacheService->clearAllCaches();
+
+            return redirect()->back()->with('success', "Berhasil menghapus {$totalCount} data (Tabungan: {$countTabungan}, Deposito: {$countDeposito}, Linkage: {$countLinkage}, Pembiayaan: {$countPembiayaan}) dan {$countCsvUploads} riwayat upload.");
         } catch (\Exception $e) {
             Log::error('Clear Data Error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
@@ -577,5 +622,172 @@ class UploadController extends Controller
             'memory' => 512, // 512MB memory limit
             'queue' => 'default' // Use default queue
         ];
+    }
+
+    /**
+     * Validate that uploaded CSV files match their selected types
+     */
+    private function validateCsvFileTypes(Request $request, array $uploadTypes): array
+    {
+        $errors = [];
+
+        $fileMappings = [
+            'pembiayaan' => ['field' => 'csv_file', 'expectedType' => 'PEMBIAYAAN'],
+            'tabungan' => ['field' => 'csv_tabungan', 'expectedType' => 'TABUNGAN'],
+            'deposito' => ['field' => 'csv_deposito', 'expectedType' => 'DEPOSITO'],
+            'linkage' => ['field' => 'csv_linkage', 'expectedType' => 'LINKAGE']
+        ];
+
+        foreach ($uploadTypes as $uploadType) {
+            if (isset($fileMappings[$uploadType])) {
+                $field = $fileMappings[$uploadType]['field'];
+                $expectedType = $fileMappings[$uploadType]['expectedType'];
+
+                if ($request->hasFile($field)) {
+                    $file = $request->file($field);
+                    $detectedType = $this->detectCsvFileType($file->getPathname());
+
+                    if ($detectedType && $detectedType !== $expectedType) {
+                        $typeNames = [
+                            'PEMBIAYAAN' => 'Pembiayaan',
+                            'TABUNGAN' => 'Tabungan',
+                            'DEPOSITO' => 'Deposito',
+                            'LINKAGE' => 'Linkage'
+                        ];
+
+                        $expectedName = $typeNames[$expectedType] ?? $expectedType;
+                        $detectedName = $typeNames[$detectedType] ?? $detectedType;
+
+                        $errors[] = "File CSV {$expectedName} tidak sesuai. File terdeteksi sebagai data {$detectedName}. Silakan periksa file yang diupload.";
+                    }
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Detect CSV file type based on header analysis
+     */
+    private function detectCsvFileType(string $filePath): ?string
+    {
+        try {
+            $handle = fopen($filePath, 'r');
+            $header = fgetcsv($handle, 1000, ',', '"', '\\');
+            fclose($handle);
+
+            if (!$header) {
+                return null;
+            }
+
+            // Convert header to lowercase for case-insensitive comparison
+            $headerLower = array_map('strtolower', array_map('trim', $header));
+
+            // Define characteristic columns for each file type with weights
+            $fileTypeSignatures = [
+                'PEMBIAYAAN' => [
+                    'nokontrak' => 5, // Very specific to pembiayaan - highest weight
+                    'nama' => 1,
+                    'tgleff' => 1,
+                    'jw' => 2,
+                    'tglexp' => 2,
+                    'mdlawal' => 3,
+                    'mgnawal' => 3,
+                    'osmdlc' => 3,
+                    'osmgnc' => 3,
+                    'angsmdl' => 2,
+                    'angsmgn' => 2,
+                    'sahirrp' => 1,
+                    'prsnisbah' => 1,
+                    'plafon' => 1,
+                    'os' => 1
+                ],
+                'TABUNGAN' => [
+                    'nocif' => 1,
+                    'notab' => 5, // Very specific to tabungan - highest weight
+                    'kodeprd' => 1,
+                    'sahirrp' => 1,
+                    'fnama' => 1,
+                    'namaqq' => 2,
+                    'stsrec' => 1,
+                    'saldoblok' => 2,
+                    'stsrest' => 2,
+                    'tax' => 1,
+                    'avgeom' => 2,
+                    'stspep' => 1
+                ],
+                'DEPOSITO' => [
+                    'nodep' => 5, // Very specific to deposito - highest weight
+                    'nocif' => 1,
+                    'nobilyet' => 5, // Very specific to deposito - highest weight
+                    'nama' => 1,
+                    'nomrp' => 2,
+                    'stsrec' => 1,
+                    'kdprd' => 1,
+                    'jkwaktu' => 2,
+                    'jnsjkwaktu' => 2,
+                    'aro' => 2,
+                    'nisbah' => 1,
+                    'spread' => 1,
+                    'equivrate' => 1,
+                    'komitrate' => 1
+                ],
+                'LINKAGE' => [
+                    'nocif' => 1,
+                    'nokontrak' => 5, // Very specific to linkage - highest weight
+                    'nama' => 1,
+                    'tgleff' => 2,
+                    'tgljt' => 2,
+                    'kelompok' => 3, // Very specific to linkage
+                    'jnsakad' => 3, // Very specific to linkage
+                    'prsnisbah' => 2,
+                    'plafon' => 1,
+                    'os' => 1
+                ]
+            ];
+
+            // Calculate weighted scores for each file type
+            $scores = [];
+            foreach ($fileTypeSignatures as $type => $signatureColumns) {
+                $score = 0;
+                $matchedColumns = [];
+                foreach ($signatureColumns as $column => $weight) {
+                    if (in_array($column, $headerLower)) {
+                        $score += $weight;
+                        $matchedColumns[] = $column;
+                    }
+                }
+                $scores[$type] = $score;
+            }
+
+            // Find the type with highest score
+            arsort($scores);
+            $bestMatch = key($scores);
+            $bestScore = current($scores);
+
+            // Additional validation: Check for unique identifier columns
+            $uniqueIdentifiers = [
+                'PEMBIAYAAN' => ['nokontrak'],
+                'TABUNGAN' => ['notab'],
+                'DEPOSITO' => ['nodep', 'nobilyet'],
+                'LINKAGE' => ['nokontrak']
+            ];
+
+            // If the best match has a unique identifier, it's definitely that type
+            if (isset($uniqueIdentifiers[$bestMatch])) {
+                foreach ($uniqueIdentifiers[$bestMatch] as $uniqueCol) {
+                    if (in_array($uniqueCol, $headerLower)) {
+                        return $bestMatch;
+                    }
+                }
+            }
+
+            // Only return a type if score is significant (at least 3 points)
+            return $bestScore >= 3 ? $bestMatch : null;
+        } catch (\Exception $e) {
+            Log::warning("Could not detect CSV file type: " . $e->getMessage());
+            return null;
+        }
     }
 }
