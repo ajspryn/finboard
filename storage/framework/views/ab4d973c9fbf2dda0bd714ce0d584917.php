@@ -2727,7 +2727,6 @@ function formatNominal(amount) {
             }
         });
         monthlyTrendChart.render();
-        console.log('Monthly trend chart rendered');
     }
 
     // 2. NPF Distribution Chart (Per Segmentasi)
@@ -2815,7 +2814,6 @@ function formatNominal(amount) {
             }
         });
         npfDistributionChart.render();
-        console.log('NPF distribution chart rendered');
     }
 
     // 3. Segmentasi Bar Chart (Outstanding per Segmentasi)
@@ -2878,7 +2876,6 @@ function formatNominal(amount) {
                 }
             });
             segmentasiChart.render();
-            console.log('Segmentasi chart rendered');
         }
     }
 
@@ -2929,7 +2926,6 @@ function formatNominal(amount) {
             }
         });
         kolektibilitasChart.render();
-        console.log('Kolektibilitas chart rendered');
     }
 
     // 5. Top Products Bar Chart
@@ -2976,7 +2972,6 @@ function formatNominal(amount) {
             }
         });
         topProductsChart.render();
-        console.log('Top products chart rendered');
     }
 
     // Nasabah Trend Chart (Line Chart - 6 Bulan Terakhir)
@@ -3024,7 +3019,6 @@ function formatNominal(amount) {
                     zoom: { enabled: true },
                     events: {
                         markerClick: function(event, chartContext, config) {
-                            console.log('Marker clicked!', config);
                             const seriesIndex = config.seriesIndex;
                             const dataPointIndex = config.dataPointIndex;
                             const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[dataPointIndex];
@@ -3035,12 +3029,10 @@ function formatNominal(amount) {
                             else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
                             else if (seriesIndex === 2) kategori = 'kontrak_lunas';
 
-                            console.log('Opening modal:', monthLabel, kategori);
                             // Buka modal detail
                             window.showTrendKontrakDetail(monthLabel, kategori);
                         },
                         dataPointSelection: function(event, chartContext, config) {
-                            console.log('Data point selected!', config);
                             const monthIndex = config.dataPointIndex;
                             const seriesIndex = config.seriesIndex;
                             const monthLabel = <?php echo json_encode($nasabahTrendData['labels'], 15, 512) ?>[monthIndex];
@@ -3051,12 +3043,10 @@ function formatNominal(amount) {
                             else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
                             else if (seriesIndex === 2) kategori = 'kontrak_lunas';
 
-                            console.log('Opening modal from selection:', monthLabel, kategori);
                             // Buka modal detail
                             window.showTrendKontrakDetail(monthLabel, kategori);
                         },
                         click: function(event, chartContext, config) {
-                            console.log('Chart clicked!', config);
                             if (config && config.dataPointIndex !== undefined) {
                                 const seriesIndex = config.seriesIndex;
                                 const dataPointIndex = config.dataPointIndex;
@@ -3068,7 +3058,6 @@ function formatNominal(amount) {
                                 else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
                                 else if (seriesIndex === 2) kategori = 'kontrak_lunas';
 
-                                console.log('Opening modal from click:', monthLabel, kategori);
                                 // Buka modal detail
                                 window.showTrendKontrakDetail(monthLabel, kategori);
                             }
@@ -3173,7 +3162,6 @@ function formatNominal(amount) {
                 }
             });
             nasabahTrendChart.render();
-            console.log('Nasabah trend chart rendered (type: ' + type + ')');
 
             // Make data labels clickable after chart is rendered
             setTimeout(() => {
@@ -3194,7 +3182,6 @@ function formatNominal(amount) {
                             else if (seriesIndex === 1) kategori = 'pelunasan_cepat';
                             else if (seriesIndex === 2) kategori = 'kontrak_lunas';
 
-                            console.log('Data label clicked:', monthLabel, kategori);
                             // Buka modal detail
                             window.showTrendKontrakDetail(monthLabel, kategori);
                         });
@@ -3361,7 +3348,7 @@ function formatNominal(amount) {
         });
     });
 
-    console.log('All charts initialized successfully!');
+    // All charts initialized
 });
 
 // Function untuk menampilkan detail segmentasi
@@ -3961,6 +3948,23 @@ function initializeMap() {
         return 6;
     }
 
+    // Hardcoded coordinates untuk kecamatan yang tidak ditemukan oleh Nominatim
+    const hardcodedCoordinates = {
+        'PARE': { lat: -7.8167, lon: 112.0167 }, // KAB KEDIRI
+        'LEUWILIANG': { lat: -6.6167, lon: 106.6167 }, // BOGOR
+        'PAMIJAHAN': { lat: -6.7167, lon: 106.7167 }, // BOGOR
+        'MENGWI': { lat: -8.5167, lon: 115.1833 }, // KAB BADUNG
+        'PUNCU': { lat: -7.8167, lon: 112.0167 }, // KAB KEDIRI
+        'DENPASAR BARAT': { lat: -8.6500, lon: 115.2167 }, // KOTA DENPASAR
+        'PURWODADI': { lat: -7.8167, lon: 110.0167 }, // KAB PURWOREJO
+        'CIBUNGBULANG': { lat: -6.6167, lon: 106.6167 }, // BOGOR
+        'RUMPIN': { lat: -6.4167, lon: 106.6167 }, // BOGOR
+        'PURWOASRI': { lat: -7.8167, lon: 112.0167 }, // KAB KEDIRI
+        'ABIANSEMAL': { lat: -8.5500, lon: 115.1833 }, // KAB BADUNG
+        'KEPUNG': { lat: -7.8167, lon: 112.0167 }, // KAB KEDIRI
+        'NGABLAK': { lat: -7.6167, lon: 110.2167 } // KAB MAGELANG
+    };
+
     // Counter untuk tracking progress
     let markersAdded = 0;
     let markersFailed = 0;
@@ -4007,9 +4011,6 @@ function initializeMap() {
 
                         const lat = parseFloat(bestMatch.lat);
                         const lon = parseFloat(bestMatch.lon);
-
-                        console.log(`✓ Geocoded: ${kecamatanName}${kotaName ? ' (' + kotaName + ')' : ''} → [${lat.toFixed(4)}, ${lon.toFixed(4)}]`);
-                        console.log(`  Location: ${bestMatch.display_name}`);
 
                         const nasabah = kec.total_nasabah;
                         const color = getColor(nasabah);
@@ -4062,13 +4063,109 @@ function initializeMap() {
                             console.log(`Progress: ${markersAdded}/${totalMarkers} markers loaded (${markersFailed} failed)`);
                         }
                     } else {
-                        console.warn(`✗ Tidak ditemukan koordinat untuk: ${kecamatanName}${kotaName ? ' (' + kotaName + ')' : ''}`);
-                        markersFailed++;
+                        // Cek apakah ada koordinat hardcoded
+                        const hardcodedKey = kecamatanName.toUpperCase();
+                        if (hardcodedCoordinates[hardcodedKey]) {
+                            const lat = hardcodedCoordinates[hardcodedKey].lat;
+                            const lon = hardcodedCoordinates[hardcodedKey].lon;
+
+                            const nasabah = kec.total_nasabah;
+                            const color = getColor(nasabah);
+                            const size = getMarkerSize(nasabah);
+
+                            // Create circle marker
+                            const marker = L.circleMarker([lat, lon], {
+                                radius: size,
+                                fillColor: color,
+                                color: '#fff',
+                                weight: 2,
+                                opacity: 1,
+                                fillOpacity: 0.85
+                            }).addTo(map);
+
+                            // Popup content
+                            const popupContent = `
+                                <div class="text-center">
+                                    <h6 class="mb-2">${kecamatanName}${kotaName ? ' (' + kotaName + ')' : ''}</h6>
+                                    <p class="mb-2"><strong>Total Nasabah:</strong> ${nasabah}</p>
+                                    <div class="d-grid gap-1">
+                                        <button class="btn btn-xs btn-primary w-100" onclick="showKecamatanDetail('${kec.kecamatan}')">
+                                            <i class="ti ti-eye"></i> Lihat Detail
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+
+                            marker.bindPopup(popupContent);
+
+                            // Click event
+                            marker.on('click', function() {
+                                this.openPopup();
+                            });
+
+                            markersAdded++;
+
+                            // Log progress setiap 10 marker
+                            if (markersAdded % 10 === 0 || markersAdded === totalMarkers) {
+                                console.log(`Progress: ${markersAdded}/${totalMarkers} markers loaded (${markersFailed} failed)`);
+                            }
+                        } else {
+                            console.warn(`✗ Tidak ditemukan koordinat untuk: ${kecamatanName}${kotaName ? ' (' + kotaName + ')' : ''}`);
+                            markersFailed++;
+                        }
                     }
                 })
                 .catch(error => {
-                    console.error(`✗ Error geocoding ${kecamatanName}:`, error);
-                    markersFailed++;
+                    // Cek apakah ada koordinat hardcoded jika geocoding gagal
+                    const hardcodedKey = kecamatanName.toUpperCase();
+                    if (hardcodedCoordinates[hardcodedKey]) {
+                        const lat = hardcodedCoordinates[hardcodedKey].lat;
+                        const lon = hardcodedCoordinates[hardcodedKey].lon;
+
+                        const nasabah = kec.total_nasabah;
+                        const color = getColor(nasabah);
+                        const size = getMarkerSize(nasabah);
+
+                        // Create circle marker
+                        const marker = L.circleMarker([lat, lon], {
+                            radius: size,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.85
+                        }).addTo(map);
+
+                        // Popup content
+                        const popupContent = `
+                            <div class="text-center">
+                                <h6 class="mb-2">${kecamatanName}${kotaName ? ' (' + kotaName + ')' : ''}</h6>
+                                <p class="mb-2"><strong>Total Nasabah:</strong> ${nasabah}</p>
+                                <div class="d-grid gap-1">
+                                    <button class="btn btn-xs btn-primary w-100" onclick="showKecamatanDetail('${kec.kecamatan}')">
+                                        <i class="ti ti-eye"></i> Lihat Detail
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        marker.bindPopup(popupContent);
+
+                        // Click event
+                        marker.on('click', function() {
+                            this.openPopup();
+                        });
+
+                        markersAdded++;
+
+                        // Log progress setiap 10 marker
+                        if (markersAdded % 10 === 0 || markersAdded === totalMarkers) {
+                            console.log(`Progress: ${markersAdded}/${totalMarkers} markers loaded (${markersFailed} failed)`);
+                        }
+                    } else {
+                        console.error(`✗ Error geocoding ${kecamatanName}:`, error);
+                        markersFailed++;
+                    }
                 });
         }, index * 1200); // Delay 1.2 detik per request untuk menghormati rate limit Nominatim
     });
@@ -4832,7 +4929,6 @@ function renderCombinedTrendChart(series, categories, type) {
                 },
                 events: {
                     markerClick: function(event, chartContext, config) {
-                        console.log('Combined trend marker clicked!', config);
                         const seriesIndex = config.seriesIndex;
                         const dataPointIndex = config.dataPointIndex;
                         const seriesName = series[seriesIndex].name;
@@ -4849,7 +4945,6 @@ function renderCombinedTrendChart(series, categories, type) {
                         }
 
                         if (kategori) {
-                            console.log('Opening combined trend modal:', monthLabel, kategori);
                             // Parse month and year from label
                             const parts = monthLabel.split(' ');
                             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -4860,7 +4955,6 @@ function renderCombinedTrendChart(series, categories, type) {
                         }
                     },
                     dataPointSelection: function(event, chartContext, config) {
-                        console.log('Combined trend data point selected!', config);
                         const seriesIndex = config.seriesIndex;
                         const dataPointIndex = config.dataPointIndex;
                         const seriesName = series[seriesIndex].name;
@@ -4877,7 +4971,6 @@ function renderCombinedTrendChart(series, categories, type) {
                         }
 
                         if (kategori) {
-                            console.log('Opening combined trend modal from selection:', monthLabel, kategori);
                             // Parse month and year from label
                             const parts = monthLabel.split(' ');
                             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -4888,7 +4981,6 @@ function renderCombinedTrendChart(series, categories, type) {
                         }
                     },
                     click: function(event, chartContext, config) {
-                        console.log('Combined trend chart clicked!', config);
                         if (config && config.dataPointIndex !== undefined) {
                             const seriesIndex = config.seriesIndex;
                             const dataPointIndex = config.dataPointIndex;
@@ -4906,7 +4998,6 @@ function renderCombinedTrendChart(series, categories, type) {
                             }
 
                             if (kategori) {
-                                console.log('Opening combined trend modal from click:', monthLabel, kategori);
                                 // Parse month and year from label
                                 const parts = monthLabel.split(' ');
                                 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -5054,7 +5145,6 @@ function renderCombinedTrendChart(series, categories, type) {
                         }
 
                         if (kategori) {
-                            console.log('Data label clicked:', monthLabel, kategori);
                             // Parse month and year from label
                             const parts = monthLabel.split(' ');
                             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -7115,8 +7205,6 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 detailHtml = '<p>Data tidak tersedia</p>';
         }
 
-        console.log('Detail HTML generated, length:', detailHtml.length);
-
         const modalHtml = `
             <div class="modal fade" id="detailModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -7786,11 +7874,6 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         container.style.zIndex = '9999';
         document.body.appendChild(container);
         return container;
-    }
-
-    // Format number with thousand separators
-    function formatNumber(num) {
-        return new Intl.NumberFormat('id-ID').format(num);
     }
 
     // Initialize search when DOM is ready
