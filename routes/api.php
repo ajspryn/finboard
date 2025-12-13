@@ -23,15 +23,19 @@ Route::post('/auth/resend-pin', [AuthController::class, 'resendPin'])->name('api
 
 // Elasticsearch Search API Routes
 Route::middleware(['web', 'auth'])->prefix('search')->group(function () {
+    Route::get('/unified', [SearchController::class, 'unifiedSearch'])->name('api.search.unified');
     Route::get('/pembiayaan', [SearchController::class, 'searchPembiayaan'])->name('api.search.pembiayaan');
     Route::get('/tabungan', [SearchController::class, 'searchTabungan'])->name('api.search.tabungan');
     Route::get('/deposito', [SearchController::class, 'searchDeposito'])->name('api.search.deposito');
     Route::get('/financial-highlights', [SearchController::class, 'searchFinancialHighlights'])->name('api.search.financial-highlights');
     Route::get('/all', [SearchController::class, 'searchAll'])->name('api.search.all');
+});
 
-    // Detail routes
+// Detail routes - tanpa auth untuk testing
+Route::prefix('search')->group(function () {
     Route::get('/pembiayaan/{id}', [SearchController::class, 'getPembiayaanDetail'])->name('api.search.pembiayaan.detail');
     Route::get('/tabungan/{id}', [SearchController::class, 'getTabunganDetail'])->name('api.search.tabungan.detail');
     Route::get('/deposito/{id}', [SearchController::class, 'getDepositoDetail'])->name('api.search.deposito.detail');
+    Route::get('/linkage/{id}', [SearchController::class, 'getLinkageDetail'])->name('api.search.linkage.detail');
     Route::get('/financial-highlights/{id}', [SearchController::class, 'getFinancialHighlightDetail'])->name('api.search.financial-highlights.detail');
 });

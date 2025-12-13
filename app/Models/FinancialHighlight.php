@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class FinancialHighlight extends Model
 {
-    use Searchable;
-    protected $fillable = [
+    use Searchable;    protected $fillable = [
         'period_year',
         'period_month',
         'car',

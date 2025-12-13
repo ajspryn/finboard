@@ -787,6 +787,7 @@ function formatNominal($amount) {
     ?>
 
     <!-- Search Bar Row -->
+    <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-primary border-2 shadow-sm">
@@ -831,6 +832,7 @@ function formatNominal($amount) {
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Financial Highlights Row -->
     <?php if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus'): ?>
@@ -6774,7 +6776,8 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         searchTypeSelect.disabled = true;
 
         try {
-            const response = await fetch(`/api/search/${searchType}?q=${encodeURIComponent(query)}&limit=20`, {
+            // Use unified search for all types
+            const response = await fetch(`/api/search/unified?q=${encodeURIComponent(query)}&limit=50`, {
                 credentials: 'same-origin'
             });
             const data = await response.json();
@@ -6785,12 +6788,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
             if (response.ok) {
                 if (data.success) {
                     // Update search stats
-                    const resultCount = searchType === 'all'
-                        ? Object.values(data.results || {}).reduce((sum, cat) => sum + (cat.results?.length || 0), 0)
-                        : (data.results?.length || 0);
-                    updateSearchStats(query, resultCount, searchTime);
+                    updateSearchStats(query, data.total, searchTime);
 
-                    showSearchResults(data, query, searchType);
+                    showUnifiedSearchResults(data, query);
                 } else {
                     showToast(data.message || 'Terjadi kesalahan saat pencarian', 'error');
                 }
@@ -6815,8 +6815,8 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         }
     }
 
-    // Show search results in modal
-    function showSearchResults(data, query, searchType) {
+    // Show unified search results in modal
+    function showUnifiedSearchResults(data, query) {
         const modalHtml = `
             <div class="modal fade" id="searchResultsModal" tabindex="-1" aria-labelledby="searchResultsModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -6828,19 +6828,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                 </div>
                                 <div class="flex-grow-1">
                                     <h4 class="modal-title mb-0" id="searchResultsModalLabel">
-                                        Hasil Pencarian
+                                        Hasil Pencarian Unified
                                     </h4>
                                     <p class="mb-0 small opacity-75">
-                                        <strong>"${query}"</strong> dalam ${getTypeTitle(searchType).toLowerCase()}
+                                        <strong>"${query}"</strong> • ${data.total} hasil ditemukan
                                     </p>
                                 </div>
                             </div>
                             <button type="button" class="btn-close btn-close-white position-absolute top-50 end-0 translate-middle-y me-3" data-bs-dismiss="modal" aria-label="Tutup"></button>
                         </div>
                         <div class="modal-body p-4">
-                            <div class="search-results-container">
-                                ${generateResultsHtml(data, searchType)}
-                            </div>
+                            ${renderUnifiedResults(data.results, query)}
                         </div>
                         <div class="modal-footer bg-light">
                             <div class="d-flex justify-content-between align-items-center w-100">
@@ -6848,14 +6846,11 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                     <small class="text-muted">
                                         <i class="ti ti-clock me-1"></i>
                                         ${new Date().toLocaleString('id-ID')}
-                                        ${searchType === 'all'
-                                            ? ` • ${data.results ? Object.keys(data.results).length : 0} kategori`
-                                            : ` • ${data.total || data.results?.length || 0} hasil`
-                                        }
+                                        • Diurutkan berdasarkan relevansi
                                     </small>
                                 </div>
                                 <div class="modal-actions">
-                                    <button type="button" class="btn btn-outline-secondary me-2" onclick="exportSearchResults('${query}', '${searchType}')">
+                                    <button type="button" class="btn btn-outline-secondary me-2" onclick="exportUnifiedSearchResults('${query}')">
                                         <i class="ti ti-download me-1"></i>Ekspor
                                     </button>
                                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
@@ -6894,96 +6889,58 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         });
     }
 
-    // Generate HTML for search results
-    function generateResultsHtml(data, searchType) {
-        if (!data || !data.results) {
-            return generateEmptyResultsHtml();
-        }
-
-        if (searchType === 'all') {
-            return generateUniversalResultsHtml(data.results);
-        } else {
-            return generateSpecificResultsHtml(data.results, searchType);
-        }
-    }
-
-    // Generate empty results HTML
-    function generateEmptyResultsHtml() {
-        return `
-            <div class="text-center py-5">
-                <div class="empty-state-icon mb-4">
-                    <i class="ti ti-search-off display-1 text-muted"></i>
-                </div>
-                <h5 class="text-muted mb-2">Tidak ada hasil ditemukan</h5>
-                <p class="text-muted mb-4">Coba gunakan kata kunci yang berbeda atau periksa ejaan Anda</p>
-                <div class="suggestions">
-                    <small class="text-muted">Saran pencarian:</small>
-                    <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
-                        <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('pembiayaan')">💰 Pembiayaan</span>
-                        <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('tabungan')">💳 Tabungan</span>
-                        <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('deposito')">🏦 Deposito</span>
+    // Render unified search results
+    function renderUnifiedResults(results, query) {
+        if (!results || results.length === 0) {
+            return `
+                <div class="text-center py-5">
+                    <div class="empty-state-icon mb-4">
+                        <i class="ti ti-search-off display-1 text-muted"></i>
+                    </div>
+                    <h5 class="text-muted mb-2">Tidak ada hasil ditemukan</h5>
+                    <p class="text-muted mb-4">Coba gunakan kata kunci yang berbeda atau periksa ejaan Anda</p>
+                    <div class="suggestions">
+                        <small class="text-muted">Saran pencarian:</small>
+                        <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                            <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('pembiayaan')">💰 Pembiayaan</span>
+                            <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('tabungan')">💳 Tabungan</span>
+                            <span class="badge bg-light text-dark cursor-pointer" onclick="performQuickSearch('deposito')">🏦 Deposito</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
-    }
-
-    // Generate HTML for universal search results
-    function generateUniversalResultsHtml(results) {
-        if (!results || Object.keys(results).length === 0) {
-            return generateEmptyResultsHtml();
+            `;
         }
 
-        let html = '<div class="row g-4">';
+        let html = '<div class="row g-3">';
 
-        Object.keys(results).forEach(type => {
-            const typeResults = results[type];
-            const typeTitle = getTypeTitle(type);
-            const typeIcon = getTypeIcon(type);
-            const typeColor = getTypeColor(type);
-
-            if (!typeResults.results || typeResults.results.length === 0) {
-                return; // Skip empty categories
-            }
+        results.forEach(result => {
+            const badgeClass = getBadgeClass(result.type);
+            const badgeIcon = getBadgeIcon(result.type);
+            const badgeText = getBadgeText(result.type);
+            const details = getResultDetails(result);
+            const relevanceScore = parseFloat(result.relevance_score || 0).toFixed(2);
 
             html += `
-                <div class="col-md-6 col-lg-3 mb-4">
-                    <div class="card h-100 border-${typeColor} shadow-sm hover-lift">
-                        <div class="card-header bg-${typeColor} text-white d-flex align-items-center">
-                            <i class="${typeIcon} me-2 fs-5"></i>
-                            <div class="flex-grow-1">
-                                <h6 class="mb-0 fw-bold">${typeTitle}</h6>
-                                <small class="opacity-75">${typeResults.total} hasil</small>
-                            </div>
-                        </div>
+                <div class="col-12">
+                    <div class="card border hover-lift cursor-pointer" onclick="showSearchResultDetail(${result.id}, '${result.type}')">
                         <div class="card-body p-3">
-                            <div class="results-list" style="max-height: 300px; overflow-y: auto;">
-                                ${typeResults.results.slice(0, 5).map((result, index) => `
-                                    <div class="result-item mb-2 p-3 border rounded small cursor-pointer transition-all"
-                                         style="cursor: pointer;"
-                                         onclick="viewResultDetail('${type}', '${result.id}')"
-                                         onmouseenter="highlightResult(this)"
-                                         onmouseleave="unhighlightResult(this)"
-                                         tabindex="0"
-                                         role="button"
-                                         aria-label="Lihat detail ${getResultDisplayName(result, type)}">
-                                        <div class="d-flex align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="fw-bold text-dark mb-1">${getResultDisplayName(result, type)}</div>
-                                                <div class="text-muted small mb-1">${getResultSubtitle(result, type)}</div>
-                                                ${result.score ? `<div class="text-primary small"><i class="ti ti-target me-1"></i>Relevansi: ${result.score.toFixed(2)}</div>` : ''}
-                                            </div>
-                                            <div class="ms-2">
-                                                <i class="ti ti-chevron-right text-muted"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                                ${typeResults.results.length > 5 ? `
-                                    <div class="text-center mt-3">
-                                        <small class="text-muted">+${typeResults.results.length - 5} hasil lainnya</small>
-                                    </div>
-                                ` : ''}
+                            <div class="d-flex align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        ${result.nama || result.fnama || 'N/A'}
+                                        <small class="badge ${badgeClass} ms-2">
+                                            <i class="ti ${badgeIcon} me-1"></i>${badgeText}
+                                        </small>
+                                        <small class="text-muted">(${result.nocif || result.nodep || 'N/A'})</small>
+                                    </h6>
+                                    ${details}
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">Relevansi</small><br>
+                                    <span class="badge bg-light text-dark">
+                                        ${relevanceScore}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -6995,164 +6952,112 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         return html;
     }
 
-    // Generate HTML for specific type search results
-    function generateSpecificResultsHtml(results, type) {
-        if (!results || results.length === 0) {
-            return generateEmptyResultsHtml();
-        }
-
-        const typeTitle = getTypeTitle(type);
-        const typeIcon = getTypeIcon(type);
-        const typeColor = getTypeColor(type);
-
-        let html = `
-            <div class="alert alert-${typeColor} border-${typeColor} d-flex align-items-center mb-4">
-                <i class="${typeIcon} me-3 fs-4"></i>
-                <div class="flex-grow-1">
-                    <strong>${typeTitle}</strong>
-                    <div class="small opacity-75">Ditemukan ${results.length} hasil pencarian</div>
-                </div>
-                <div class="badge bg-${typeColor} fs-6">${results.length}</div>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover table-striped border">
-                    <thead class="table-${typeColor} text-white">
-                        <tr>
-                            ${getTableHeaders(type)}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${results.map((result, index) => `
-                            <tr style="cursor: pointer;"
-                                onclick="viewResultDetail('${type}', '${result.id}')"
-                                onmouseenter="highlightTableRow(this)"
-                                onmouseleave="unhighlightTableRow(this)"
-                                tabindex="0"
-                                role="button"
-                                aria-label="Lihat detail ${getResultDisplayName(result, type)}">
-                                ${getTableRow(result, type)}
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-        return html;
+    // Get badge class for result type
+    function getBadgeClass(type) {
+        const classes = {
+            'tabungan': 'bg-primary',
+            'deposito': 'bg-success',
+            'pembiayaan': 'bg-warning',
+            'linkage': 'bg-info',
+        };
+        return classes[type] || 'bg-secondary';
     }
 
-    // Helper functions for result display
-    function getTypeTitle(type) {
-        const titles = {
-            'pembiayaan': 'Pembiayaan',
+    // Get badge icon for result type
+    function getBadgeIcon(type) {
+        const icons = {
+            'tabungan': 'ti-piggy-bank',
+            'deposito': 'ti-clock-dollar',
+            'pembiayaan': 'ti-building-bank',
+            'linkage': 'ti-link',
+        };
+        return icons[type] || 'ti-file';
+    }
+
+    // Get badge text for result type
+    function getBadgeText(type) {
+        const texts = {
             'tabungan': 'Tabungan',
             'deposito': 'Deposito',
-            'financial_highlight': 'Financial Highlights'
+            'pembiayaan': 'Pembiayaan',
+            'linkage': 'Linkage',
         };
-        return titles[type] || type;
+        return texts[type] || type;
     }
 
-    function getTypeIcon(type) {
-        const icons = {
-            'pembiayaan': 'ti ti-cash',
-            'tabungan': 'ti ti-wallet',
-            'deposito': 'ti ti-piggy-bank',
-            'financial_highlight': 'ti ti-chart-line'
-        };
-        return icons[type] || 'ti ti-file';
-    }
+    // Get result details based on type
+    function getResultDetails(result) {
+        let details = '<div class="row g-2">';
 
-    function getTypeColor(type) {
-        const colors = {
-            'pembiayaan': 'primary',
-            'tabungan': 'success',
-            'deposito': 'info',
-            'financial_highlight': 'warning'
-        };
-        return colors[type] || 'secondary';
-    }
-
-    function getResultDisplayName(result, type) {
-        switch (type) {
-            case 'pembiayaan': return result.nama || result.nokontrak;
-            case 'tabungan': return result.fnama || result.notab;
-            case 'deposito': return result.nama || result.nodep;
-            case 'financial_highlight': return `Periode ${result.period_year}-${String(result.period_month).padStart(2, '0')}`;
-            default: return 'Unknown';
+        if (result.type === 'tabungan') {
+            details += `
+                <div class="col-auto">
+                    <small class="text-muted">No. Tabungan:</small><br>
+                    <strong>${result.notab || 'N/A'}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Saldo:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.sahirrp || 0)}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Periode:</small><br>
+                    <strong>${String(result.period_month || 0).padStart(2, '0')}-${result.period_year || 0}</strong>
+                </div>
+            `;
+        } else if (result.type === 'deposito') {
+            details += `
+                <div class="col-auto">
+                    <small class="text-muted">No. Deposito:</small><br>
+                    <strong>${result.nodep || 'N/A'}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Nominal:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.nomrp || 0)}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Status:</small><br>
+                    <strong>${result.stsrec || 'N/A'}</strong>
+                </div>
+            `;
+        } else if (result.type === 'pembiayaan') {
+            details += `
+                <div class="col-auto">
+                    <small class="text-muted">No. Kontrak:</small><br>
+                    <strong>${result.nokontrak || 'N/A'}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Plafon:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.sahirrp || 0)}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">OS:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.colbaru || 0)}</strong>
+                </div>
+            `;
+        } else if (result.type === 'linkage') {
+            details += `
+                <div class="col-auto">
+                    <small class="text-muted">No. Kontrak:</small><br>
+                    <strong>${result.nokontrak || 'N/A'}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">Plafon:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.plafon || 0)}</strong>
+                </div>
+                <div class="col-auto">
+                    <small class="text-muted">OS:</small><br>
+                    <strong>Rp ${new Intl.NumberFormat('id-ID').format(result.os || 0)}</strong>
+                </div>
+            `;
         }
+
+        details += '</div>';
+        return details;
     }
 
-    function getResultSubtitle(result, type) {
-        switch (type) {
-            case 'pembiayaan': return `Kontrak: ${result.nokontrak} • Saldo: ${formatNominal(result.sahirrp || 0)} • ${result.colbaru === '1' ? 'Lancar' : 'Kurang Lancar'}`;
-            case 'tabungan': return `Rekening: ${result.notab} • Saldo: ${formatNominal(result.sahirrp || 0)} • ${result.stsrec === 'A' ? 'Aktif' : 'Tidak Aktif'}`;
-            case 'deposito': return `Deposito: ${result.nodep} • Nominal: ${formatNominal(result.nomrp || 0)} • Jatuh Tempo: ${result.tglexp || '-'}`;
-            case 'financial_highlight': return `CAR: ${result.car || 'N/A'}% • ROA: ${result.roa || 'N/A'}% • NPF: ${result.npf || 'N/A'}%`;
-            default: return '';
-        }
-    }
 
-    function getTableHeaders(type) {
-        switch (type) {
-            case 'pembiayaan':
-                return '<th>Kontrak</th><th>Nama Nasabah</th><th>AO</th><th>Plafon</th><th>Saldo</th><th>Margin</th><th>Jangka Waktu</th><th>Status</th>';
-            case 'tabungan':
-                return '<th>Rekening</th><th>Nama</th><th>Saldo</th><th>Saldo Min</th><th>Status</th><th>Tanggal Buka</th>';
-            case 'deposito':
-                return '<th>Deposito</th><th>Nama</th><th>Nominal</th><th>Bunga</th><th>Jangka Waktu</th><th>Jatuh Tempo</th><th>AO</th>';
-            case 'financial_highlight':
-                return '<th>Periode</th><th>CAR</th><th>ROA</th><th>ROE</th><th>NPF</th><th>BOPO</th><th>LDR</th>';
-            default:
-                return '<th>Data</th>';
-        }
-    }
 
-    function getTableRow(result, type) {
-        switch (type) {
-            case 'pembiayaan':
-                return `
-                    <td><strong>${result.nokontrak}</strong></td>
-                    <td>${result.nama}</td>
-                    <td>${result.nmao || '-'}</td>
-                    <td class="text-end">${formatNominal(result.plafon || 0)}</td>
-                    <td class="text-end"><strong>${formatNominal(result.sahirrp || 0)}</strong></td>
-                    <td class="text-center">${result.margin || 0}%</td>
-                    <td class="text-center">${result.jkwaktu || 0} bln</td>
-                    <td><span class="badge bg-${result.colbaru === '1' ? 'success' : 'warning'}">${result.colbaru === '1' ? 'Lancar' : 'Kurang Lancar'}</span></td>
-                `;
-            case 'tabungan':
-                return `
-                    <td><strong>${result.notab}</strong></td>
-                    <td>${result.fnama}</td>
-                    <td class="text-end"><strong>${formatNominal(result.sahirrp || 0)}</strong></td>
-                    <td class="text-end">${formatNominal(result.sahmin || 0)}</td>
-                    <td><span class="badge bg-${result.stsrec === 'A' ? 'success' : 'secondary'}">${result.stsrec === 'A' ? 'Aktif' : 'Tidak Aktif'}</span></td>
-                    <td class="text-center">${result.tglbuk || '-'}</td>
-                `;
-            case 'deposito':
-                return `
-                    <td><strong>${result.nodep}</strong></td>
-                    <td>${result.nama}</td>
-                    <td class="text-end"><strong>${formatNominal(result.nomrp || 0)}</strong></td>
-                    <td class="text-center">${result.bunga || 0}%</td>
-                    <td class="text-center">${result.jkwaktu || 0} bln</td>
-                    <td class="text-center">${result.tglexp || '-'}</td>
-                    <td>${result.kodeaoh || '-'}</td>
-                `;
-            case 'financial_highlight':
-                return `
-                    <td><strong>${result.period_year}-${String(result.period_month).padStart(2, '0')}</strong></td>
-                    <td class="text-center">${result.car || 0}%</td>
-                    <td class="text-center">${result.roa || 0}%</td>
-                    <td class="text-center">${result.roe || 0}%</td>
-                    <td class="text-center">${result.npf || 0}%</td>
-                    <td class="text-center">${result.bopo || 0}%</td>
-                    <td class="text-center">${result.ldr || 0}%</td>
-                `;
-            default:
-                return '<td>Unknown data</td>';
-        }
-    }
+
 
     // View result detail
     function viewResultDetail(type, id) {
@@ -7179,9 +7084,13 @@ function showKolektibilitasDetails(kategori, namaKategori) {
 
     // Show detail modal
     function showDetailModal(type, data) {
+        console.log('showDetailModal called with type:', type, 'data:', data);
+
         const typeTitle = getTypeTitle(type);
         const typeIcon = getTypeIcon(type);
         const typeColor = getTypeColor(type);
+
+        console.log('Type info:', { typeTitle, typeIcon, typeColor });
 
         let detailHtml = '';
 
@@ -7195,12 +7104,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
             case 'deposito':
                 detailHtml = generateDepositoDetailHtml(data);
                 break;
+            case 'linkage':
+                detailHtml = generateLinkageDetailHtml(data);
+                break;
             case 'financial_highlight':
                 detailHtml = generateFinancialHighlightDetailHtml(data);
                 break;
             default:
                 detailHtml = '<p>Data tidak tersedia</p>';
         }
+
+        console.log('Detail HTML generated, length:', detailHtml.length);
 
         const modalHtml = `
             <div class="modal fade" id="detailModal" tabindex="-1">
@@ -7227,20 +7141,32 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         // Remove existing modal if any
         const existingModal = document.getElementById('detailModal');
         if (existingModal) {
+            console.log('Removing existing modal');
             existingModal.remove();
         }
 
         // Add modal to body
+        console.log('Adding modal to body');
         document.body.insertAdjacentHTML('beforeend', modalHtml);
 
         // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
-        modal.show();
+        const modalElement = document.getElementById('detailModal');
+        console.log('Modal element found:', modalElement);
 
-        // Clean up modal when hidden
-        document.getElementById('detailModal').addEventListener('hidden.bs.modal', function() {
-            this.remove();
-        });
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            console.log('Bootstrap modal instance created:', modal);
+            modal.show();
+            console.log('Modal show() called');
+
+            // Clean up modal when hidden
+            modalElement.addEventListener('hidden.bs.modal', function() {
+                console.log('Modal hidden, removing from DOM');
+                this.remove();
+            });
+        } else {
+            console.error('Modal element not found after insertion!');
+        }
     }
 
     // Generate detail HTML for different types
@@ -7258,7 +7184,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                 <tr><td class="fw-bold">Nomor Kontrak:</td><td><strong class="text-primary">${data.nokontrak || '-'}</strong></td></tr>
                                 <tr><td class="fw-bold">Nama Nasabah:</td><td>${data.nama || '-'}</td></tr>
                                 <tr><td class="fw-bold">Alamat:</td><td>${data.alamat || '-'}</td></tr>
-                                <tr><td class="fw-bold">No. HP:</td><td>${data.nohp || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. HP:</td><td>${data.hp || '-'}</td></tr>
                                 <tr><td class="fw-bold">Account Officer:</td><td>${data.nmao || '-'}</td></tr>
                                 <tr><td class="fw-bold">Status:</td><td><span class="badge bg-${data.colbaru === '1' ? 'success' : 'warning'} fs-6">${data.colbaru === '1' ? 'Lancar' : 'Kurang Lancar'}</span></td></tr>
                             </table>
@@ -7274,12 +7200,13 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Plafon Awal:</td><td class="text-end"><strong>${formatNominal(data.plafon || 0)}</strong></td></tr>
-                                <tr><td class="fw-bold">Saldo Pokok:</td><td class="text-end"><strong class="text-success">${formatNominal(data.sahirrp || 0)}</strong></td></tr>
-                                <tr><td class="fw-bold">Margin/Khusus:</td><td class="text-end">${data.margin || 0}% p.a</td></tr>
-                                <tr><td class="fw-bold">Angsuran Pokok:</td><td class="text-end">${formatNominal(data.angsuranpokok || 0)}</td></tr>
-                                <tr><td class="fw-bold">Angsuran Margin:</td><td class="text-end">${formatNominal(data.angsuranmargin || 0)}</td></tr>
-                                <tr><td class="fw-bold">Total Angsuran:</td><td class="text-end"><strong>${formatNominal((data.angsuranpokok || 0) + (data.angsuranmargin || 0))}</strong></td></tr>
+                                <tr><td class="fw-bold">Plafon Awal:</td><td class="text-end"><strong>${formatNominal(data.mdlawal || 0)}</strong></td></tr>
+                                <tr><td class="fw-bold">Margin Awal:</td><td class="text-end">${formatNominal(data.mgnawal || 0)}</td></tr>
+                                <tr><td class="fw-bold">Outstanding Pokok:</td><td class="text-end"><strong class="text-success">${formatNominal(data.osmdlc || 0)}</strong></td></tr>
+                                <tr><td class="fw-bold">Outstanding Margin:</td><td class="text-end"><strong class="text-success">${formatNominal(data.osmgnc || 0)}</strong></td></tr>
+                                <tr><td class="fw-bold">Angsuran Pokok:</td><td class="text-end">${formatNominal(data.angsmdl || 0)}</td></tr>
+                                <tr><td class="fw-bold">Angsuran Margin:</td><td class="text-end">${formatNominal(data.angsmgn || 0)}</td></tr>
+                                <tr><td class="fw-bold">Total Outstanding:</td><td class="text-end"><strong>${formatNominal((data.osmdlc || 0) + (data.osmgnc || 0))}</strong></td></tr>
                             </table>
                         </div>
                     </div>
@@ -7293,11 +7220,11 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Jangka Waktu:</td><td>${data.jkwaktu || 0} bulan</td></tr>
-                                <tr><td class="fw-bold">Tanggal Akad:</td><td>${data.tglakad || '-'}</td></tr>
-                                <tr><td class="fw-bold">Tanggal Jatuh Tempo:</td><td>${data.tglexp || '-'}</td></tr>
-                                <tr><td class="fw-bold">Frekuensi Angsuran:</td><td>${data.freq || 'Bulanan'}</td></tr>
-                                <tr><td class="fw-bold">Sisa Angsuran:</td><td>${data.sisaangsuran || 0} kali</td></tr>
+                                <tr><td class="fw-bold">Jangka Waktu:</td><td>${data.jw || 0} bulan</td></tr>
+                                <tr><td class="fw-bold">Tanggal Efektif:</td><td>${data.tgleff ? new Date(data.tgleff).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Jatuh Tempo:</td><td>${data.tglexp ? new Date(data.tglexp).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Account Officer Kode:</td><td>${data.kdaoh || '-'}</td></tr>
+                                <tr><td class="fw-bold">Account Pokok:</td><td>${data.acpok || '-'}</td></tr>
                                 <tr><td class="fw-bold">Kolektibilitas:</td><td><span class="badge bg-${getKolektibilitasColor(data.colbaru)}">${getKolektibilitasText(data.colbaru)}</span></td></tr>
                             </table>
                         </div>
@@ -7312,12 +7239,10 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Sektor Ekonomi:</td><td>${data.sektor || '-'}</td></tr>
-                                <tr><td class="fw-bold">Jenis Penggunaan:</td><td>${data.jenispenggunaan || '-'}</td></tr>
-                                <tr><td class="fw-bold">Jenis Jaminan:</td><td>${data.jenisjaminan || '-'}</td></tr>
-                                <tr><td class="fw-bold">Nilai Jaminan:</td><td class="text-end">${formatNominal(data.nilaijaminan || 0)}</td></tr>
-                                <tr><td class="fw-bold">Tanggal Update:</td><td>${data.updated_at || '-'}</td></tr>
-                                <tr><td class="fw-bold">Kantor Cabang:</td><td>${data.kantorcabang || '-'}</td></tr>
+                                <tr><td class="fw-bold">Telp Rumah:</td><td>${data.telprmh || '-'}</td></tr>
+                                <tr><td class="fw-bold">Periode:</td><td>${data.period_year || '-'} - ${String(data.period_month || 0).padStart(2, '0')}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Dibuat:</td><td>${data.created_at ? new Date(data.created_at).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Update:</td><td>${data.updated_at ? new Date(data.updated_at).toLocaleDateString('id-ID') : '-'}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7361,11 +7286,11 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
                                 <tr><td class="fw-bold">Nomor Rekening:</td><td><strong class="text-success">${data.notab || '-'}</strong></td></tr>
+                                <tr><td class="fw-bold">No. CIF:</td><td>${data.nocif || '-'}</td></tr>
                                 <tr><td class="fw-bold">Nama Nasabah:</td><td>${data.fnama || '-'}</td></tr>
-                                <tr><td class="fw-bold">Alamat:</td><td>${data.alamat || '-'}</td></tr>
-                                <tr><td class="fw-bold">No. HP:</td><td>${data.nohp || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. HP:</td><td>${data.hp || '-'}</td></tr>
                                 <tr><td class="fw-bold">Status:</td><td><span class="badge bg-${data.stsrec === 'A' ? 'success' : 'secondary'} fs-6">${data.stsrec === 'A' ? 'Aktif' : 'Tidak Aktif'}</span></td></tr>
-                                <tr><td class="fw-bold">Tanggal Buka:</td><td>${data.tglbuk || '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Transaksi Akhir:</td><td>${data.tgltrnakh ? new Date(data.tgltrnakh).toLocaleDateString('id-ID') : '-'}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7380,30 +7305,30 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
                                 <tr><td class="fw-bold">Saldo Aktual:</td><td class="text-end"><strong class="text-info">${formatNominal(data.sahirrp || 0)}</strong></td></tr>
-                                <tr><td class="fw-bold">Saldo Minimum:</td><td class="text-end">${formatNominal(data.sahmin || 0)}</td></tr>
-                                <tr><td class="fw-bold">Saldo Blokir:</td><td class="text-end">${formatNominal(data.sablok || 0)}</td></tr>
-                                <tr><td class="fw-bold">Saldo Efektif:</td><td class="text-end"><strong>${formatNominal((data.sahirrp || 0) - (data.sablok || 0))}</strong></td></tr>
-                                <tr><td class="fw-bold">Bunga per Tahun:</td><td class="text-end">${data.bunga || 0}%</td></tr>
-                                <tr><td class="fw-bold">Biaya Administrasi:</td><td class="text-end">${formatNominal(data.admin || 0)}</td></tr>
+                                <tr><td class="fw-bold">Saldo Blokir:</td><td class="text-end">${formatNominal(data.saldoblok || 0)}</td></tr>
+                                <tr><td class="fw-bold">Tax:</td><td class="text-end">${formatNominal(data.tax || 0)}</td></tr>
+                                <tr><td class="fw-bold">Average Geom:</td><td class="text-end">${formatNominal(data.avgeom || 0)}</td></tr>
+                                <tr><td class="fw-bold">Kode Produk:</td><td>${data.kodeprd || '-'}</td></tr>
+                                <tr><td class="fw-bold">Nama QQ:</td><td>${data.namaqq || '-'}</td></tr>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Informasi Transaksi -->
+                <!-- Informasi Status -->
                 <div class="col-md-6">
                     <div class="card border-primary">
                         <div class="card-header bg-primary text-white">
-                            <h6 class="mb-0"><i class="ti ti-exchange me-2"></i>Aktivitas Transaksi</h6>
+                            <h6 class="mb-0"><i class="ti ti-shield-check me-2"></i>Status & Informasi</h6>
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Jumlah Debit:</td><td class="text-end">${formatNominal(data.jumlahdebit || 0)}</td></tr>
-                                <tr><td class="fw-bold">Jumlah Kredit:</td><td class="text-end">${formatNominal(data.jumlahkredit || 0)}</td></tr>
-                                <tr><td class="fw-bold">Frekuensi Debit:</td><td class="text-end">${data.freqdebit || 0} kali</td></tr>
-                                <tr><td class="fw-bold">Frekuensi Kredit:</td><td class="text-end">${data.freqkredit || 0} kali</td></tr>
-                                <tr><td class="fw-bold">Tanggal Transaksi Terakhir:</td><td>${data.tgltranslast || '-'}</td></tr>
-                                <tr><td class="fw-bold">Kantor Cabang:</td><td>${data.kantorcabang || '-'}</td></tr>
+                                <tr><td class="fw-bold">Status Restruktur:</td><td><span class="badge bg-${data.stsrest === '0' ? 'success' : 'warning'}">${data.stsrest === '0' ? 'Normal' : 'Restruktur'}</span></td></tr>
+                                <tr><td class="fw-bold">Status PEP:</td><td><span class="badge bg-${data.stspep === 'TENGAH' ? 'warning' : 'secondary'}">${data.stspep || 'N/A'}</span></td></tr>
+                                <tr><td class="fw-bold">Kode Risk:</td><td>${data.kdrisk || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. ID:</td><td>${data.noid || '-'}</td></tr>
+                                <tr><td class="fw-bold">Nama Ibu:</td><td>${data.nmibu || '-'}</td></tr>
+                                <tr><td class="fw-bold">Keterangan Sandi:</td><td>${data.ketsandi || '-'}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7413,16 +7338,14 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 <div class="col-md-6">
                     <div class="card border-warning">
                         <div class="card-header bg-warning text-white">
-                            <h6 class="mb-0"><i class="ti ti-settings me-2"></i>Informasi Tambahan</h6>
+                            <h6 class="mb-0"><i class="ti ti-info-circle me-2"></i>Informasi Tambahan</h6>
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Jenis Tabungan:</td><td>${data.jenistabungan || '-'}</td></tr>
-                                <tr><td class="fw-bold">Mata Uang:</td><td>${data.matauang || 'IDR'}</td></tr>
-                                <tr><td class="fw-bold">Biaya Tutup Rekening:</td><td class="text-end">${formatNominal(data.biayatutup || 0)}</td></tr>
-                                <tr><td class="fw-bold">Setoran Minimum:</td><td class="text-end">${formatNominal(data.setoranmin || 0)}</td></tr>
-                                <tr><td class="fw-bold">Tanggal Update:</td><td>${data.updated_at || '-'}</td></tr>
-                                <tr><td class="fw-bold">User Input:</td><td>${data.userinput || '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Lahir:</td><td>${data.tgllhr ? new Date(data.tgllhr).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Periode:</td><td>${data.period_year || '-'} - ${String(data.period_month || 0).padStart(2, '0')}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Dibuat:</td><td>${data.created_at ? new Date(data.created_at).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Update:</td><td>${data.updated_at ? new Date(data.updated_at).toLocaleDateString('id-ID') : '-'}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7443,9 +7366,10 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
                                 <tr><td class="fw-bold">Nomor Deposito:</td><td><strong class="text-info">${data.nodep || '-'}</strong></td></tr>
+                                <tr><td class="fw-bold">No. CIF:</td><td>${data.nocif || '-'}</td></tr>
                                 <tr><td class="fw-bold">Nama Nasabah:</td><td>${data.nama || '-'}</td></tr>
                                 <tr><td class="fw-bold">Alamat:</td><td>${data.alamat || '-'}</td></tr>
-                                <tr><td class="fw-bold">No. HP:</td><td>${data.nohp || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. HP:</td><td>${data.hp || '-'}</td></tr>
                                 <tr><td class="fw-bold">Account Officer:</td><td>${data.kodeaoh || '-'}</td></tr>
                                 <tr><td class="fw-bold">Status:</td><td><span class="badge bg-success fs-6">Aktif</span></td></tr>
                             </table>
@@ -7462,10 +7386,11 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
                                 <tr><td class="fw-bold">Nominal Deposito:</td><td class="text-end"><strong class="text-success">${formatNominal(data.nomrp || 0)}</strong></td></tr>
-                                <tr><td class="fw-bold">Bunga per Tahun:</td><td class="text-end">${data.bunga || 0}% p.a</td></tr>
-                                <tr><td class="fw-bold">Bunga per Bulan:</td><td class="text-end">${((data.bunga || 0) / 12).toFixed(2)}%</td></tr>
-                                <tr><td class="fw-bold">Estimasi Bunga:</td><td class="text-end"><strong>${formatNominal(((data.nomrp || 0) * (data.bunga || 0) * (data.jkwaktu || 0)) / (12 * 100))}</strong></td></tr>
-                                <tr><td class="fw-bold">Total Pencairan:</td><td class="text-end"><strong>${formatNominal((data.nomrp || 0) + ((data.nomrp || 0) * (data.bunga || 0) * (data.jkwaktu || 0)) / (12 * 100))}</strong></td></tr>
+                                <tr><td class="fw-bold">Suku Bunga:</td><td class="text-end">${data.equivrate || 0}% p.a</td></tr>
+                                <tr><td class="fw-bold">Komitmen Rate:</td><td class="text-end">${data.komitrate || 0}%</td></tr>
+                                <tr><td class="fw-bold">Nisbah:</td><td class="text-end">${data.nisbah || 0}%</td></tr>
+                                <tr><td class="fw-bold">Tax:</td><td class="text-end">${formatNominal(data.tax || 0)}</td></tr>
+                                <tr><td class="fw-bold">Bunga Tanggal:</td><td class="text-end">${formatNominal(data.bnghtg || 0)}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7479,12 +7404,12 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Jangka Waktu:</td><td>${data.jkwaktu || 0} bulan</td></tr>
-                                <tr><td class="fw-bold">Tanggal Mulai:</td><td>${data.tglmulai || '-'}</td></tr>
-                                <tr><td class="fw-bold">Tanggal Jatuh Tempo:</td><td>${data.tglexp || '-'}</td></tr>
-                                <tr><td class="fw-bold">Frekuensi Bunga:</td><td>${data.freqbunga || 'Bulanan'}</td></tr>
-                                <tr><td class="fw-bold">Cara Pembayaran Bunga:</td><td>${data.carabayar || 'Transfer'}</td></tr>
-                                <tr><td class="fw-bold">Auto Roll Over:</td><td><span class="badge bg-${data.autorollover === 'Y' ? 'success' : 'secondary'}">${data.autorollover === 'Y' ? 'Ya' : 'Tidak'}</span></td></tr>
+                                <tr><td class="fw-bold">Jangka Waktu:</td><td>${data.jkwaktu || 0} ${data.jnsjkwaktu || 'bulan'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Buka:</td><td>${data.tglbuka ? new Date(data.tglbuka).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Efektif:</td><td>${data.tgleff ? new Date(data.tgleff).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Jatuh Tempo:</td><td>${data.tgljtempo ? new Date(data.tgljtempo).toLocaleDateString('id-ID') : '-'}</td></tr>
+                                <tr><td class="fw-bold">ARO (Auto Roll Over):</td><td><span class="badge bg-${data.aro === 'Y' ? 'success' : 'secondary'}">${data.aro === 'Y' ? 'Ya' : 'Tidak'}</span></td></tr>
+                                <tr><td class="fw-bold">Status Record:</td><td><span class="badge bg-${data.stsrec === 'A' ? 'success' : 'warning'}">${data.stsrec === 'A' ? 'Aktif' : 'Tidak Aktif'}</span></td></tr>
                             </table>
                         </div>
                     </div>
@@ -7498,12 +7423,67 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
-                                <tr><td class="fw-bold">Jenis Deposito:</td><td>${data.jenisdep || '-'}</td></tr>
-                                <tr><td class="fw-bold">Mata Uang:</td><td>${data.matauang || 'IDR'}</td></tr>
-                                <tr><td class="fw-bold">Suku Bunga Khusus:</td><td>${data.sukubungakhusus || 'Tidak'}</td></tr>
-                                <tr><td class="fw-bold">Biaya Penutupan:</td><td class="text-end">${formatNominal(data.biayapenutupan || 0)}</td></tr>
-                                <tr><td class="fw-bold">Kantor Cabang:</td><td>${data.kantorcabang || '-'}</td></tr>
-                                <tr><td class="fw-bold">Tanggal Update:</td><td>${data.updated_at || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kode Produk:</td><td>${data.kdprd || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. Bilyet:</td><td>${data.nobilyet || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kota:</td><td>${data.kota || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kecamatan:</td><td>${data.kecamatan || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kelurahan:</td><td>${data.kelurahan || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kode Pos:</td><td>${data.kdpos || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. ID:</td><td>${data.noid || '-'}</td></tr>
+                                <tr><td class="fw-bold">Telp Rumah:</td><td>${data.telprmh || '-'}</td></tr>
+                                <tr><td class="fw-bold">Nama Ibu:</td><td>${data.nmibu || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. Account Bunga:</td><td>${data.noacbng || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kode Wilayah:</td><td>${data.kdwil || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kode AOP:</td><td>${data.kodeaop || '-'}</td></tr>
+                                <tr><td class="fw-bold">Gol Cust BI:</td><td>${data.golcustbi || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kode Risk:</td><td>${data.kdrisk || '-'}</td></tr>
+                                <tr><td class="fw-bold">Status Kait:</td><td><span class="badge bg-${data.stskait === 'Y' ? 'success' : 'secondary'}">${data.stskait === 'Y' ? 'Kait' : 'Tidak Kait'}</span></td></tr>
+                                <tr><td class="fw-bold">Status Transaksi:</td><td><span class="badge bg-${data.ststrn === 'Y' ? 'success' : 'secondary'}">${data.ststrn === 'Y' ? 'Aktif' : 'Tidak Aktif'}</span></td></tr>
+                                <tr><td class="fw-bold">Status PEP:</td><td><span class="badge bg-${data.stspep === 'Y' ? 'warning' : 'secondary'}">${data.stspep === 'Y' ? 'PEP' : 'Bukan PEP'}</span></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function generateLinkageDetailHtml(data) {
+        return `
+            <div class="row g-3">
+                <!-- Informasi Linkage -->
+                <div class="col-md-6">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="ti ti-link me-2"></i>Informasi Linkage</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless">
+                                <tr><td class="fw-bold">Nomor Kontrak:</td><td><strong class="text-info">${data.nokontrak || '-'}</strong></td></tr>
+                                <tr><td class="fw-bold">No. CIF:</td><td>${data.nocif || '-'}</td></tr>
+                                <tr><td class="fw-bold">Nama Nasabah:</td><td>${data.nama || '-'}</td></tr>
+                                <tr><td class="fw-bold">Kelompok:</td><td>${data.kelompok || '-'}</td></tr>
+                                <tr><td class="fw-bold">Jenis Akad:</td><td>${data.jnsakad || '-'}</td></tr>
+                                <tr><td class="fw-bold">Status:</td><td><span class="badge bg-success fs-6">Aktif</span></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informasi Finansial -->
+                <div class="col-md-6">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="ti ti-trending-up me-2"></i>Informasi Finansial</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless">
+                                <tr><td class="fw-bold">Plafon:</td><td class="text-end"><strong>${formatNominal(data.plafon || 0)}</strong></td></tr>
+                                <tr><td class="fw-bold">Outstanding (OS):</td><td class="text-end"><strong>${formatNominal(data.os || 0)}</strong></td></tr>
+                                <tr><td class="fw-bold">Persentase Nisabah:</td><td class="text-end"><strong>${data.prsnisbah || 0}%</strong></td></tr>
+                                <tr><td class="fw-bold">Tanggal Efektif:</td><td>${data.tgleff || '-'}</td></tr>
+                                <tr><td class="fw-bold">Tanggal Jatuh Tempo:</td><td>${data.tgljt || '-'}</td></tr>
+                                <tr><td class="fw-bold">Periode:</td><td>${data.period_year || '-'} - ${String(data.period_month || 0).padStart(2, '0')}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7681,6 +7661,12 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         // TODO: Implement export functionality
     }
 
+    // Export unified search results
+    function exportUnifiedSearchResults(query) {
+        showToast('Fitur ekspor sedang dalam pengembangan', 'info');
+        // TODO: Implement unified export functionality
+    }
+
     // Update search stats
     function updateSearchStats(query, resultCount, searchTime) {
         const statsElement = document.getElementById('searchStats');
@@ -7702,183 +7688,68 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         searchInput.focus();
     }
 
-    // Show detail modal
-    function showDetailModal(type, data) {
-        const typeTitle = getTypeTitle(type);
-        const typeIcon = getTypeIcon(type);
-        const typeColor = getTypeColor(type);
+    // Helper functions for modal
+    function getTypeTitle(type) {
+        const titles = {
+            'pembiayaan': 'Pembiayaan',
+            'tabungan': 'Tabungan',
+            'deposito': 'Deposito',
+            'linkage': 'Linkage',
+            'financial_highlight': 'Financial Highlight'
+        };
+        return titles[type] || type;
+    }
 
-        let detailHtml = '';
+    function getTypeIcon(type) {
+        const icons = {
+            'pembiayaan': 'ti ti-building-bank',
+            'tabungan': 'ti ti-piggy-bank',
+            'deposito': 'ti ti-clock-dollar',
+            'linkage': 'ti ti-link',
+            'financial_highlight': 'ti ti-chart-line'
+        };
+        return icons[type] || 'ti ti-file';
+    }
 
-        switch (type) {
-            case 'pembiayaan':
-                detailHtml = generatePembiayaanDetailHtml(data);
-                break;
-            case 'tabungan':
-                detailHtml = generateTabunganDetailHtml(data);
-                break;
-            case 'deposito':
-                detailHtml = generateDepositoDetailHtml(data);
-                break;
-            case 'financial_highlight':
-                detailHtml = generateFinancialHighlightDetailHtml(data);
-                break;
-            default:
-                detailHtml = '<p>Data tidak tersedia</p>';
+    function getTypeColor(type) {
+        const colors = {
+            'pembiayaan': 'warning',
+            'tabungan': 'primary',
+            'deposito': 'success',
+            'linkage': 'info',
+            'financial_highlight': 'secondary'
+        };
+        return colors[type] || 'secondary';
+    }
+
+    // Show search result detail
+    async function showSearchResultDetail(id, type) {
+        console.log('Fetching detail for:', type, id);
+
+        try {
+            const response = await fetch(`/api/search/${type}/${id}`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                credentials: 'same-origin'
+            });
+
+            console.log('Response status:', response.status);
+            const data = await response.json();
+            console.log('Response data:', data);
+
+            if (response.ok && data.success) {
+                showDetailModal(type, data.data);
+            } else {
+                showToast(data.message || 'Gagal memuat detail data', 'error');
+            }
+        } catch (error) {
+            console.error('Detail fetch error:', error);
+            showToast('Gagal terhubung ke server', 'error');
         }
-
-        const modalHtml = `
-            <div class="modal fade" id="detailModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header bg-${typeColor} text-white">
-                            <h5 class="modal-title">
-                                <i class="${typeIcon} me-2"></i>
-                                Detail ${typeTitle}
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            ${detailHtml}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Remove existing modal if any
-        const existingModal = document.getElementById('detailModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // Add modal to body
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
-        modal.show();
-    }
-
-    // Generate detail HTML for pembiayaan
-    function generatePembiayaanDetailHtml(data) {
-        return `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Kontrak</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>ID:</strong></td><td>${data.id}</td></tr>
-                        <tr><td><strong>No. Kontrak:</strong></td><td>${data.nokontrak || '-'}</td></tr>
-                        <tr><td><strong>Nama:</strong></td><td>${data.nama || '-'}</td></tr>
-                        <tr><td><strong>Nama AO:</strong></td><td>${data.nmao || '-'}</td></tr>
-                        <tr><td><strong>Alamat:</strong></td><td>${data.alamat || '-'}</td></tr>
-                    </table>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Finansial</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>Sisa Hutang:</strong></td><td>Rp ${formatNumber(data.sahirrp || 0)}</td></tr>
-                        <tr><td><strong>Collateral Baru:</strong></td><td>${data.colbaru || '-'}</td></tr>
-                        <tr><td><strong>Status Rekam:</strong></td><td>${data.stsrec || '-'}</td></tr>
-                        <tr><td><strong>Periode:</strong></td><td>${data.period_year || '-'} - ${data.period_month || '-'}</td></tr>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-
-    // Generate detail HTML for tabungan
-    function generateTabunganDetailHtml(data) {
-        return `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Rekening</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>ID:</strong></td><td>${data.id}</td></tr>
-                        <tr><td><strong>No. Tabungan:</strong></td><td>${data.notab || '-'}</td></tr>
-                        <tr><td><strong>No. CIF:</strong></td><td>${data.nocif || '-'}</td></tr>
-                        <tr><td><strong>Nama:</strong></td><td>${data.fnama || '-'}</td></tr>
-                        <tr><td><strong>Nama Queue:</strong></td><td>${data.namaqq || '-'}</td></tr>
-                    </table>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Saldo</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>Saldo:</strong></td><td>Rp ${formatNumber(data.sahirrp || 0)}</td></tr>
-                        <tr><td><strong>Status Rekam:</strong></td><td>${data.stsrec || '-'}</td></tr>
-                        <tr><td><strong>Periode:</strong></td><td>${data.period_year || '-'} - ${data.period_month || '-'}</td></tr>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-
-    // Generate detail HTML for deposito
-    function generateDepositoDetailHtml(data) {
-        return `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Deposito</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>ID:</strong></td><td>${data.id}</td></tr>
-                        <tr><td><strong>No. Deposito:</strong></td><td>${data.nodep || '-'}</td></tr>
-                        <tr><td><strong>No. CIF:</strong></td><td>${data.nocif || '-'}</td></tr>
-                        <tr><td><strong>Nama:</strong></td><td>${data.nama || '-'}</td></tr>
-                        <tr><td><strong>Nominal:</strong></td><td>Rp ${formatNumber(data.nomrp || 0)}</td></tr>
-                    </table>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Informasi Status</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>Status Rekam:</strong></td><td>${data.stsrec || '-'}</td></tr>
-                        <tr><td><strong>Kode AO Head:</strong></td><td>${data.kodeaoh || '-'}</td></tr>
-                        <tr><td><strong>Periode:</strong></td><td>${data.period_year || '-'} - ${data.period_month || '-'}</td></tr>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-
-    // Generate detail HTML for financial highlight
-    function generateFinancialHighlightDetailHtml(data) {
-        return `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Rasio Keuangan</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>CAR:</strong></td><td>${data.car || '-'}%</td></tr>
-                        <tr><td><strong>ROA:</strong></td><td>${data.roa || '-'}%</td></tr>
-                        <tr><td><strong>ROE:</strong></td><td>${data.roe || '-'}%</td></tr>
-                        <tr><td><strong>NPF:</strong></td><td>${data.npf || '-'}%</td></tr>
-                        <tr><td><strong>Cash Ratio:</strong></td><td>${data.cash_ratio || '-'}%</td></tr>
-                    </table>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="text-primary mb-3">Data Keuangan</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>Aset:</strong></td><td>Rp ${formatNumber(data.aset || 0)}</td></tr>
-                        <tr><td><strong>Pembiayaan:</strong></td><td>Rp ${formatNumber(data.pembiayaan || 0)}</td></tr>
-                        <tr><td><strong>Laba Rugi:</strong></td><td>Rp ${formatNumber(data.laba_rugi || 0)}</td></tr>
-                        <tr><td><strong>DPK:</strong></td><td>Rp ${formatNumber(data.dpk || 0)}</td></tr>
-                        <tr><td><strong>FDR:</strong></td><td>${data.fdr || '-'}%</td></tr>
-                    </table>
-                </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-12">
-                    <h6 class="text-primary mb-3">Informasi Periode</h6>
-                    <table class="table table-sm">
-                        <tr><td><strong>Periode:</strong></td><td>${data.period_year || '-'} - ${data.period_month || '-'}</td></tr>
-                        <tr><td><strong>Biaya:</strong></td><td>Rp ${formatNumber(data.biaya || 0)}</td></tr>
-                        <tr><td><strong>Pendapatan:</strong></td><td>Rp ${formatNumber(data.pendapatan || 0)}</td></tr>
-                        <tr><td><strong>BOPO:</strong></td><td>${data.bopo || '-'}%</td></tr>
-                    </table>
-                </div>
-            </div>
-        `;
     }
 
     // Toast notification function
@@ -7927,6 +7798,5 @@ function showKolektibilitasDetails(kategori, namaKategori) {
     </script>
 
 <?php $__env->stopSection(); ?>
-
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /Users/ajspryn/Project/finboard/resources/views/dashboard.blade.php ENDPATH**/ ?>

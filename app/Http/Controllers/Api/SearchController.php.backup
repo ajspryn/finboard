@@ -374,241 +374,179 @@ class SearchController extends Controller
     /**
      * Get pembiayaan detail by ID
      */
-    public function getPembiayaanDetail($id)
+    public function getPembiayaanDetail($id): JsonResponse
     {
         $pembiayaan = Pembiayaan::find($id);
 
         if (!$pembiayaan) {
-            return [
+            return response()->json([
                 'success' => false,
                 'message' => 'Data pembiayaan tidak ditemukan'
-            ];
+            ], 404);
         }
 
-        return [
+        return response()->json([
             'success' => true,
             'data' => $pembiayaan
-        ];
+        ]);
     }
 
     /**
      * Get tabungan detail by ID
      */
-    public function getTabunganDetail($id)
+    public function getTabunganDetail($id): JsonResponse
     {
         $tabungan = Tabungan::find($id);
 
         if (!$tabungan) {
-            return [
+            return response()->json([
                 'success' => false,
                 'message' => 'Data tabungan tidak ditemukan'
-            ];
+            ], 404);
         }
 
-        return [
+        return response()->json([
             'success' => true,
             'data' => $tabungan
-        ];
+        ]);
     }
 
     /**
      * Get deposito detail by ID
      */
-    public function getDepositoDetail($id)
+    public function getDepositoDetail($id): JsonResponse
     {
         $deposito = Deposito::find($id);
 
         if (!$deposito) {
-            return [
+            return response()->json([
                 'success' => false,
                 'message' => 'Data deposito tidak ditemukan'
-            ];
+            ], 404);
         }
 
-        return [
+        return response()->json([
             'success' => true,
             'data' => $deposito
-        ];
-    }
-
-    /**
-     * Get linkage detail by ID
-     */
-    public function getLinkageDetail($id)
-    {
-        $linkage = Linkage::find($id);
-
-        if (!$linkage) {
-            return [
-                'success' => false,
-                'message' => 'Data linkage tidak ditemukan'
-            ];
-        }
-
-        return [
-            'success' => true,
-            'data' => $linkage
-        ];
+        ]);
     }
 
     /**
      * Get financial highlight detail by ID
      */
-    public function getFinancialHighlightDetail($id)
+    public function getFinancialHighlightDetail($id): JsonResponse
     {
         $highlight = FinancialHighlight::find($id);
 
         if (!$highlight) {
-            return [
+            return response()->json([
                 'success' => false,
                 'message' => 'Data financial highlight tidak ditemukan'
-            ];
+            ], 404);
         }
 
-        return [
+        return response()->json([
             'success' => true,
             'data' => $highlight
-        ];
+        ]);
     }
 
     /**
      * Unified search across all data types
      */
-    public function unifiedSearch(Request $request)
+    public function unifiedSearch(Request $request): JsonResponse
     {
-        // Simple validation
+        $request->validate([
+            'q' => 'required|string|min:1|max:100',
+            'limit' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $query = $request->get('q');
         $limit = $request->get('limit', 50);
 
-        if (!$query || strlen($query) < 1 || strlen($query) > 100) {
-            return [
-                'success' => false,
-                'error' => 'Query harus diisi dan maksimal 100 karakter'
-            ];
-        }
+        // Search in all models with relevance scoring
+        $tabunganResults = $this->searchInModel(Tabungan::class, $query, 'tabungan', $limit);
+        $depositoResults = $this->searchInModel(Deposito::class, $query, 'deposito', $limit);
+        $pembiayaanResults = $this->searchInModel(Pembiayaan::class, $query, 'pembiayaan', $limit);
 
-        if ($limit < 1 || $limit > 100) {
-            $limit = 50;
-        }
+        // Combine all results
+        $allResults = collect();
+        $allResults = $allResults->merge($tabunganResults);
+        $allResults = $allResults->merge($depositoResults);
+        $allResults = $allResults->merge($pembiayaanResults);
 
-        $allResults = [];
+        // Sort by relevance score (descending)
+        $sortedResults = $allResults->sortByDesc('relevance_score')->values();
 
-        // Search pembiayaan
-        try {
-            $pembiayaanResults = Pembiayaan::search($query, ['size' => $limit]);
-            foreach ($pembiayaanResults['hits'] as $item) {
-                $allResults[] = [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'nokontrak' => $item->nokontrak,
-                    'nocif' => $item->nokontrak, // For frontend compatibility
-                    'type' => 'pembiayaan',
-                    'badge' => 'Pembiayaan',
-                    'badge_class' => 'badge-warning',
-                    'relevance_score' => $item->_score ?? 0,
-                    'url' => '/pembiayaan/' . $item->id,
-                    // Additional pembiayaan fields
-                    'plafond' => $item->plafond ?? 0,
-                    'saldo' => $item->saldo ?? 0,
-                    'period_year' => $item->period_year ?? 0,
-                    'period_month' => $item->period_month ?? 0,
-                ];
-            }
-        } catch (\Exception $e) {
-            // Skip if search fails
-        }
+        // Limit total results
+        $limitedResults = $sortedResults->take($limit);
 
-        // Search tabungan
-        try {
-            $tabunganResults = Tabungan::search($query, ['size' => $limit]);
-            foreach ($tabunganResults['hits'] as $item) {
-                $allResults[] = [
-                    'id' => $item->id,
-                    'fnama' => $item->fnama,
-                    'nama' => $item->fnama, // For consistency
-                    'notab' => $item->notab,
-                    'nocif' => $item->notab, // For frontend compatibility
-                    'type' => 'tabungan',
-                    'badge' => 'Tabungan',
-                    'badge_class' => 'badge-primary',
-                    'relevance_score' => $item->_score ?? 0,
-                    'url' => '/tabungan/' . $item->id,
-                    // Additional tabungan fields
-                    'sahirrp' => $item->sahirrp ?? 0,
-                    'period_year' => $item->period_year ?? 0,
-                    'period_month' => $item->period_month ?? 0,
-                ];
-            }
-        } catch (\Exception $e) {
-            // Skip if search fails
-        }
-
-        // Search deposito
-        try {
-            $depositoResults = Deposito::search($query, ['size' => $limit]);
-            foreach ($depositoResults['hits'] as $item) {
-                $allResults[] = [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'nodep' => $item->nodep,
-                    'nocif' => $item->nodep, // For frontend compatibility
-                    'type' => 'deposito',
-                    'badge' => 'Deposito',
-                    'badge_class' => 'badge-success',
-                    'relevance_score' => $item->_score ?? 0,
-                    'url' => '/deposito/' . $item->id,
-                    // Additional deposito fields
-                    'nomrp' => $item->nomrp ?? 0,
-                    'stsrec' => $item->stsrec ?? 'N/A',
-                    'period_year' => $item->period_year ?? 0,
-                    'period_month' => $item->period_month ?? 0,
-                ];
-            }
-        } catch (\Exception $e) {
-            // Skip if search fails
-        }
-
-        // Search linkage
-        try {
-            $linkageResults = Linkage::search($query, ['size' => $limit]);
-            foreach ($linkageResults['hits'] as $item) {
-                $allResults[] = [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'nokontrak' => $item->nokontrak,
-                    'nocif' => $item->nocif, // For frontend compatibility
-                    'type' => 'linkage',
-                    'badge' => 'Linkage',
-                    'badge_class' => 'badge-info',
-                    'relevance_score' => $item->_score ?? 0,
-                    'url' => '/linkage/' . $item->id,
-                    // Additional linkage fields
-                    'plafon' => $item->plafon ?? 0,
-                    'os' => $item->os ?? 0,
-                    'kelompok' => $item->kelompok ?? '',
-                    'jnsakad' => $item->jnsakad ?? '',
-                    'period_year' => $item->period_year ?? 0,
-                    'period_month' => $item->period_month ?? 0,
-                ];
-            }
-        } catch (\Exception $e) {
-            // Skip if search fails
-        }
-
-        // Sort by score (relevance) descending
-        usort($allResults, function ($a, $b) {
-            return $b['relevance_score'] <=> $a['relevance_score'];
-        });
-
-        // Limit results
-        $limitedResults = array_slice($allResults, 0, $limit);
-
-        return [
+        return response()->json([
             'success' => true,
             'query' => $query,
-            'total' => count($allResults),
+            'total' => $limitedResults->count(),
             'results' => $limitedResults,
-            'message' => 'Pencarian berhasil'
-        ];
+        ]);
     }
-}
+
+    /**
+     * Search in a specific model with relevance scoring
+     */
+    private function searchInModel($modelClass, $query, $type, $limit)
+    {
+        $results = $modelClass::search($query, function ($engine, $query, $options) use ($limit) {
+            $options['body'] = [
+                'query' => [
+                    'multi_match' => [
+                        'query' => $query,
+                        'fields' => $this->getSearchFields($type),
+                        'fuzziness' => 'AUTO',
+                        'minimum_should_match' => '70%'
+                    ]
+                ],
+                'sort' => [
+                    '_score' => ['order' => 'desc']
+                ],
+                'size' => $limit
+            ];
+
+            return $engine->search($query, $options);
+        })->get();
+
+        // Remove duplicates and add metadata
+        $uniqueResults = $this->removeContentDuplicates($results, $this->getContentField($type));
+
+        return $uniqueResults->map(function ($result) use ($type) {
+            $result->type = $type;
+            $result->relevance_score = $result->_score ?? 0;
+            return $result;
+        })->toArray();
+    }
+
+    /**
+     * Get search fields for each model type
+     */
+    private function getSearchFields($type)
+    {
+        $fieldMaps = [
+            'tabungan' => ['fnama^3', 'namaqq^2', 'nocif', 'notab', 'noid', 'hp'],
+            'deposito' => ['nama^3', 'nocif', 'nodep', 'nobilyet', 'noid', 'alamat'],
+            'pembiayaan' => ['nama^3', 'nocif', 'nokontrak', 'noid', 'alamat'],
+        ];
+
+        return $fieldMaps[$type] ?? ['*'];
+    }
+
+    /**
+     * Get content field for duplicate removal
+     */
+    private function getContentField($type)
+    {
+        $contentFields = [
+            'tabungan' => 'notab',
+            'deposito' => 'nodep',
+            'pembiayaan' => 'nokontrak',
+        ];
+
+        return $contentFields[$type] ?? 'id';
+    }
