@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="/template/assets/vendor/libs/node-waves/node-waves.css" />
     <link rel="stylesheet" href="/template/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css" />
     <link rel="stylesheet" href="/template/assets/vendor/libs/typeahead-js/typeahead.css" />
+    <link rel="stylesheet" href="/template/assets/vendor/libs/pickr/pickr-themes.css" />
     <link rel="stylesheet" href="/template/assets/vendor/libs/apex-charts/apex-charts.css" />
 
     <!-- Page CSS -->
@@ -40,6 +41,7 @@
     @yield('styles')
 
     <!-- Helpers -->
+    <script src="/template/assets/vendor/libs/pickr/pickr.js"></script>
     <script src="/template/assets/vendor/js/helpers.js"></script>
     <script src="/template/assets/vendor/js/template-customizer.js"></script>
     <script src="/template/assets/js/config.js"></script>

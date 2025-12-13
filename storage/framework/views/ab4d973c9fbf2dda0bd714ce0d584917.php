@@ -2615,16 +2615,17 @@ function formatNominal(amount) {
 
     // Format nominal function for JavaScript
     window.formatNominal = function(amount) {
-        if (amount >= 1000000000) {
-            return 'Rp ' + (amount / 1000000000).toFixed(2) + ' M'; // Miliar
-        } else if (amount >= 1000000) {
-            return 'Rp ' + (amount / 1000000).toFixed(2) + ' Jt'; // Juta
-        } else if (amount >= 100000) {
-            return 'Rp ' + (amount / 1000).toFixed(0) + ' Rb'; // Ratusan Ribu
-        } else if (amount >= 1000) {
-            return 'Rp ' + (amount / 1000).toFixed(1) + ' Rb'; // Ribuan
+        let numAmount = parseFloat(amount) || 0;
+        if (numAmount >= 1000000000) {
+            return 'Rp ' + (numAmount / 1000000000).toFixed(2) + ' M'; // Miliar
+        } else if (numAmount >= 1000000) {
+            return 'Rp ' + (numAmount / 1000000).toFixed(2) + ' Jt'; // Juta
+        } else if (numAmount >= 100000) {
+            return 'Rp ' + (numAmount / 1000).toFixed(0) + ' Rb'; // Ratusan Ribu
+        } else if (numAmount >= 1000) {
+            return 'Rp ' + (numAmount / 1000).toFixed(1) + ' Rb'; // Ribuan
         } else {
-            return 'Rp ' + amount.toFixed(0); // Di bawah ribu
+            return 'Rp ' + numAmount.toFixed(0); // Di bawah ribu
         }
     };
 
@@ -4140,7 +4141,7 @@ function initializeMap() {
                 }
             }, 3000);
         }
-    }, (maxMarkers * 100) + 2000);
+    }, (totalMarkers * 100) + 2000);
 }
 
 // Function untuk menampilkan detail status nasabah
@@ -6928,16 +6929,16 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                 <div class="flex-grow-1">
                                     <h6 class="mb-1">
                                         ${result.nama || result.fnama || 'N/A'}
-                                        <small class="badge ${badgeClass} ms-2">
-                                            <i class="ti ${badgeIcon} me-1"></i>${badgeText}
-                                        </small>
                                         <small class="text-muted">(${result.nocif || result.nodep || 'N/A'})</small>
+                                        <span class="badge ${badgeClass} ms-2">
+                                            <i class="ti ${badgeIcon} me-1"></i>${badgeText}
+                                        </span>
                                     </h6>
                                     ${details}
                                 </div>
                                 <div class="text-end">
                                     <small class="text-muted">Relevansi</small><br>
-                                    <span class="badge bg-light text-dark">
+                                    <span class="badge bg-light text-dark" mb-2>
                                         ${relevanceScore}
                                     </span>
                                 </div>
@@ -7206,7 +7207,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                 <tr><td class="fw-bold">Outstanding Margin:</td><td class="text-end"><strong class="text-success">${formatNominal(data.osmgnc || 0)}</strong></td></tr>
                                 <tr><td class="fw-bold">Angsuran Pokok:</td><td class="text-end">${formatNominal(data.angsmdl || 0)}</td></tr>
                                 <tr><td class="fw-bold">Angsuran Margin:</td><td class="text-end">${formatNominal(data.angsmgn || 0)}</td></tr>
-                                <tr><td class="fw-bold">Total Outstanding:</td><td class="text-end"><strong>${formatNominal((data.osmdlc || 0) + (data.osmgnc || 0))}</strong></td></tr>
+                                <tr><td class="fw-bold">Total Outstanding:</td><td class="text-end"><strong>${formatNominal((parseFloat(data.osmdlc) || 0) + (parseFloat(data.osmgnc) || 0))}</strong></td></tr>
                             </table>
                         </div>
                     </div>
