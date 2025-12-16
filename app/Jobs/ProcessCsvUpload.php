@@ -411,6 +411,10 @@ class ProcessCsvUpload implements ShouldQueue
     {
         if ($jenis === 'PEMBIAYAAN') {
             // Use the existing validateAndConvertData method for pembiayaan
+            if (count($header) !== count($data)) {
+                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
+                return null;
+            }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
                 $record = $this->validateAndConvertData($csvRow, $lineNumber);
@@ -420,125 +424,43 @@ class ProcessCsvUpload implements ShouldQueue
                 return null; // Skip this row
             }
         } elseif ($jenis === 'TABUNGAN') {
+            // Use array_combine and validation like PEMBIAYAAN
+            if (count($header) !== count($data)) {
+                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
+                return null;
+            }
+            $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
-                return [
-                    'nocif' => $data[0] ?? '',
-                    'notab' => $data[1] ?? '',
-                    'kodeprd' => $data[2] ?? '',
-                    'sahirrp' => $this->parseNumeric($data[3] ?? 0),
-                    'fnama' => $data[4] ?? '',
-                    'namaqq' => $data[5] ?? '',
-                    'stsrec' => $data[6] ?? '',
-                    'saldoblok' => $this->parseNumeric($data[7] ?? 0),
-                    'stsrest' => $data[8] ?? '',
-                    'tax' => $this->parseNumeric($data[9] ?? 0),
-                    'tgltrnakh' => $this->parseDate($data[10] ?? ''),
-                    'avgeom' => $this->parseNumeric($data[11] ?? 0),
-                    'stspep' => $data[12] ?? '',
-                    'kdrisk' => $data[13] ?? '',
-                    'noid' => $data[14] ?? '',
-                    'hp' => $data[15] ?? '',
-                    'tgllhr' => $this->parseDate($data[16] ?? ''),
-                    'nmibu' => $data[17] ?? '',
-                    'ketsandi' => $data[18] ?? '',
-                    'namapt' => $data[19] ?? '',
-                    'kodeloc' => $data[20] ?? '',
-                    'period_month' => $month,
-                    'period_year' => $year,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                $record = $this->validateTabunganData($csvRow, $lineNumber);
+                return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing TABUNGAN row {$lineNumber}: " . $e->getMessage());
                 return null; // Skip this row
             }
         } elseif ($jenis === 'DEPOSITO') {
+            // Use array_combine and validation like PEMBIAYAAN
+            if (count($header) !== count($data)) {
+                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
+                return null;
+            }
+            $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
-                return [
-                    'nodep' => $data[0] ?? '',
-                    'nocif' => $data[1] ?? '',
-                    'nobilyet' => $data[2] ?? '',
-                    'nama' => $data[3] ?? '',
-                    'nomrp' => $this->parseNumeric($data[4] ?? 0),
-                    'stsrec' => $data[5] ?? '',
-                    'kdprd' => $data[6] ?? '',
-                    'jkwaktu' => $data[7] ?? '',
-                    'jnsjkwaktu' => $data[8] ?? '',
-                    'tglbuka' => $this->parseDate($data[9] ?? ''),
-                    'tgleff' => $this->parseDate($data[10] ?? ''),
-                    'tgljtempo' => $this->parseDate($data[11] ?? ''),
-                    'aro' => $data[12] ?? '',
-                    'nisbah' => $this->parseNumeric($data[13] ?? 0),
-                    'spread' => $this->parseNumeric($data[14] ?? 0),
-                    'equivrate' => $this->parseNumeric($data[15] ?? 0),
-                    'komitrate' => $this->parseNumeric($data[16] ?? 0),
-                    'ststrn' => $data[17] ?? '',
-                    'kdwil' => $data[18] ?? '',
-                    'kodeaoh' => $data[19] ?? '',
-                    'kodeaop' => $data[20] ?? '',
-                    'noacbng' => $data[22] ?? '',
-                    'tambahnom' => $data[23] ?? '',
-                    'noid' => $data[24] ?? '',
-                    'alamat' => $data[25] ?? '',
-                    'kota' => $data[26] ?? '',
-                    'telprmh' => $data[27] ?? '',
-                    'hp' => $data[28] ?? '',
-                    'stskait' => $data[29] ?? '',
-                    'golcustbi' => $data[30] ?? '',
-                    'kelurahan' => $data[31] ?? '',
-                    'kecamatan' => $data[32] ?? '',
-                    'kdpos' => $data[33] ?? '',
-                    'kdrisk' => $data[34] ?? '',
-                    'tax' => $this->parseNumeric($data[35] ?? 0),
-                    'bnghtg' => $this->parseNumeric($data[36] ?? 0),
-                    'nisbahrp' => $this->parseNumeric($data[37] ?? 0),
-                    'stspep' => $data[38] ?? '',
-                    'tgllhr' => $this->parseDate($data[41] ?? ''),
-                    'nmibu' => $data[42] ?? '',
-                    'ketsandi' => $data[43] ?? '',
-                    'namapt' => $data[44] ?? '',
-                    'period_month' => $month,
-                    'period_year' => $year,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                $record = $this->validateDepositoData($csvRow, $lineNumber);
+                return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing DEPOSITO row {$lineNumber}: " . $e->getMessage());
                 return null; // Skip this row
             }
         } elseif ($jenis === 'LINKAGE') {
+            // Use array_combine and validation like PEMBIAYAAN
+            if (count($header) !== count($data)) {
+                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
+                return null;
+            }
+            $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
-                // Validate that we have the expected number of columns
-                if (count($data) < 10) {
-                    throw new \Exception("Baris tidak lengkap, expected minimal 10 kolom, got " . count($data));
-                }
-
-                // Validate date fields with more tolerance
-                $tgleff = $data[3] ?? '';
-                $tgljt = $data[4] ?? '';
-                if (!empty($tgleff) && !preg_match('/^\d{8}$/', $tgleff)) {
-                    Log::warning("Format tanggal efektif tidak valid untuk linkage row {$lineNumber}: {$tgleff}");
-                }
-                if (!empty($tgljt) && !preg_match('/^\d{8}$/', $tgljt)) {
-                    Log::warning("Format tanggal jatuh tempo tidak valid untuk linkage row {$lineNumber}: {$tgljt}");
-                }
-
-                return [
-                    'nocif' => $data[0] ?? '',
-                    'nama' => $data[1] ?? '',
-                    'nokontrak' => $data[2] ?? '',
-                    'tgleff' => $this->parseDate($tgleff),
-                    'tgljt' => $this->parseDate($tgljt),
-                    'kelompok' => $data[5] ?? '',
-                    'jnsakad' => $data[6] ?? '',
-                    'prsnisbah' => $this->parseNumeric($data[7] ?? 0),
-                    'plafon' => $this->parseNumeric($data[8] ?? 0),
-                    'os' => $this->parseNumeric($data[9] ?? 0),
-                    'period_month' => $month,
-                    'period_year' => $year,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                $record = $this->validateLinkageData($csvRow, $lineNumber);
+                return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing LINKAGE row {$lineNumber}: " . $e->getMessage());
                 return null; // Skip this row
@@ -701,6 +623,122 @@ class ProcessCsvUpload implements ShouldQueue
             'period_year' => $this->year,
             'tgleff' => $tgleff,
             'tglexp' => $tglexp,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function validateTabunganData(array $data, int $lineNumber): array
+    {
+        // Validate and convert numeric fields
+        $numericFields = ['sahirrp', 'saldoblok', 'tax', 'avgeom'];
+        $validatedData = [];
+        foreach ($numericFields as $field) {
+            $value = $data[$field] ?? 0;
+            $parsedValue = $this->parseNumeric($value);
+            if (!is_numeric($parsedValue) && !empty($value)) {
+                Log::warning("Field '{$field}' tidak valid pada baris {$lineNumber}, menggunakan 0");
+                $parsedValue = 0;
+            }
+            $validatedData[$field] = $parsedValue;
+        }
+
+        // Validate and convert date fields
+        $dateFields = ['tgltrnakh', 'tgllhr'];
+        foreach ($dateFields as $field) {
+            $validatedData[$field] = $this->parseDate($data[$field] ?? '');
+        }
+
+        // Handle string fields with trimming
+        $stringFields = ['nocif', 'notab', 'kodeprd', 'fnama', 'namaqq', 'stsrec', 'stsrest', 'stspep', 'kdrisk', 'noid', 'hp', 'nmibu', 'ketsandi', 'namapt', 'kodeloc'];
+        foreach ($stringFields as $field) {
+            $validatedData[$field] = trim($data[$field] ?? '');
+        }
+
+        return array_merge($validatedData, [
+            'period_month' => $this->month,
+            'period_year' => $this->year,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function validateDepositoData(array $data, int $lineNumber): array
+    {
+        // Validate and convert numeric fields
+        $numericFields = ['nomrp', 'nisbah', 'spread', 'equivrate', 'komitrate', 'tambahnom', 'tax', 'bnghtg', 'nisbahrp'];
+        $validatedData = [];
+        foreach ($numericFields as $field) {
+            $value = $data[$field] ?? 0;
+            $parsedValue = $this->parseNumeric($value);
+            if (!is_numeric($parsedValue) && !empty($value)) {
+                Log::warning("Field '{$field}' tidak valid pada baris {$lineNumber}, menggunakan 0");
+                $parsedValue = 0;
+            }
+            $validatedData[$field] = $parsedValue;
+        }
+
+        // Validate and convert date fields
+        $dateFields = ['tglbuka', 'tgleff', 'tgljtempo', 'tgllhr'];
+        foreach ($dateFields as $field) {
+            $validatedData[$field] = $this->parseDate($data[$field] ?? '');
+        }
+
+        // Handle string fields with trimming
+        $stringFields = ['nodep', 'nocif', 'nobilyet', 'nama', 'stsrec', 'kdprd', 'jkwaktu', 'jnsjkwaktu', 'aro', 'ststrn', 'kdwil', 'kodeaoh', 'kodeaop', 'noacbng', 'noid', 'alamat', 'kota', 'telprmh', 'hp', 'stskait', 'golcustbi', 'kelurahan', 'kecamatan', 'kdpos', 'kdrisk', 'stspep', 'nmibu', 'ketsandi', 'namapt'];
+        foreach ($stringFields as $field) {
+            $validatedData[$field] = trim($data[$field] ?? '');
+        }
+
+        return array_merge($validatedData, [
+            'period_month' => $this->month,
+            'period_year' => $this->year,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function validateLinkageData(array $data, int $lineNumber): array
+    {
+        // Validate that we have the expected number of columns (minimal check)
+        if (count($data) < 10) {
+            throw new \Exception("Baris tidak lengkap, expected minimal 10 kolom, got " . count($data));
+        }
+
+        // Validate and convert numeric fields
+        $numericFields = ['prsnisbah', 'plafon', 'os'];
+        $validatedData = [];
+        foreach ($numericFields as $field) {
+            $value = $data[$field] ?? 0;
+            $parsedValue = $this->parseNumeric($value);
+            if (!is_numeric($parsedValue) && !empty($value)) {
+                Log::warning("Field '{$field}' tidak valid pada baris {$lineNumber}, menggunakan 0");
+                $parsedValue = 0;
+            }
+            $validatedData[$field] = $parsedValue;
+        }
+
+        // Validate and convert date fields with tolerance
+        $tgleff = $data['tgleff'] ?? '';
+        $tgljt = $data['tgljt'] ?? '';
+        if (!empty($tgleff) && !preg_match('/^\d{8}$/', $tgleff)) {
+            Log::warning("Format tanggal efektif tidak valid untuk linkage row {$lineNumber}: {$tgleff}");
+        }
+        if (!empty($tgljt) && !preg_match('/^\d{8}$/', $tgljt)) {
+            Log::warning("Format tanggal jatuh tempo tidak valid untuk linkage row {$lineNumber}: {$tgljt}");
+        }
+        $validatedData['tgleff'] = $this->parseDate($tgleff);
+        $validatedData['tgljt'] = $this->parseDate($tgljt);
+
+        // Handle string fields with trimming
+        $stringFields = ['nocif', 'nama', 'nokontrak', 'kelompok', 'jnsakad'];
+        foreach ($stringFields as $field) {
+            $validatedData[$field] = trim($data[$field] ?? '');
+        }
+
+        return array_merge($validatedData, [
+            'period_month' => $this->month,
+            'period_year' => $this->year,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
