@@ -132,7 +132,7 @@ class UploadController extends Controller
         }, $pembiayaanPeriods->toArray()));
 
         // Get recent upload statuses for pembiayaan background jobs
-        $recentUploads = CsvUploadStatus::where('user_id', auth()->id())
+        $recentUploads = CsvUploadStatus::with('user')
             ->get()
             ->sortByDesc('created_at');
 
@@ -154,7 +154,8 @@ class UploadController extends Controller
                 'created_at' => $period['last_upload'],
                 'progress' => null,
                 'processed_records' => $period['count'],
-                'total_records' => $period['count']
+                'total_records' => $period['count'],
+                'user_name' => null
             ]);
             $completedPeriods->push($periodKey);
         }
@@ -174,15 +175,16 @@ class UploadController extends Controller
                     'created_at' => $upload->created_at,
                     'progress' => $upload->total_records > 0 ? round(($upload->processed_records / $upload->total_records) * 100) : 0,
                     'processed_records' => $upload->processed_records ?? 0,
-                    'total_records' => $upload->total_records ?? 0
+                    'total_records' => $upload->total_records ?? 0,
+                    'user_name' => $upload->user->name ?? 'Unknown'
                 ]);
             }
         }
 
         // Sort by created_at descending and paginate
         $sortedUploads = $combinedUploads->sortByDesc('created_at')->values();
-        $perPage = request()->get('per_page', 10); // Allow user to choose items per page
-        $perPage = in_array($perPage, [5, 10, 25, 50, 100]) ? $perPage : 10; // Validate per_page values
+        $perPage = request()->get('per_page', 5); // Allow user to choose items per page
+        $perPage = in_array($perPage, [5, 10, 25, 50, 100]) ? $perPage : 5; // Validate per_page values
         $currentPage = request()->get('page', 1);
         $offset = ($currentPage - 1) * $perPage;
 

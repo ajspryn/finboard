@@ -68,9 +68,9 @@ class FinancialHighlightController extends Controller
 
         $data = $request->all();
 
-        // Calculate derived values if not provided
-        $derivedFields = ['dpk', 'pembiayaan', 'npf', 'aset'];
-        foreach ($derivedFields as $field) {
+        // Calculate auto-calculated values (pembiayaan, dpk, npf, fdr)
+        $autoCalculatedFields = ['dpk', 'pembiayaan', 'npf', 'fdr'];
+        foreach ($autoCalculatedFields as $field) {
             if (empty($data[$field])) {
                 $method = 'calculate' . ucfirst($field);
                 $data[$field] = FinancialHighlight::$method($data['period_year'], $data['period_month']);
@@ -122,14 +122,12 @@ class FinancialHighlightController extends Controller
 
         $data = $request->all();
 
-        // Calculate derived values if not provided
-        $derivedFields = ['dpk', 'pembiayaan', 'npf', 'aset'];
-        foreach ($derivedFields as $field) {
-            if (empty($data[$field])) {
-                $method = 'calculate' . ucfirst($field);
-                $data[$field] = FinancialHighlight::$method($financialHighlight->period_year, $financialHighlight->period_month);
-                \Log::info("Calculated {$field}: {$data[$field]}");
-            }
+        // Always recalculate auto-calculated values based on latest data
+        $autoCalculatedFields = ['dpk', 'pembiayaan', 'npf', 'fdr'];
+        foreach ($autoCalculatedFields as $field) {
+            $method = 'calculate' . ucfirst($field);
+            $data[$field] = FinancialHighlight::$method($financialHighlight->period_year, $financialHighlight->period_month);
+            \Log::info("Recalculated {$field}: {$data[$field]}");
         }
 
         \Log::info('About to update with data', $data);
@@ -282,7 +280,8 @@ class FinancialHighlightController extends Controller
     }
 
     /**
-     * Calculate derived financial metrics for a specific period
+     * Calculate auto-calculated financial metrics for a specific period
+     * Returns: pembiayaan, dpk, npf, fdr
      */
     public function calculateDerivedValues(Request $request)
     {
@@ -294,9 +293,10 @@ class FinancialHighlightController extends Controller
         }
 
         return response()->json([
-            'dpk' => FinancialHighlight::calculateDpk($year, $month),
             'pembiayaan' => FinancialHighlight::calculatePembiayaan($year, $month),
+            'dpk' => FinancialHighlight::calculateDpk($year, $month),
             'npf' => FinancialHighlight::calculateNpf($year, $month),
+            'fdr' => FinancialHighlight::calculateFdr($year, $month),
         ]);
     }
 }

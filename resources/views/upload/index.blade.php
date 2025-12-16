@@ -129,7 +129,7 @@
                             <label for="perPageSelect" class="form-label me-2 mb-0 small">Tampilkan:</label>
                             <select id="perPageSelect" class="form-select form-select-sm" style="width: 80px;" onchange="changePerPage(this.value)">
                                 @foreach($perPageOptions as $option)
-                                    <option value="{{ $option }}" {{ request('per_page', 10) == $option ? 'selected' : '' }}>{{ $option }}</option>
+                                    <option value="{{ $option }}" {{ request('per_page', 5) == $option ? 'selected' : '' }}>{{ $option }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -146,6 +146,7 @@
                                     <th class="text-end">Total Saldo</th>
                                     <th class="text-center">Status</th>
                                     <th class="text-center">Progress</th>
+                                    <th>User</th>
                                     <th>Pesan</th>
                                     <th class="text-center">Tanggal Upload</th>
                                 </tr>
@@ -225,6 +226,15 @@
                                         @else
                                             <small class="text-muted">-</small>
                                         @endif
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 150px;">
+                                            @if($upload['user_name'])
+                                                <small class="text-primary">{{ $upload['user_name'] }}</small>
+                                            @else
+                                                <small class="text-muted">-</small>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td>
                                         <div style="max-width: 250px;">

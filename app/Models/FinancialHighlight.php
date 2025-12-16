@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class FinancialHighlight extends Model
 {
-    use Searchable;    protected $fillable = [
+    use Searchable;
+    protected $fillable = [
         'period_year',
         'period_month',
         'car',
@@ -230,6 +231,23 @@ class FinancialHighlight extends Model
     }
 
     /**
+     * Calculate all derived values from database and update the model
+     * Only calculates: pembiayaan, dpk, npf, fdr (auto-calculated fields)
+     * Other fields like CAR, ROA, ROE, aset, etc. remain as manually entered
+     */
+    public function calculateDerivedValues()
+    {
+        // Only calculate these auto-calculated fields from database
+        $this->dpk = self::calculateDpk($this->period_year, $this->period_month);
+        $this->pembiayaan = self::calculatePembiayaan($this->period_year, $this->period_month);
+        $this->npf = self::calculateNpf($this->period_year, $this->period_month);
+        $this->fdr = self::calculateFdr($this->period_year, $this->period_month);
+
+        // Other fields (CAR, ROA, ROE, aset, laba_rugi, biaya, pendapatan, bopo, cash_ratio)
+        // are manually entered and should not be overwritten
+    }
+
+    /**
      * Get or calculate field value
      */
     public function getCalculatedField($field)
@@ -248,8 +266,6 @@ class FinancialHighlight extends Model
                     return self::calculatePembiayaan($this->period_year, $this->period_month);
                 case 'npf':
                     return self::calculateNpf($this->period_year, $this->period_month);
-                case 'aset':
-                    return self::calculateAset($this->period_year, $this->period_month);
                 case 'fdr':
                     return self::calculateFdr($this->period_year, $this->period_month);
                 default:

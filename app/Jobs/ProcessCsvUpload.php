@@ -111,6 +111,15 @@ class ProcessCsvUpload implements ShouldQueue
             foreach ($this->filePaths as $filePath) {
                 Storage::delete($filePath);
             }
+
+            // Dispatch event to trigger FinancialHighlight recalculation
+            \App\Events\FinancialDataUpdated::dispatch([
+                'period_month' => $this->month,
+                'period_year' => $this->year,
+                'types_updated' => array_keys($this->filePaths),
+                'total_imported' => $totalImported,
+                'total_errors' => $totalErrors
+            ], 'data_import');
         } catch (\Exception $e) {
             // Update all status records with error
             foreach ($statusRecords as $status) {

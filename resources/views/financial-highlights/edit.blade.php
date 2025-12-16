@@ -242,3 +242,10 @@
     </div>
 </div>
 @endsection
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Note: Period cannot be changed in edit mode, so no auto-calculation on period change
+    // Auto-calculated fields are always recalculated on form submission
+});
+</script>
