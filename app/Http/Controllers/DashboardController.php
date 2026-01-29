@@ -274,7 +274,9 @@ class DashboardController extends Controller
                 DB::raw('COUNT(*) as jumlah_pinjaman'),
                 DB::raw('SUM(mdlawal) as total_pinjaman'),
                 DB::raw('SUM(mgnawal) as total_bunga'),
-                DB::raw('SUM(osmdlc + osmgnc) as total_angsuran')
+                DB::raw('SUM(osmdlc + osmgnc) as total_angsuran'),
+                DB::raw('SUM(osmdlc) as total_outstanding'),
+                DB::raw('MAX(colbaru) as kolektibilitas')
             )
             ->groupBy('nocif')
             ->orderByDesc('total_pinjaman')

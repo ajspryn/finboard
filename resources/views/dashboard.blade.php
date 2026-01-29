@@ -1830,8 +1830,8 @@ function formatNominal($amount) {
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="card-title mb-0">💰 Top 50 Nasabah dengan Total Pinjaman Terbesar</h5>
-                        <small class="text-muted">Data Pinjaman Aktif</small>
+                        <h5 class="card-title mb-0">💰 Top 50 Nasabah dengan Total Pembiayaan Terbesar</h5>
+                        <small class="text-muted">Data Pembiayaan Aktif</small>
                         <small class="text-muted d-block">
                             <i class="ti ti-calendar me-1"></i>
                             Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
@@ -1853,10 +1853,12 @@ function formatNominal($amount) {
                                     <th>#</th>
                                     <th>No. CIF</th>
                                     <th>Nama Nasabah</th>
-                                    <th class="text-center">Jml Pinjaman</th>
-                                    <th class="text-end">Total Pinjaman</th>
-                                    <th class="text-end">Total Bunga</th>
+                                    <th class="text-center">Jml Pembiayaan</th>
+                                    <th class="text-end">Total Pembiayaan (Plafon)</th>
+                                    <th class="text-end">Outstanding</th>
+                                    <th class="text-end">Total Margin</th>
                                     <th class="text-end">Total Angsuran</th>
+                                    <th class="text-center">Kolektibilitas</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1872,6 +1874,9 @@ function formatNominal($amount) {
                                         {{ formatNominal($nasabah->total_pinjaman) }}
                                     </td>
                                     <td class="text-end">
+                                        {{ formatNominal($nasabah->total_outstanding ?? 0) }}
+                                    </td>
+                                    <td class="text-end">
                                         {{ formatNominal($nasabah->total_bunga) }}
                                     </td>
                                     <td class="text-end">
@@ -1879,10 +1884,18 @@ function formatNominal($amount) {
                                             {{ formatNominal($nasabah->total_angsuran) }}
                                         </strong>
                                     </td>
+                                    <td class="text-center">
+                                        @php $kol = $nasabah->kolektibilitas ?? null; @endphp
+                                        @if($kol)
+                                            <span class="badge {{ in_array($kol, [3,4,5]) ? 'bg-danger' : 'bg-success' }}">KOL {{ $kol }}</span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted">Belum ada data</td>
+                                    <td colspan="9" class="text-center text-muted">Belum ada data</td>
                                 </tr>
                                 @endforelse
                             </tbody>
@@ -1901,6 +1914,12 @@ function formatNominal($amount) {
                                     </td>
                                     <td class="text-end">
                                         <strong>
+                                            @php $totalOutstanding = $nasabahLending->sum('total_outstanding'); @endphp
+                                            {{ formatNominal($totalOutstanding) }}
+                                        </strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>
                                             @php $totalBunga = $nasabahLending->sum('total_bunga'); @endphp
                                             {{ formatNominal($totalBunga) }}
                                         </strong>
@@ -1911,6 +1930,7 @@ function formatNominal($amount) {
                                             {{ formatNominal($totalAngsuran) }}
                                         </strong>
                                     </td>
+                                    <td class="text-center"><strong>-</strong></td>
                                 </tr>
                             </tfoot>
                             @endif

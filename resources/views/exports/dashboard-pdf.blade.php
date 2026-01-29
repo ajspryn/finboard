@@ -913,7 +913,7 @@
     <!-- Top Nasabah Lending -->
     @if(isset($nasabahLending) && $nasabahLending->count() > 0)
     <div class="section">
-        <div class="section-title">💰 Top 50 Nasabah dengan Total Pinjaman Terbesar</div>
+        <div class="section-title">💰 Top 50 Nasabah dengan Total Pembiayaan Terbesar</div>
         <div class="card">
             <div class="card-body">
                 <table class="table">

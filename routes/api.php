@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\PembiayaanAngsuranController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,3 +40,7 @@ Route::prefix('search')->group(function () {
     Route::get('/linkage/{id}', [SearchController::class, 'getLinkageDetail'])->name('api.search.linkage.detail');
     Route::get('/financial-highlights/{id}', [SearchController::class, 'getFinancialHighlightDetail'])->name('api.search.financial-highlights.detail');
 });
+
+// Pembiayaan angsuran API (read-only)
+Route::middleware(['web', 'auth'])->get('/pembiayaan/angsuran', [PembiayaanAngsuranController::class, 'index'])
+    ->name('api.pembiayaan.angsuran');
