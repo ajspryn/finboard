@@ -3565,9 +3565,35 @@ function showSegmentKolDetail(event, category, type, kolValue) {
         url += '?' + params.join('&');
     }
 
-    fetch(url)
-        .then(response => response.json())
+    fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                if (contentType.includes('application/json')) {
+                    return response.json().then(err => {
+                        const msg = err.message || err.error || 'Server error';
+                        throw new Error(msg);
+                    });
+                }
+                return response.text().then(text => {
+                    throw new Error('Server returned non-JSON response');
+                });
+            }
+
+            if (!contentType.includes('application/json')) {
+                return response.text().then(text => {
+                    throw new Error('Expected JSON but received HTML');
+                });
+            }
+
+            return response.json();
+        })
         .then(data => {
+            if (!data || data.error) {
+                const msg = data && (data.message || data.error) ? (data.message || data.error) : 'Tidak ada data';
+                document.getElementById('modalKolBody').innerHTML = '<div class="alert alert-danger"><i class="ti ti-alert-circle"></i> Gagal memuat data: ' + msg + '</div>';
+                return;
+            }
             // Helper function untuk format rupiah
             const formatRupiah = (amount) => {
                 if (amount >= 1000000000) {
@@ -3579,12 +3605,18 @@ function showSegmentKolDetail(event, category, type, kolValue) {
                 }
             };
 
+            const summary = data.summary || {};
+            const totalNasabah = summary.total_nasabah ?? 0;
+            const totalKontrak = summary.total_kontrak ?? 0;
+            const totalOutstanding = summary.total_outstanding ?? 0;
+            const avgOutstanding = summary.avg_outstanding ?? 0;
+
             let html = '<div class="alert alert-' + kolColors[kolValue] + ' mb-3">';
             html += '<div class="row text-center">';
-            html += '<div class="col-3"><strong>Total Nasabah</strong><br>' + data.summary.total_nasabah.toLocaleString('id-ID') + '</div>';
-            html += '<div class="col-3"><strong>Total Kontrak</strong><br>' + data.summary.total_kontrak.toLocaleString('id-ID') + '</div>';
-            html += '<div class="col-3"><strong>Total Outstanding</strong><br>' + formatRupiah(data.summary.total_outstanding) + '</div>';
-            html += '<div class="col-3"><strong>Rata-rata</strong><br>' + formatRupiah(data.summary.avg_outstanding) + '</div>';
+            html += '<div class="col-3"><strong>Total Nasabah</strong><br>' + totalNasabah.toLocaleString('id-ID') + '</div>';
+            html += '<div class="col-3"><strong>Total Kontrak</strong><br>' + totalKontrak.toLocaleString('id-ID') + '</div>';
+            html += '<div class="col-3"><strong>Total Outstanding</strong><br>' + formatRupiah(totalOutstanding) + '</div>';
+            html += '<div class="col-3"><strong>Rata-rata</strong><br>' + formatRupiah(avgOutstanding) + '</div>';
             html += '</div></div>';
 
             if (data.details.length > 0) {
