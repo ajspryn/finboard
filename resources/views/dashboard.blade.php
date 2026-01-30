@@ -836,6 +836,21 @@ function formatNominal($amount) {
     </div>
     @endif
 
+    <!-- Segmentasi Tagihan Modal -->
+    <div class="modal fade" id="segmentasiTagihanModal" tabindex="-1" aria-labelledby="segmentasiTagihanModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="segmentasiTagihanModalTitle">Daftar Tagihan Segmentasi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="segmentasiTagihanModalBody">
+                    <div class="text-center py-4"><div class="spinner-border" role="status"></div><br>Memuat...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Financial Highlights Row -->
     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
     <div class="row mb-4">
@@ -1408,6 +1423,39 @@ function formatNominal($amount) {
                 </div>
                 <div class="card-body">
                     <div id="npfDistributionChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3.5: Segmentasi Tagihan Viewer -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">📋 List Tagihan per Segmentasi</h5>
+                        <small class="text-muted">Filter berdasarkan Segmentasi untuk melihat nasabah dengan tagihan</small>
+                    </div>
+                    <div>
+                        <div class="d-flex gap-2">
+                            <select id="segmentCategorySelect" class="form-select form-select-sm">
+                                <option value="">Pilih Kategori</option>
+                                @foreach($segmentCodes as $category => $types)
+                                    <option value="{{ $category }}">{{ $category }}</option>
+                                @endforeach
+                            </select>
+
+                            <select id="segmentTypeSelect" class="form-select form-select-sm">
+                                <option value="">Pilih Type</option>
+                            </select>
+
+                            <button class="btn btn-primary btn-sm" id="btnShowSegmentTagihan" onclick="showSegmentasiTagihan()">Tampilkan</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <small class="text-muted">Klik "Tampilkan" untuk membuka modal berisi daftar nasabah dan outstanding.</small>
                 </div>
             </div>
         </div>
@@ -2545,6 +2593,87 @@ function formatNominal($amount) {
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// Populate types when category changes
+document.addEventListener('DOMContentLoaded', function() {
+    const segmentCodes = @json($segmentCodes);
+    const categorySelect = document.getElementById('segmentCategorySelect');
+    const typeSelect = document.getElementById('segmentTypeSelect');
+
+    categorySelect && categorySelect.addEventListener('change', function() {
+        const cat = this.value;
+        // Clear previous
+        typeSelect.innerHTML = '<option value="">Pilih Type</option>';
+        if (!cat || !segmentCodes[cat]) return;
+        Object.keys(segmentCodes[cat]).forEach(type => {
+            const opt = document.createElement('option');
+            opt.value = type;
+            opt.textContent = type;
+            typeSelect.appendChild(opt);
+        });
+    });
+});
+
+function showSegmentasiTagihan() {
+    const category = document.getElementById('segmentCategorySelect').value;
+    const type = document.getElementById('segmentTypeSelect').value;
+    if (!category || !type) {
+        alert('Pilih kategori dan type segmentasi terlebih dahulu');
+        return;
+    }
+
+    const modal = document.getElementById('segmentasiTagihanModal');
+    const modalTitle = document.getElementById('segmentasiTagihanModalTitle');
+    const modalBody = document.getElementById('segmentasiTagihanModalBody');
+    const modalInstance = new bootstrap.Modal(modal, { backdrop: true });
+
+    modalTitle.textContent = `Daftar Tagihan - ${category} / ${type}`;
+    modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"></div><br>Memuat...</div>';
+    modalInstance.show();
+
+    // Build URL with current filters
+    const params = new URLSearchParams();
+    @if(isset($filterMonth)) params.append('month', '{{ $filterMonth }}'); @endif
+    @if(isset($filterYear)) params.append('year', '{{ $filterYear }}'); @endif
+    @if(isset($startDay) && $startDay) params.append('start_day', '{{ $startDay }}'); @endif
+    @if(isset($endDay) && $endDay) params.append('end_day', '{{ $endDay }}'); @endif
+
+    const url = `/dashboard/segmentasi-detail/${encodeURIComponent(category)}/${encodeURIComponent(type)}?${params.toString()}`;
+
+    fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(resp => {
+            if (!resp.ok) return resp.text().then(t => { throw new Error(`Server ${resp.status}: ${t}`); });
+            return resp.json();
+        })
+        .then(data => {
+            if (!data.details || data.details.length === 0) {
+                modalBody.innerHTML = '<div class="text-center text-muted py-4">Tidak ada data</div>';
+                return;
+            }
+
+            let html = '<div class="table-responsive" style="max-height:500px;overflow-y:auto">';
+            html += '<table class="table table-sm table-hover">';
+            html += '<thead><tr><th class="text-center">#</th><th>Nama</th><th>No Kontrak</th><th class="text-end">Outstanding</th><th class="text-end">Plafon</th><th class="text-center">Kolektibilitas</th><th class="text-center">AO</th></tr></thead><tbody>';
+            data.details.forEach((d, i) => {
+                html += `<tr>`;
+                html += `<td class="text-center">${i+1}</td>`;
+                html += `<td>${d.nama}</td>`;
+                html += `<td><code>${d.nokontrak}</code></td>`;
+                html += `<td class="text-end">${formatNominal(d.osmdlc)}</td>`;
+                html += `<td class="text-end">${formatNominal(d.mdlawal)}</td>`;
+                html += `<td class="text-center">${d.colbaru_label || (d.colbaru ? 'KOL '+d.colbaru : '-')}</td>`;
+                html += `<td class="text-center">${d.nmao || '-'}</td>`;
+                html += `</tr>`;
+            });
+            html += '</tbody></table>';
+            html += `<div class="mt-2 text-muted">Total kontrak: ${data.summary.total_kontrak} — Total Outstanding: ${formatNominal(data.summary.total_outstanding)}</div>`;
+            html += '</div>';
+            modalBody.innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Error loading segmentasi tagihan:', err);
+            modalBody.innerHTML = `<div class="alert alert-danger">Gagal memuat data: ${err.message}</div>`;
+        });
+}
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard loaded');
     console.log('ApexCharts available:', typeof ApexCharts !== 'undefined');
@@ -3254,9 +3383,11 @@ function formatNominal(amount) {
             })
             .catch(error => {
                 console.error('Error:', error);
+                const msg = error && error.message ? error.message : 'Gagal memuat data.';
                 modalBody.innerHTML = `
                     <div class="alert alert-danger">
-                        <i class="ti ti-alert-circle"></i> Gagal memuat data. Silakan coba lagi.
+                        <i class="ti ti-alert-circle"></i>
+                        <div>Gagal memuat data: <small class="text-monospace">${msg}</small></div>
                     </div>
                 `;
             });
@@ -3331,8 +3462,18 @@ function showSegmentDetail(category, type) {
         url += '?' + params.join('&');
     }
 
-    fetch(url)
-        .then(response => response.json())
+    fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(response => {
+            const ct = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(`Server ${response.status}: ${text}`); });
+            }
+            if (ct.includes('application/json')) return response.json();
+            return response.text().then(text => {
+                console.error('Non-JSON response for segment detail:', text);
+                throw new Error('Unexpected response format from server');
+            });
+        })
         .then(data => {
             let html = '<div class="alert alert-info mb-3">';
             html += '<div class="row text-center">';

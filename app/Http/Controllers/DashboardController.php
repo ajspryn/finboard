@@ -817,7 +817,9 @@ class DashboardController extends Controller
                 return $item;
             });
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'startDay', 'endDay', 'topTabunganProducts', 'lastUpdated'));
+        $segmentCodes = $this->getSegmentCodes();
+
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'startDay', 'endDay', 'topTabunganProducts', 'lastUpdated', 'segmentCodes'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
