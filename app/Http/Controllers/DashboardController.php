@@ -9,6 +9,7 @@ use App\Models\Linkage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -1764,9 +1765,14 @@ class DashboardController extends Controller
                 $query->whereIn('kdgroupdeb', $codes);
             }
 
-            // Get detail data
+            // Get detail data. Only select `dpd` if the column exists in the table
+            $selectCols = ['nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao'];
+            if (Schema::hasColumn('pembiayaans', 'dpd')) {
+                $selectCols[] = 'dpd';
+            }
+
             $details = $query
-                ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao', 'dpd')
+                ->select($selectCols)
                 ->orderBy('osmdlc', 'desc')
                 ->limit(100) // Limit untuk performa
                 ->get()
@@ -1780,7 +1786,7 @@ class DashboardController extends Controller
                         'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
                         'kdgroupdeb' => $item->kdgroupdeb,
                         'nmao' => $item->nmao ?? '-',
-                        'dpd' => $item->dpd ?? 0
+                        'dpd' => isset($item->dpd) ? $item->dpd : 0
                     ];
                 });
 
