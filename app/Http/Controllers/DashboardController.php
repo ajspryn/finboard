@@ -1704,101 +1704,112 @@ class DashboardController extends Controller
 
     public function getSegmentasiKolDetail(Request $request, $category, $type, $kol)
     {
-        // Get filter parameters
-        $startDay = $request->input('start_day');
-        $endDay = $request->input('end_day');
-        $filterMonth = $request->input('month');
-        $filterYear = $request->input('year');
+        try {
+            // Get filter parameters
+            $startDay = $request->input('start_day');
+            $endDay = $request->input('end_day');
+            $filterMonth = $request->input('month');
+            $filterYear = $request->input('year');
 
-        // Build base query with combined filters
-        $query = Pembiayaan::query();
+            // Build base query with combined filters
+            $query = Pembiayaan::query();
 
-        // Step 1: Filter by period_month dan period_year - WAJIB
-        if ($filterMonth && $filterYear) {
-            $query->where('period_month', $filterMonth);
-            $query->where('period_year', $filterYear);
+            // Step 1: Filter by period_month dan period_year - WAJIB
+            if ($filterMonth && $filterYear) {
+                $query->where('period_month', $filterMonth);
+                $query->where('period_year', $filterYear);
 
-            // Step 2: Filter by tanggal range (tgleff) - OPSIONAL
-            if ($startDay && $endDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
-                $query->whereDate('tgleff', '>=', $startDate)
-                    ->whereDate('tgleff', '<=', $endDate);
-            } elseif ($startDay) {
-                $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
-                $query->whereDate('tgleff', '>=', $startDate);
-            } elseif ($endDay) {
-                $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
-                $query->whereDate('tgleff', '<=', $endDate);
-            }
-        }
-
-        // Filter by kolektibilitas
-        $query->where('colbaru', $kol);
-
-        // Handle LAIN-LAIN category
-        if ($category === 'LAIN-LAIN' && $type === 'Lainnya') {
-            // Get all mapped codes from segment structure
-            $segmentCodes = $this->getSegmentCodes();
-            $mappedCodes = [];
-            foreach ($segmentCodes as $segments) {
-                foreach ($segments as $codes) {
-                    $mappedCodes = array_merge($mappedCodes, $codes);
+                // Step 2: Filter by tanggal range (tgleff) - OPSIONAL
+                if ($startDay && $endDay) {
+                    $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                    $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                    $query->whereDate('tgleff', '>=', $startDate)
+                        ->whereDate('tgleff', '<=', $endDate);
+                } elseif ($startDay) {
+                    $startDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($startDay, 2, '0', STR_PAD_LEFT);
+                    $query->whereDate('tgleff', '>=', $startDate);
+                } elseif ($endDay) {
+                    $endDate = $filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT) . '-' . str_pad($endDay, 2, '0', STR_PAD_LEFT);
+                    $query->whereDate('tgleff', '<=', $endDate);
                 }
             }
 
-            // Query untuk LAIN-LAIN (yang tidak ada di mapping)
-            $query->whereNotIn('kdgroupdeb', $mappedCodes)
-                ->whereNotNull('kdgroupdeb')
-                ->where('kdgroupdeb', '!=', '');
-        } else {
-            // Handle normal categories
-            $segmentCodes = $this->getSegmentCodes();
-            $codes = $segmentCodes[$category][$type] ?? [];
+            // Filter by kolektibilitas
+            $query->where('colbaru', $kol);
 
-            if (empty($codes)) {
-                return response()->json(['error' => 'Segment not found'], 404);
+            // Handle LAIN-LAIN category
+            if ($category === 'LAIN-LAIN' && $type === 'Lainnya') {
+                // Get all mapped codes from segment structure
+                $segmentCodes = $this->getSegmentCodes();
+                $mappedCodes = [];
+                foreach ($segmentCodes as $segments) {
+                    foreach ($segments as $codes) {
+                        $mappedCodes = array_merge($mappedCodes, $codes);
+                    }
+                }
+
+                // Query untuk LAIN-LAIN (yang tidak ada di mapping)
+                $query->whereNotIn('kdgroupdeb', $mappedCodes)
+                    ->whereNotNull('kdgroupdeb')
+                    ->where('kdgroupdeb', '!=', '');
+            } else {
+                // Handle normal categories
+                $segmentCodes = $this->getSegmentCodes();
+                $codes = $segmentCodes[$category][$type] ?? [];
+
+                if (empty($codes)) {
+                    return response()->json(['error' => 'Segment not found'], 404);
+                }
+
+                $query->whereIn('kdgroupdeb', $codes);
             }
 
-            $query->whereIn('kdgroupdeb', $codes);
+            // Get detail data
+            $details = $query
+                ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao', 'dpd')
+                ->orderBy('osmdlc', 'desc')
+                ->limit(100) // Limit untuk performa
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'nokontrak' => $item->nokontrak,
+                        'nama' => $item->nama,
+                        'osmdlc' => $item->osmdlc,
+                        'mdlawal' => $item->mdlawal,
+                        'colbaru' => $item->colbaru,
+                        'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
+                        'kdgroupdeb' => $item->kdgroupdeb,
+                        'nmao' => $item->nmao ?? '-',
+                        'dpd' => $item->dpd ?? 0
+                    ];
+                });
+
+            $summary = [
+                'total_nasabah' => $details->count(),
+                'total_kontrak' => $details->count(),
+                'total_outstanding' => $details->sum('osmdlc'),
+                'avg_outstanding' => $details->count() > 0 ? $details->avg('osmdlc') : 0,
+                'total_disburse' => $details->sum('mdlawal'),
+            ];
+
+            return response()->json([
+                'category' => $category,
+                'type' => $type,
+                'kol' => $kol,
+                'kol_label' => $this->getCollectibilityLabel($kol),
+                'summary' => $summary,
+                'details' => $details
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('getSegmentasiKolDetail error: ' . $e->getMessage(), ['exception' => $e]);
+
+            $message = config('app.debug') ? $e->getMessage() : 'Internal Server Error';
+
+            return response()->json([
+                'error' => 'Server Error',
+                'message' => $message
+            ], 500);
         }
-
-        // Get detail data
-        $details = $query
-            ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao', 'dpd')
-            ->orderBy('osmdlc', 'desc')
-            ->limit(100) // Limit untuk performa
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'nokontrak' => $item->nokontrak,
-                    'nama' => $item->nama,
-                    'osmdlc' => $item->osmdlc,
-                    'mdlawal' => $item->mdlawal,
-                    'colbaru' => $item->colbaru,
-                    'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
-                    'kdgroupdeb' => $item->kdgroupdeb,
-                    'nmao' => $item->nmao ?? '-',
-                    'dpd' => $item->dpd ?? 0
-                ];
-            });
-
-        $summary = [
-            'total_nasabah' => $details->count(),
-            'total_kontrak' => $details->count(),
-            'total_outstanding' => $details->sum('osmdlc'),
-            'avg_outstanding' => $details->count() > 0 ? $details->avg('osmdlc') : 0,
-            'total_disburse' => $details->sum('mdlawal'),
-        ];
-
-        return response()->json([
-            'category' => $category,
-            'type' => $type,
-            'kol' => $kol,
-            'kol_label' => $this->getCollectibilityLabel($kol),
-            'summary' => $summary,
-            'details' => $details
-        ]);
     }
 
     public function getKecamatanDetail($kecamatan)
