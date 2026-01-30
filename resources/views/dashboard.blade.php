@@ -5547,8 +5547,28 @@ function showKolektibilitasDetails(kategori, namaKategori) {
     }, { once: true });
 
     // Fetch kolektibilitas customer data
-    fetch(`/dashboard/kolektibilitas-details?kategori=${kategori}&limit=100`)
-        .then(response => response.json())
+    fetch(`/dashboard/kolektibilitas-details?kategori=${kategori}&limit=100`, {
+        headers: {
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Server responded ${response.status}: ${text}`);
+                });
+            }
+            if (contentType.includes('application/json')) {
+                return response.json();
+            }
+            // If not JSON, capture body for debugging
+            return response.text().then(text => {
+                console.error('Non-JSON response for kolektibilitas details:', text);
+                throw new Error('Unexpected response format from server');
+            });
+        })
         .then(data => {
             if (data.customers && data.customers.length > 0) {
                 let html = '<div class="table-responsive" style="max-height: 500px; overflow-y: auto;">';

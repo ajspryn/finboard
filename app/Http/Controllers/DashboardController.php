@@ -279,7 +279,7 @@ class DashboardController extends Controller
                 DB::raw('MAX(colbaru) as kolektibilitas')
             )
             ->groupBy('nocif')
-            ->orderByDesc('total_pinjaman')
+            ->orderByRaw('SUM(osmdlc) desc')
             ->limit(50)
             ->get();
 
