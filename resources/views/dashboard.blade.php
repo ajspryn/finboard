@@ -2357,6 +2357,16 @@ function formatNominal($amount) {
                         <i class="ti ti-clock me-1"></i>
                         Data terupdate: {{ formatLastUpdated($lastUpdated['deposito'] ?? null) }}
                     </small>
+                    @if(isset($funding['deposito_growth_percent']))
+                        @php $dg = $funding['deposito_growth_percent']; $da = $funding['deposito_growth_amount']; @endphp
+                        <small class="d-block mt-1">
+                            @if($dg >= 0)
+                                <span class="text-success">▲ {{ $dg }}% ({{ formatNominal($da) }})</span>
+                            @else
+                                <span class="text-danger">▼ {{ abs($dg) }}% ({{ formatNominal($da) }})</span>
+                            @endif
+                        </small>
+                    @endif
                     @if(isset($funding['buka_deposito']) || isset($funding['pencairan_deposito']))
                         @php
                             $bukaCount = $funding['buka_deposito']['jumlah'] ?? 0;

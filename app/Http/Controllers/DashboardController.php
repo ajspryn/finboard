@@ -162,43 +162,78 @@ class DashboardController extends Controller
         $jumlahBaruDeposito = $depositoBaru->jumlah_baru_deposito ?? 0;
         $totalBaruDeposito = $depositoBaru->total_baru_deposito ?? 0;
 
-        // Tabungan: hitung berapa yang "ditarik" (ada di bulan lalu tapi tidak ada di bulan ini)
-        $tabunganCair = DB::table('tabungans as prev')
-            ->leftJoin('tabungans as curr', function ($join) use ($filterMonth, $filterYear) {
-                $join->on('prev.notab', '=', 'curr.notab')
-                    ->where('curr.period_month', $filterMonth)
-                    ->where('curr.period_year', $filterYear);
-            })
-            ->where('prev.period_month', $prevMonth)
-            ->where('prev.period_year', $prevYear)
-            ->whereNull('curr.notab')
-            ->select(
-                DB::raw('COUNT(*) as jumlah_pencairan_tabungan'),
-                DB::raw('SUM(prev.sahirrp) as total_pencairan_tabungan')
-            )
-            ->first();
+        // Tabungan: compute per-account deltas between previous and current period to get
+        // withdrawn (penarikan) and new deposit (nabung) counts and totals.
+        try {
+            $pairsSql = "SELECT SUM(GREATEST(prev_bal - curr_bal, 0)) AS withdrawn_total,
+                                 SUM(GREATEST(curr_bal - prev_bal, 0)) AS new_total,
+                                 SUM(CASE WHEN prev_bal > curr_bal THEN 1 ELSE 0 END) AS withdrawn_count,
+                                 SUM(CASE WHEN curr_bal > prev_bal THEN 1 ELSE 0 END) AS new_count
+                          FROM (
+                              SELECT n.notab,
+                                     COALESCE(prev.sahirrp, 0) AS prev_bal,
+                                     COALESCE(curr.sahirrp, 0) AS curr_bal
+                              FROM (
+                                  SELECT notab FROM tabungans WHERE period_month = ? AND period_year = ?
+                                  UNION
+                                  SELECT notab FROM tabungans WHERE period_month = ? AND period_year = ?
+                              ) n
+                              LEFT JOIN tabungans prev ON prev.notab = n.notab AND prev.period_month = ? AND prev.period_year = ?
+                              LEFT JOIN tabungans curr ON curr.notab = n.notab AND curr.period_month = ? AND curr.period_year = ?
+                          ) pairs";
 
-        $jumlahPencairanTabungan = $tabunganCair->jumlah_pencairan_tabungan ?? 0;
-        $totalPencairanTabungan = $tabunganCair->total_pencairan_tabungan ?? 0;
+            $bindings = [
+                $prevMonth, $prevYear,
+                $filterMonth, $filterYear,
+                $prevMonth, $prevYear,
+                $filterMonth, $filterYear
+            ];
 
-        // Tabungan: hitung berapa yang baru menabung (ada di bulan ini tapi tidak ada di bulan lalu)
-        $tabunganBaru = DB::table('tabungans as curr')
-            ->leftJoin('tabungans as prev', function ($join) use ($prevMonth, $prevYear) {
-                $join->on('curr.notab', '=', 'prev.notab')
-                    ->where('prev.period_month', $prevMonth)
-                    ->where('prev.period_year', $prevYear);
-            })
-            ->where('curr.period_month', $filterMonth)
-            ->where('curr.period_year', $filterYear)
-            ->whereNull('prev.notab')
-            ->select(
-                DB::raw('COUNT(*) as jumlah_baru_tabungan'),
-                DB::raw('SUM(curr.sahirrp) as total_baru_tabungan')
-            )
-            ->first();
+            $pairResult = DB::selectOne(DB::raw($pairsSql), $bindings);
 
-        $jumlahBaruTabungan = $tabunganBaru->jumlah_baru_tabungan ?? 0;
-        $totalBaruTabungan = $tabunganBaru->total_baru_tabungan ?? 0;
+            $jumlahPencairanTabungan = isset($pairResult->withdrawn_count) ? (int)$pairResult->withdrawn_count : 0;
+            $totalPencairanTabungan = isset($pairResult->withdrawn_total) ? (float)$pairResult->withdrawn_total : 0;
+
+            $jumlahBaruTabungan = isset($pairResult->new_count) ? (int)$pairResult->new_count : 0;
+            $totalBaruTabungan = isset($pairResult->new_total) ? (float)$pairResult->new_total : 0;
+        } catch (\Exception $e) {
+            // Fallback to previous simple calculations if complex query fails
+            $tabunganCair = DB::table('tabungans as prev')
+                ->leftJoin('tabungans as curr', function ($join) use ($filterMonth, $filterYear) {
+                    $join->on('prev.notab', '=', 'curr.notab')
+                        ->where('curr.period_month', $filterMonth)
+                        ->where('curr.period_year', $filterYear);
+                })
+                ->where('prev.period_month', $prevMonth)
+                ->where('prev.period_year', $prevYear)
+                ->whereNull('curr.notab')
+                ->select(
+                    DB::raw('COUNT(*) as jumlah_pencairan_tabungan'),
+                    DB::raw('SUM(prev.sahirrp) as total_pencairan_tabungan')
+                )
+                ->first();
+
+            $jumlahPencairanTabungan = $tabunganCair->jumlah_pencairan_tabungan ?? 0;
+            $totalPencairanTabungan = $tabunganCair->total_pencairan_tabungan ?? 0;
+
+            $tabunganBaru = DB::table('tabungans as curr')
+                ->leftJoin('tabungans as prev', function ($join) use ($prevMonth, $prevYear) {
+                    $join->on('curr.notab', '=', 'prev.notab')
+                        ->where('prev.period_month', $prevMonth)
+                        ->where('prev.period_year', $prevYear);
+                })
+                ->where('curr.period_month', $filterMonth)
+                ->where('curr.period_year', $filterYear)
+                ->whereNull('prev.notab')
+                ->select(
+                    DB::raw('COUNT(*) as jumlah_baru_tabungan'),
+                    DB::raw('SUM(curr.sahirrp) as total_baru_tabungan')
+                )
+                ->first();
+
+            $jumlahBaruTabungan = $tabunganBaru->jumlah_baru_tabungan ?? 0;
+            $totalBaruTabungan = $tabunganBaru->total_baru_tabungan ?? 0;
+        }
 
         // Calculate pencairan growth from previous month
         $prevPrevMonth = $prevMonth == '01' ? '12' : str_pad($prevMonth - 1, 2, '0', STR_PAD_LEFT);
@@ -276,6 +311,17 @@ class DashboardController extends Controller
             'jumlah' => $jumlahBaruDeposito,
             'total' => $totalBaruDeposito
         ];
+
+        // Deposito-specific growth (compare to previous month)
+        try {
+            $depositoDelta = $totalDeposito - $prevTotalDeposito;
+            $depositoGrowthPercent = $prevTotalDeposito > 0 ? (($depositoDelta) / $prevTotalDeposito) * 100 : 0;
+            $funding['deposito_growth_percent'] = round($depositoGrowthPercent, 2);
+            $funding['deposito_growth_amount'] = $depositoDelta;
+        } catch (\Exception $e) {
+            $funding['deposito_growth_percent'] = 0;
+            $funding['deposito_growth_amount'] = 0;
+        }
 
         // Funding Detail Table - Current Period (dengan filter)
         $fundingDetails = [
