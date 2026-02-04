@@ -2277,6 +2277,29 @@ function formatNominal($amount) {
                         <i class="ti ti-clock me-1"></i>
                         Data terupdate: {{ formatLastUpdated($lastUpdated['tabungan'] ?? null) }}
                     </small>
+                    @if(isset($funding['tabungan_growth_percent']))
+                        @php $tg = $funding['tabungan_growth_percent']; $ta = $funding['tabungan_growth_amount']; @endphp
+                        <small class="d-block mt-1">
+                            @if($tg >= 0)
+                                <span class="text-success">▲ {{ $tg }}% ({{ formatNominal($ta) }})</span>
+                            @else
+                                <span class="text-danger">▼ {{ abs($tg) }}% ({{ formatNominal($ta) }})</span>
+                            @endif
+                        </small>
+                    @endif
+                    @if(isset($funding['nabung']) || isset($funding['pencairan_tabungan']))
+                        @php
+                            $nabungCount = $funding['nabung']['jumlah'] ?? 0;
+                            $nabungTotal = $funding['nabung']['total'] ?? 0;
+                            $tarikCount = $funding['pencairan_tabungan']['jumlah'] ?? 0;
+                            $tarikTotal = $funding['pencairan_tabungan']['total'] ?? 0;
+                        @endphp
+                        <small class="d-block mt-1">
+                            <span class="text-success">Nabung: <strong>{{ $nabungCount }}</strong> akun ({{ formatNominal($nabungTotal) }})</span>
+                            <span class="text-muted mx-2">|</span>
+                            <span class="text-danger">Tarik: <strong>{{ $tarikCount }}</strong> akun ({{ formatNominal($tarikTotal) }})</span>
+                        </small>
+                    @endif
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -2334,6 +2357,19 @@ function formatNominal($amount) {
                         <i class="ti ti-clock me-1"></i>
                         Data terupdate: {{ formatLastUpdated($lastUpdated['deposito'] ?? null) }}
                     </small>
+                    @if(isset($funding['buka_deposito']) || isset($funding['pencairan_deposito']))
+                        @php
+                            $bukaCount = $funding['buka_deposito']['jumlah'] ?? 0;
+                            $bukaTotal = $funding['buka_deposito']['total'] ?? 0;
+                            $cairCount = $funding['pencairan_deposito']['jumlah'] ?? 0;
+                            $cairTotal = $funding['pencairan_deposito']['total'] ?? 0;
+                        @endphp
+                        <small class="d-block mt-1">
+                            <span class="text-success">Buka: <strong>{{ $bukaCount }}</strong> ({{ formatNominal($bukaTotal) }})</span>
+                            <span class="text-muted mx-2">|</span>
+                            <span class="text-danger">Cair: <strong>{{ $cairCount }}</strong> ({{ formatNominal($cairTotal) }})</span>
+                        </small>
+                    @endif
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">

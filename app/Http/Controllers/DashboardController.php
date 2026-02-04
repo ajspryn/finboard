@@ -143,6 +143,63 @@ class DashboardController extends Controller
         $jumlahPencairan = $depositoCairkan->jumlah_pencairan ?? 0;
         $totalPencairan = $depositoCairkan->total_pencairan ?? 0;
 
+        // Deposito: hitung berapa yang baru buka deposito (ada di bulan ini tapi tidak ada di bulan lalu)
+        $depositoBaru = DB::table('depositos as curr')
+            ->leftJoin('depositos as prev', function ($join) use ($prevMonth, $prevYear) {
+                $join->on('curr.nobilyet', '=', 'prev.nobilyet')
+                    ->where('prev.period_month', $prevMonth)
+                    ->where('prev.period_year', $prevYear);
+            })
+            ->where('curr.period_month', $filterMonth)
+            ->where('curr.period_year', $filterYear)
+            ->whereNull('prev.nobilyet')
+            ->select(
+                DB::raw('COUNT(*) as jumlah_baru_deposito'),
+                DB::raw('SUM(curr.nomrp) as total_baru_deposito')
+            )
+            ->first();
+
+        $jumlahBaruDeposito = $depositoBaru->jumlah_baru_deposito ?? 0;
+        $totalBaruDeposito = $depositoBaru->total_baru_deposito ?? 0;
+
+        // Tabungan: hitung berapa yang "ditarik" (ada di bulan lalu tapi tidak ada di bulan ini)
+        $tabunganCair = DB::table('tabungans as prev')
+            ->leftJoin('tabungans as curr', function ($join) use ($filterMonth, $filterYear) {
+                $join->on('prev.notab', '=', 'curr.notab')
+                    ->where('curr.period_month', $filterMonth)
+                    ->where('curr.period_year', $filterYear);
+            })
+            ->where('prev.period_month', $prevMonth)
+            ->where('prev.period_year', $prevYear)
+            ->whereNull('curr.notab')
+            ->select(
+                DB::raw('COUNT(*) as jumlah_pencairan_tabungan'),
+                DB::raw('SUM(prev.sahirrp) as total_pencairan_tabungan')
+            )
+            ->first();
+
+        $jumlahPencairanTabungan = $tabunganCair->jumlah_pencairan_tabungan ?? 0;
+        $totalPencairanTabungan = $tabunganCair->total_pencairan_tabungan ?? 0;
+
+        // Tabungan: hitung berapa yang baru menabung (ada di bulan ini tapi tidak ada di bulan lalu)
+        $tabunganBaru = DB::table('tabungans as curr')
+            ->leftJoin('tabungans as prev', function ($join) use ($prevMonth, $prevYear) {
+                $join->on('curr.notab', '=', 'prev.notab')
+                    ->where('prev.period_month', $prevMonth)
+                    ->where('prev.period_year', $prevYear);
+            })
+            ->where('curr.period_month', $filterMonth)
+            ->where('curr.period_year', $filterYear)
+            ->whereNull('prev.notab')
+            ->select(
+                DB::raw('COUNT(*) as jumlah_baru_tabungan'),
+                DB::raw('SUM(curr.sahirrp) as total_baru_tabungan')
+            )
+            ->first();
+
+        $jumlahBaruTabungan = $tabunganBaru->jumlah_baru_tabungan ?? 0;
+        $totalBaruTabungan = $tabunganBaru->total_baru_tabungan ?? 0;
+
         // Calculate pencairan growth from previous month
         $prevPrevMonth = $prevMonth == '01' ? '12' : str_pad($prevMonth - 1, 2, '0', STR_PAD_LEFT);
         $prevPrevYear = $prevMonth == '01' ? $prevYear - 1 : $prevYear;
@@ -185,6 +242,39 @@ class DashboardController extends Controller
                 'total' => $totalPencairan,
                 'growth' => round($pencairanGrowth, 2)
             ]
+        ];
+
+        // Tabungan-specific growth (compare to previous month)
+        try {
+            $tabunganDelta = $totalTabungan - $prevTotalTabungan;
+            $tabunganGrowthPercent = $prevTotalTabungan > 0 ? (($tabunganDelta) / $prevTotalTabungan) * 100 : 0;
+            $funding['tabungan_growth_percent'] = round($tabunganGrowthPercent, 2);
+            $funding['tabungan_growth_amount'] = $tabunganDelta;
+        } catch (\Exception $e) {
+            $funding['tabungan_growth_percent'] = 0;
+            $funding['tabungan_growth_amount'] = 0;
+        }
+
+        // Attach tabungan-specific counts/totals for UI
+        $funding['pencairan_tabungan'] = [
+            'jumlah' => $jumlahPencairanTabungan,
+            'total' => $totalPencairanTabungan
+        ];
+
+        $funding['nabung'] = [
+            'jumlah' => $jumlahBaruTabungan,
+            'total' => $totalBaruTabungan
+        ];
+
+        // Attach deposito-specific counts/totals for UI
+        $funding['pencairan_deposito'] = [
+            'jumlah' => $jumlahPencairan,
+            'total' => $totalPencairan
+        ];
+
+        $funding['buka_deposito'] = [
+            'jumlah' => $jumlahBaruDeposito,
+            'total' => $totalBaruDeposito
         ];
 
         // Funding Detail Table - Current Period (dengan filter)
