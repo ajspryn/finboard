@@ -1529,8 +1529,9 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($topAOData as $index => $ao)
-                                <tr class="ao-row" data-ao="{{ $ao['nmao'] }}" style="cursor: pointer;">
+                                @if(isset($topAOData) && count($topAOData) > 0)
+                                    @foreach($topAOData as $index => $ao)
+                                    <tr class="ao-row" data-ao="{{ $ao['nmao'] }}" style="cursor: pointer;">
                                     <td><strong>{{ $index + 1 }}</strong></td>
                                     <td>
                                         <div class="d-flex align-items-center">
@@ -1589,7 +1590,18 @@ function formatNominal($amount) {
                                         </div>
                                     </td>
                                 </tr>
-                                @endforeach
+                                    @endforeach
+                                @else
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted py-4">
+                                            <i class="ti ti-info-circle me-2"></i>
+                                            Tidak ada data Account Officer untuk periode ini.
+                                            @if(isset($filterMonth) && isset($filterYear))
+                                                <div class="small mt-2">Periode: {{ $filterMonth }} / {{ $filterYear }}</div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>
