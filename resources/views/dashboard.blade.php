@@ -1085,6 +1085,40 @@ function formatNominal($amount) {
                             </div>
                         </div>
                     </div>
+
+                    @php
+                        $maxRate = null; $minRate = null; $avgRate = null;
+                        try {
+                            if(\Illuminate\Support\Facades\Schema::hasColumn('depositos', 'bunga')) {
+                                $rateQuery = \DB::table('depositos')
+                                    ->where('period_month', $filterMonth)
+                                    ->where('period_year', $filterYear);
+                                $maxRate = $rateQuery->max('bunga');
+                                $minRate = $rateQuery->min('bunga');
+                                $avgRate = $rateQuery->avg('bunga');
+                            }
+                        } catch (Exception $e) {
+                            // keep nulls when DB/schema unavailable
+                        }
+                    @endphp
+
+                    <div class="mt-3">
+                        <h6 class="mb-2">📊 Rate Deposito</h6>
+                        <div class="d-flex gap-4 align-items-center">
+                            <div>
+                                <small class="text-muted d-block">Tertinggi</small>
+                                <strong>{{ $maxRate !== null ? number_format($maxRate, 2) . '%' : '-' }}</strong>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">Terendah</small>
+                                <strong>{{ $minRate !== null ? number_format($minRate, 2) . '%' : '-' }}</strong>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">Rata-rata</small>
+                                <strong>{{ $avgRate !== null ? number_format($avgRate, 2) . '%' : '-' }}</strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -7619,11 +7653,11 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                         <div class="card-body">
                             <table class="table table-sm table-borderless">
                                 <tr><td class="fw-bold">Nominal Deposito:</td><td class="text-end"><strong class="text-success">${formatNominal(data.nomrp || 0)}</strong></td></tr>
-                                <tr><td class="fw-bold">Suku Bunga:</td><td class="text-end">${data.equivrate || 0}% p.a</td></tr>
+                                <tr><td class="fw-bold">Suku Margin:</td><td class="text-end">${data.equivrate || 0}% p.a</td></tr>
                                 <tr><td class="fw-bold">Komitmen Rate:</td><td class="text-end">${data.komitrate || 0}%</td></tr>
                                 <tr><td class="fw-bold">Nisbah:</td><td class="text-end">${data.nisbah || 0}%</td></tr>
                                 <tr><td class="fw-bold">Tax:</td><td class="text-end">${formatNominal(data.tax || 0)}</td></tr>
-                                <tr><td class="fw-bold">Bunga Tanggal:</td><td class="text-end">${formatNominal(data.bnghtg || 0)}</td></tr>
+                                <tr><td class="fw-bold">Margin Tanggal:</td><td class="text-end">${formatNominal(data.bnghtg || 0)}</td></tr>
                             </table>
                         </div>
                     </div>
@@ -7665,7 +7699,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                                 <tr><td class="fw-bold">No. ID:</td><td>${data.noid || '-'}</td></tr>
                                 <tr><td class="fw-bold">Telp Rumah:</td><td>${data.telprmh || '-'}</td></tr>
                                 <tr><td class="fw-bold">Nama Ibu:</td><td>${data.nmibu || '-'}</td></tr>
-                                <tr><td class="fw-bold">No. Account Bunga:</td><td>${data.noacbng || '-'}</td></tr>
+                                <tr><td class="fw-bold">No. Account Margin:</td><td>${data.noacbng || '-'}</td></tr>
                                 <tr><td class="fw-bold">Kode Wilayah:</td><td>${data.kdwil || '-'}</td></tr>
                                 <tr><td class="fw-bold">Kode AOP:</td><td>${data.kodeaop || '-'}</td></tr>
                                 <tr><td class="fw-bold">Gol Cust BI:</td><td>${data.golcustbi || '-'}</td></tr>
