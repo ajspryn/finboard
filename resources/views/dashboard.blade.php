@@ -1089,13 +1089,13 @@ function formatNominal($amount) {
                     @php
                         $maxRate = null; $minRate = null; $avgRate = null;
                         try {
-                            if(\Illuminate\Support\Facades\Schema::hasColumn('depositos', 'bunga')) {
+                            if(\Illuminate\Support\Facades\Schema::hasColumn('depositos', 'equivrate')) {
                                 $rateQuery = \DB::table('depositos')
                                     ->where('period_month', $filterMonth)
                                     ->where('period_year', $filterYear);
-                                $maxRate = $rateQuery->max('bunga');
-                                $minRate = $rateQuery->min('bunga');
-                                $avgRate = $rateQuery->avg('bunga');
+                                $maxRate = $rateQuery->max('equivrate');
+                                $minRate = $rateQuery->min('equivrate');
+                                $avgRate = $rateQuery->avg('equivrate');
                             }
                         } catch (Exception $e) {
                             // keep nulls when DB/schema unavailable
