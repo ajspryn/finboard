@@ -183,10 +183,14 @@ class DashboardController extends Controller
                           ) pairs";
 
             $bindings = [
-                $prevMonth, $prevYear,
-                $filterMonth, $filterYear,
-                $prevMonth, $prevYear,
-                $filterMonth, $filterYear
+                $prevMonth,
+                $prevYear,
+                $filterMonth,
+                $filterYear,
+                $prevMonth,
+                $prevYear,
+                $filterMonth,
+                $filterYear
             ];
 
             $pairResult = DB::selectOne(DB::raw($pairsSql), $bindings);
