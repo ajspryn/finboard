@@ -193,7 +193,7 @@ class DashboardController extends Controller
                 $filterYear
             ];
 
-            $pairResult = DB::selectOne(DB::raw($pairsSql), $bindings);
+            $pairResult = DB::selectOne($pairsSql, $bindings);
 
             $jumlahPencairanTabungan = isset($pairResult->withdrawn_count) ? (int)$pairResult->withdrawn_count : 0;
             $totalPencairanTabungan = isset($pairResult->withdrawn_total) ? (float)$pairResult->withdrawn_total : 0;
