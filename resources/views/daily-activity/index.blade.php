@@ -75,13 +75,35 @@
                         </div>
                         <div class="flex-grow-1">
                             <span class="fw-semibold d-block mb-1">Status API</span>
-                            <h6 class="card-title mb-1 text-success">Terhubung</h6>
+                            @if(!empty($apiConnected))
+                                <h6 class="card-title mb-1 text-success">Terhubung</h6>
+                                @if(!empty($apiStatusCode))
+                                    <small class="text-muted">HTTP {{ $apiStatusCode }}</small>
+                                @endif
+                            @else
+                                <h6 class="card-title mb-1 text-danger">Tidak Terhubung</h6>
+                                @if(!empty($apiStatusCode))
+                                    <small class="text-muted">HTTP {{ $apiStatusCode }}</small>
+                                @endif
+                            @endif
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    @if(empty($apiConnected) && !empty($apiError))
+        <div class="alert alert-warning">
+            <div class="d-flex align-items-start">
+                <i class="ti ti-alert-triangle me-2"></i>
+                <div>
+                    <div class="fw-semibold">Gagal mengambil data Daily Activity dari API absensi</div>
+                    <div class="small text-muted">{{ $apiError }}</div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- Main Content -->
     <div class="row">

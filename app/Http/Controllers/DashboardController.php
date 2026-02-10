@@ -30,9 +30,13 @@ class DashboardController extends Controller
         // Build base query with combined filters
         $query = Pembiayaan::query();
 
-        // Step 1: Filter by period_month dan period_year - WAJIB
-        $query->where('period_month', $filterMonth);
-        $query->where('period_year', $filterYear);
+        // Step 1: Filter by period_month dan period_year - apply only when user didn't select 'all'
+        if ($filterMonth !== 'all') {
+            $query->where('period_month', $filterMonth);
+        }
+        if ($filterYear !== 'all') {
+            $query->where('period_year', $filterYear);
+        }
 
         // Step 2: Filter by tanggal range (tgleff) - OPSIONAL
         if ($startDay && $endDay) {
@@ -73,11 +77,21 @@ class DashboardController extends Controller
 
         // Funding data (Real dari tabel tabungans dan depositos)
         // Build query dengan filter yang sama seperti lending
-        $tabunganQuery = Tabungan::where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+        $tabunganQuery = Tabungan::query();
+        if ($filterMonth !== 'all') {
+            $tabunganQuery->where('period_month', $filterMonth);
+        }
+        if ($filterYear !== 'all') {
+            $tabunganQuery->where('period_year', $filterYear);
+        }
 
-        $depositoQuery = Deposito::where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+        $depositoQuery = Deposito::query();
+        if ($filterMonth !== 'all') {
+            $depositoQuery->where('period_month', $filterMonth);
+        }
+        if ($filterYear !== 'all') {
+            $depositoQuery->where('period_year', $filterYear);
+        }
 
         // Apply date range filter jika ada (menggunakan tgltrnakh untuk tabungan, tglbuka untuk deposito)
         if ($startDay && $endDay) {
@@ -769,7 +783,8 @@ class DashboardController extends Controller
             });
 
         // Top AO Performance (All AOs)
-        $topAOData = (clone $query)
+        // Build Top AO query separately so we can inspect SQL/bindings if needed
+        $topAOQuery = (clone $query)
             ->select(
                 'nmao',
                 DB::raw('COUNT(*) as total_nasabah'),
@@ -781,24 +796,41 @@ class DashboardController extends Controller
             ->whereNotNull('nmao')
             ->where('nmao', '!=', '')
             ->groupBy('nmao')
-            ->orderBy('total_outstanding', 'desc')
-            ->get()
-            ->map(function ($item) {
-                $npfRatio = $item->total_outstanding > 0
-                    ? ($item->total_npf / $item->total_outstanding) * 100
-                    : 0;
+            ->orderBy('total_outstanding', 'desc');
 
-                return [
-                    'nmao' => $item->nmao,
-                    'total_nasabah' => $item->total_nasabah,
-                    'total_outstanding' => $item->total_outstanding,
-                    'total_plafon' => $item->total_plafon,
-                    'total_npf' => $item->total_npf,
-                    'jumlah_npf' => $item->jumlah_npf,
-                    'npf_ratio' => round($npfRatio, 2),
-                    'outstanding_miliar' => round($item->total_outstanding / 1000000000, 2)
-                ];
-            });
+        try {
+            $topAORawSql = $topAOQuery->toSql();
+            $topAOBindings = $topAOQuery->getBindings();
+        } catch (\Exception $e) {
+            $topAORawSql = null;
+            $topAOBindings = [];
+        }
+
+        $topAOCollection = $topAOQuery->get();
+
+        // Log SQL and counts for debugging when card is empty
+        try {
+            \Log::debug('Top AO query', ['sql' => $topAORawSql, 'bindings' => $topAOBindings, 'count' => $topAOCollection->count(), 'sample' => $topAOCollection->first()]);
+        } catch (\Exception $e) {
+            // ignore logging errors
+        }
+
+        $topAOData = $topAOCollection->map(function ($item) {
+            $npfRatio = $item->total_outstanding > 0
+                ? ($item->total_npf / $item->total_outstanding) * 100
+                : 0;
+
+            return [
+                'nmao' => $item->nmao,
+                'total_nasabah' => $item->total_nasabah,
+                'total_outstanding' => $item->total_outstanding,
+                'total_plafon' => $item->total_plafon,
+                'total_npf' => $item->total_npf,
+                'jumlah_npf' => $item->jumlah_npf,
+                'npf_ratio' => round($npfRatio, 2),
+                'outstanding_miliar' => round($item->total_outstanding / 1000000000, 2)
+            ];
+        });
 
         // AO Funding Performance - Only Depositos
         $currentDate = now()->format('Y-m-d');

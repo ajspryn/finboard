@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'absensi' => [
+        'url' => env('ABSENSI_API_URL', 'https://absensi.bprsbtb.co.id/api/daily-activities'),
+        'token' => env('ABSENSI_API_TOKEN'),
+    ],
+
 ];
