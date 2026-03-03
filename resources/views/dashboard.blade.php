@@ -781,6 +781,16 @@ function formatNominal($amount) {
             }
         }
 
+        $activeRange = $range ?? request('range', 'all');
+
+        $dashboardDefaults = [
+            'start_day' => $startDay ?? null,
+            'end_day' => $endDay ?? null,
+            'month' => $filterMonth ?? null,
+            'year' => $filterYear ?? null,
+            'range' => $range ?? null,
+        ];
+
         function formatLastUpdated($updatedAt) {
             if (!$updatedAt) return 'Belum ada data';
             $date = new DateTime($updatedAt);
@@ -835,6 +845,32 @@ function formatNominal($amount) {
         </div>
     </div>
     @endif
+
+    <!-- Global Time Range Filter (Header) -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-1">
+                <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h5 class="mb-0">Filter Waktu Dashboard</h5>
+                        <small class="text-muted d-block">
+                            <i class="ti ti-calendar me-1"></i>
+                            Range: <strong>{{ strtoupper($activeRange) }}</strong>
+                        </small>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Filter waktu dashboard">
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === '1d' ? 'active' : '' }}" onclick="setDashboardRange('1d')">1D</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === '1w' ? 'active' : '' }}" onclick="setDashboardRange('1w')">1W</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === '1m' ? 'active' : '' }}" onclick="setDashboardRange('1m')">1M</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === '3m' ? 'active' : '' }}" onclick="setDashboardRange('3m')">3M</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === '1y' ? 'active' : '' }}" onclick="setDashboardRange('1y')">1Y</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === 'ytd' ? 'active' : '' }}" onclick="setDashboardRange('ytd')">YTD</button>
+                        <button type="button" class="btn btn-outline-primary {{ $activeRange === 'all' ? 'active' : '' }}" onclick="setDashboardRange('all')">ALL</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Segmentasi Tagihan Modal -->
     <div class="modal fade" id="segmentasiTagihanModal" tabindex="-1" aria-labelledby="segmentasiTagihanModalTitle" aria-hidden="true">
@@ -1377,17 +1413,19 @@ function formatNominal($amount) {
         <!-- Monthly Trends Chart (hanya untuk admin dan pengurus) -->
         <div class="col-lg-6 mb-4">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">📈 Tren Bulanan</h5>
-                    <small class="text-muted">Plafon vs Outstanding (Miliar Rupiah)</small>
-                    <small class="text-muted d-block">
-                        <i class="ti ti-calendar me-1"></i>
-                        Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
-                    </small>
-                    <small class="text-muted d-block">
-                        <i class="ti ti-clock me-1"></i>
-                        Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
-                    </small>
+                <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <h5 class="card-title mb-0">📈 Tren Bulanan</h5>
+                        <small class="text-muted">Plafon vs Outstanding (Miliar Rupiah)</small>
+                        <small class="text-muted d-block">
+                            <i class="ti ti-calendar me-1"></i>
+                            Range: {{ $trendRangeLabel ?? '-' }}
+                        </small>
+                        <small class="text-muted d-block">
+                            <i class="ti ti-clock me-1"></i>
+                            Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
+                        </small>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="monthlyTrendChart"></div>
@@ -1531,7 +1569,7 @@ function formatNominal($amount) {
                             <tbody>
                                 @if(isset($topAOData) && count($topAOData) > 0)
                                     @foreach($topAOData as $index => $ao)
-                                    <tr class="ao-row" data-ao="{{ $ao['nmao'] }}" style="cursor: pointer;">
+                                    <tr class="ao-row" data-ao="{{ $ao['ao_key'] ?? $ao['nmao'] }}" data-ao-name="{{ $ao['nmao'] }}" style="cursor: pointer;">
                                     <td><strong>{{ $index + 1 }}</strong></td>
                                     <td>
                                         <div class="d-flex align-items-center">
@@ -1560,7 +1598,7 @@ function formatNominal($amount) {
                                         @if($ao['jumlah_npf'] > 0)
                                             <span class="badge bg-label-danger npf-badge"
                                                 style="cursor: pointer;"
-                                                onclick="showAONpfDetail(event, '{{ $ao['nmao'] }}')"
+                                                onclick="showAONpfDetail(event, '{{ $ao['ao_key'] ?? $ao['nmao'] }}', '{{ $ao['nmao'] }}')"
                                                 title="Klik untuk melihat detail NPF">
                                                 {{ $ao['jumlah_npf'] }} NPF
                                             </span>
@@ -2685,6 +2723,44 @@ function formatNominal($amount) {
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+window.__dashboardDefaults = @json($dashboardDefaults);
+
+// Helpers to keep all dashboard AJAX calls aligned with the same filters
+window.getDashboardQueryParams = function() {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams();
+    const defaults = window.__dashboardDefaults || {};
+    ['start_day', 'end_day', 'month', 'year', 'range'].forEach((key) => {
+        let value = url.searchParams.get(key);
+        if (value === null || value === '') {
+            value = defaults[key] ?? null;
+        }
+
+        if (value !== null && value !== '') {
+            params.set(key, value);
+        }
+    });
+    return params;
+};
+
+window.withDashboardQuery = function(baseUrl) {
+    const params = window.getDashboardQueryParams();
+    const qs = params.toString();
+    if (!qs) return baseUrl;
+    return baseUrl + (baseUrl.includes('?') ? '&' : '?') + qs;
+};
+
+window.setDashboardRange = function(range) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('range', range);
+    url.searchParams.delete('start_day');
+    url.searchParams.delete('end_day');
+    window.location.href = url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '');
+};
+
+// Backward-compatible alias (old name used previously)
+window.setTrendRange = window.setDashboardRange;
+
 // Populate types when category changes
 document.addEventListener('DOMContentLoaded', function() {
     const segmentCodes = @json($segmentCodes);
@@ -3822,34 +3898,18 @@ function showKecamatanDetail(kecamatan) {
 }
 
 // Function untuk menampilkan detail AO
-function showAODetail(nmao) {
+function showAODetail(aoKey, aoName) {
     const modalElement = document.getElementById('segmentDetailModal');
     if (!modalElement) return;
 
     const modal = new bootstrap.Modal(modalElement);
     modal.show();
 
-    document.getElementById('modalSegmentTitle').textContent = 'Detail Nasabah - AO: ' + nmao;
+    const titleName = aoName || aoKey;
+    document.getElementById('modalSegmentTitle').textContent = 'Detail Nasabah - AO: ' + titleName;
     document.getElementById('modalSegmentBody').innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
-    // Get current filter parameters from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const startDay = urlParams.get('start_day');
-    const endDay = urlParams.get('end_day');
-    const month = urlParams.get('month');
-    const year = urlParams.get('year');
-
-    // Build URL with all filter parameters
-    let url = `/dashboard/ao-detail/${encodeURIComponent(nmao)}`;
-    const params = [];
-    if (startDay) params.push('start_day=' + startDay);
-    if (endDay) params.push('end_day=' + endDay);
-    if (month) params.push('month=' + month);
-    if (year) params.push('year=' + year);
-    if (params.length > 0) {
-        url += '?' + params.join('&');
-    }
-
+    const url = window.withDashboardQuery(`/dashboard/ao-detail/${encodeURIComponent(aoKey)}`);
     fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -3893,7 +3953,7 @@ function showAODetail(nmao) {
 }
 
 // Function untuk menampilkan detail NPF dari Account Officer
-function showAONpfDetail(event, nmao) {
+function showAONpfDetail(event, aoKey, aoName) {
     // Stop event propagation to prevent row click event
     if (event) {
         event.stopPropagation();
@@ -3905,29 +3965,13 @@ function showAONpfDetail(event, nmao) {
     const modal = new bootstrap.Modal(modalElement);
     modal.show();
 
+    const titleName = aoName || aoKey;
     document.getElementById('modalAONpfTitle').innerHTML =
-        '<i class="ti ti-alert-triangle"></i> Detail NPF - AO: ' + nmao;
+        '<i class="ti ti-alert-triangle"></i> Detail NPF - AO: ' + titleName;
     document.getElementById('modalAONpfBody').innerHTML =
         '<div class="text-center p-4"><div class="spinner-border text-danger" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
-    // Get current filter parameters from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const startDay = urlParams.get('start_day');
-    const endDay = urlParams.get('end_day');
-    const month = urlParams.get('month');
-    const year = urlParams.get('year');
-
-    // Build URL with all filter parameters
-    let url = `/dashboard/ao-npf-detail/${encodeURIComponent(nmao)}`;
-    const params = [];
-    if (startDay) params.push('start_day=' + startDay);
-    if (endDay) params.push('end_day=' + endDay);
-    if (month) params.push('month=' + month);
-    if (year) params.push('year=' + year);
-    if (params.length > 0) {
-        url += '?' + params.join('&');
-    }
-
+    const url = window.withDashboardQuery(`/dashboard/ao-npf-detail/${encodeURIComponent(aoKey)}`);
     fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -4014,8 +4058,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Click event untuk detail nasabah AO
     document.querySelectorAll('.ao-row').forEach(row => {
         row.addEventListener('click', function(e) {
-            const aoName = this.dataset.ao;
-            showAODetail(aoName);
+            const aoKey = this.dataset.ao;
+            const aoName = this.dataset.aoName;
+            showAODetail(aoKey, aoName);
         });
     });
 
@@ -4591,7 +4636,7 @@ function createTabunganTrendChart(type = 'nominal') {
         tabunganTrendChart.destroy();
     }
 
-    fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`)
+    fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`))
         .then(response => response.json())
         .then(data => {
             const series = [];
@@ -4724,7 +4769,7 @@ function createDepositoTrendChart(type = 'nominal') {
         depositoTrendChart.destroy();
     }
 
-    fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`)
+    fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`))
         .then(response => response.json())
         .then(data => {
             const series = [];
@@ -4896,10 +4941,10 @@ function createCombinedTrendView(type = 'nominal', view = 'chart') {
 
     // Fetch both tabungan and deposito data
     Promise.all([
-        (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
-        (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
-        showTotalLinkage ? fetch(`/dashboard/trend-product-detail?jenis=linkage&type=${type}`).then(r => r.json()) : Promise.resolve({data: []}),
-        showTotalPencairanDeposito ? fetch(`/dashboard/trend-product-detail?jenis=pencairan_deposito&type=${type}`).then(r => r.json()) : Promise.resolve({data: []})
+        (showTotalTabungan || selectedTabunganProducts.length > 0) ? fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=tabungan&type=${type}`)).then(r => r.json()) : Promise.resolve({data: []}),
+        (showTotalDeposito || selectedDepositoProducts.length > 0) ? fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=deposito&type=${type}`)).then(r => r.json()) : Promise.resolve({data: []}),
+        showTotalLinkage ? fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=linkage&type=${type}`)).then(r => r.json()) : Promise.resolve({data: []}),
+        showTotalPencairanDeposito ? fetch(window.withDashboardQuery(`/dashboard/trend-product-detail?jenis=pencairan_deposito&type=${type}`)).then(r => r.json()) : Promise.resolve({data: []})
     ])
     .then(([tabunganData, depositoData, linkageData, pencairanData]) => {
         const series = [];
@@ -5449,7 +5494,7 @@ window.toggleCombinedTrendChart = function(type) {
 
 // Function to load available products for filtering
 function loadProductFilters() {
-    const tabunganPromise = fetch('/dashboard/trend-product-detail?jenis=tabungan&type=nominal')
+    const tabunganPromise = fetch(window.withDashboardQuery('/dashboard/trend-product-detail?jenis=tabungan&type=nominal'))
         .then(response => response.json())
         .then(data => {
             const tabunganList = document.getElementById('tabunganProductsList');
@@ -5479,7 +5524,7 @@ function loadProductFilters() {
             document.getElementById('tabunganProductsList').innerHTML = '<div class="col-12 text-center text-muted py-2"><small>Gagal memuat produk tabungan</small></div>';
         });
 
-    const depositoPromise = fetch('/dashboard/trend-product-detail?jenis=deposito&type=nominal')
+    const depositoPromise = fetch(window.withDashboardQuery('/dashboard/trend-product-detail?jenis=deposito&type=nominal'))
         .then(response => response.json())
         .then(data => {
             const depositoList = document.getElementById('depositoProductsList');
@@ -5636,9 +5681,10 @@ function formatProductCode(code, type) {
 function showCustomerDetails(jenis, type) {
     // Jika jenis dimulai dengan 'current_', gunakan logika trend seperti chart kontrak
     if (jenis.startsWith('current_')) {
+        const urlParams = new URLSearchParams(window.location.search);
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
-        const currentYear = currentDate.getFullYear();
+        const currentMonth = parseInt(urlParams.get('month') || String(currentDate.getMonth() + 1), 10);
+        const currentYear = parseInt(urlParams.get('year') || String(currentDate.getFullYear()), 10);
 
         let kategori = '';
         if (jenis === 'current_tabungan') kategori = 'tabungan';
@@ -5717,7 +5763,7 @@ function showCustomerDetails(jenis, type) {
     }, { once: true });
 
     // Fetch customer data
-    fetch(`/dashboard/customer-details?jenis=${jenis}&type=${type}&limit=100`)
+    fetch(window.withDashboardQuery(`/dashboard/customer-details?jenis=${jenis}&type=${type}&limit=100`))
         .then(response => response.json())
         .then(data => {
             if (data.customers && data.customers.length > 0) {
@@ -5812,7 +5858,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
     }, { once: true });
 
     // Fetch kolektibilitas customer data
-    fetch(`/dashboard/kolektibilitas-details?kategori=${kategori}&limit=100`, {
+    fetch(window.withDashboardQuery(`/dashboard/kolektibilitas-details?kategori=${kategori}&limit=100`), {
         headers: {
             'Accept': 'application/json'
         },
@@ -6110,14 +6156,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         else if (category === 'pencairan') categoryLabel = 'Pencairan';
         else if (category === 'total') categoryLabel = 'Total Funding';
 
+        const dashboardYear = window.getDashboardQueryParams().get('year');
+        const yearValue = (dashboardYear && dashboardYear !== 'all') ? dashboardYear : new Date().getFullYear();
+
         // Determine month label
         let monthLabel = '';
         if (month === 'all') {
-            monthLabel = 'Seluruh Tahun ' + new Date().getFullYear();
+            monthLabel = 'Seluruh Tahun ' + yearValue;
         } else {
             const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            monthLabel = monthNames[parseInt(month) - 1] + ' ' + new Date().getFullYear();
+            monthLabel = monthNames[parseInt(month) - 1] + ' ' + yearValue;
         }
 
         // Update title
@@ -6170,8 +6219,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
             document.body.style.paddingRight = '';
         }, { once: true }); // Use once: true to avoid multiple listeners
 
-        // Fetch customer details
-        fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}`)
+        // Fetch customer details (carry dashboard year)
+        const yearQuery = yearValue ? `?year=${encodeURIComponent(yearValue)}` : '';
+        fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}${yearQuery}`)
             .then(response => {
                 console.log('Response status:', response.status);
                 if (!response.ok) {
@@ -6200,14 +6250,17 @@ function showKolektibilitasDetails(kategori, namaKategori) {
 
         const modalBody = document.getElementById('customerDetailsModalBody');
 
+        const dashboardYear = window.getDashboardQueryParams().get('year');
+        const yearValue = (dashboardYear && dashboardYear !== 'all') ? dashboardYear : new Date().getFullYear();
+
         // Determine month label
         let monthLabel = '';
         if (month === 'all') {
-            monthLabel = 'Seluruh Tahun ' + new Date().getFullYear();
+            monthLabel = 'Seluruh Tahun ' + yearValue;
         } else {
             const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            monthLabel = monthNames[parseInt(month) - 1] + ' ' + new Date().getFullYear();
+            monthLabel = monthNames[parseInt(month) - 1] + ' ' + yearValue;
         }
 
         // Determine category label and button classes
@@ -6251,8 +6304,9 @@ function showKolektibilitasDetails(kategori, namaKategori) {
                 </div>
             `;
 
-            // Fetch data
-            fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}`)
+            // Fetch data (carry dashboard year)
+            const yearQuery = yearValue ? `?year=${encodeURIComponent(yearValue)}` : '';
+            fetch(`/dashboard/ao-customer-details/${encodeURIComponent(ao)}/${month}/${category}${yearQuery}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok: ' + response.status);
@@ -6415,7 +6469,7 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         }, { once: true }); // Use once: true to avoid multiple listeners
 
         // Fetch AO funding detail data
-        fetch(`/dashboard/ao-funding-detail/${encodeURIComponent(kodeaoh)}`)
+        fetch(window.withDashboardQuery(`/dashboard/ao-funding-detail/${encodeURIComponent(kodeaoh)}`))
             .then(response => {
                 console.log('Response status:', response.status);
                 if (!response.ok) {

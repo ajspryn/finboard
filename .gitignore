@@ -26,6 +26,14 @@ yarn-error.log
 bootstrap/cache/*
 !bootstrap/cache/.gitkeep
 
+# Laravel runtime artifacts
+/storage/framework/cache/**
+/storage/framework/sessions/**
+/storage/framework/views/**
+!/storage/framework/views/.gitkeep
+/storage/framework/testing/**
+/storage/logs/**
+
 # Database files
 database/*.sqlite
 database/*.db

@@ -9,6 +9,75 @@ use Illuminate\Support\Facades\Auth;
 
 class ExportController extends Controller
 {
+    private function getAoMapping(): array
+    {
+        return [
+            '017' => 'AGUS SETIAWAN',
+            '018' => 'ADITYA FATAHILLAH MUHARAM',
+            '020' => 'TAUFAN NUGRAHA',
+            '021' => 'SURYA SEPTIANNANDA',
+            '022' => 'FACHRI EKA PUTRA',
+            '023' => 'RIZKI NIRMALA',
+            '024' => 'GUNANTO',
+            '025' => 'SANDI M ILHAM',
+            '026' => 'FEISHAL JUAENI',
+            '027' => 'ZAINAL ARIFIN',
+            '028' => 'RIVI NUGRAHA',
+            '029' => 'YOHAN EKA PUTRA',
+            '030' => 'YUSRON WIJAYA',
+            '031' => 'SABIQ KHUSNAIDI',
+            '032' => 'YUNITA HERDIANA',
+            '033' => 'YUSI IRMAYANTI',
+            '034' => 'LARIZA AFRIANTI',
+            '035' => 'DEVI NURLIANTO',
+            '036' => 'FAUZIA NURUL AFINAH',
+            '037' => 'ENDANG SITI MULYANI',
+            '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
+            '039' => 'BALQIS CITRA SULISTYANA',
+            '11' => 'DERRY NUR MUHAMMAD',
+            '12' => 'FATTAH YASIN',
+            'GR01' => 'AO GRAMINDO 01',
+            'GR02' => 'AO GRAMINDO 02',
+            'GR03' => 'AO GRAMINDO 03',
+            'GR04' => 'AO GRAMINDO 04',
+            'GR05' => 'AO GRAMINDO 05',
+            'GR06' => 'AO BTB-GRAMIN 06',
+            'GR07' => 'AO BTB-GRAMIN 07',
+            'GR08' => 'AO BTB-GRAMIN 08',
+            'GR09' => 'AO BTB-GRAMIN 09',
+            'GR10' => 'AO BTB-GRAMIN 10',
+            'GR11' => 'AO BTB-GRAMIN 11',
+            'GR12' => 'AO BTB-GRAMIN 12',
+            'GR13' => 'AO BTB-GRAMIN 13',
+            'GR14' => 'AO BTB-GRAMIN 14',
+            'GR15' => 'AO BTB-GRAMIN 15',
+            'GR16' => 'AO BTB-GRAMIN 16',
+            'GR17' => 'AO BTB-GRAMIN 17',
+            'SDI' => 'SDI',
+        ];
+    }
+
+    private function getAoDisplayName(?string $aoCodeOrName): string
+    {
+        $raw = (string)($aoCodeOrName ?? '');
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '-';
+        }
+
+        $aoMapping = $this->getAoMapping();
+        if (isset($aoMapping[$raw])) {
+            return $aoMapping[$raw];
+        }
+
+        $withoutLeadingZeros = ltrim($raw, '0');
+        if ($withoutLeadingZeros !== '' && isset($aoMapping[$withoutLeadingZeros])) {
+            return $aoMapping[$withoutLeadingZeros];
+        }
+
+        return 'AO ' . $raw;
+    }
+
     public function exportDashboard(Request $request)
     {
         // Get current filter parameters
@@ -256,7 +325,7 @@ class ExportController extends Controller
     {
         return DB::table('pembiayaans')
             ->select(
-                'nmao',
+                'kdaoh',
                 DB::raw('COUNT(*) as total_nasabah'),
                 DB::raw('SUM(osmdlc) as total_outstanding'),
                 DB::raw('SUM(mdlawal) as total_plafon'),
@@ -265,9 +334,9 @@ class ExportController extends Controller
             )
             ->where('period_month', $month)
             ->where('period_year', $year)
-            ->whereNotNull('nmao')
-            ->where('nmao', '!=', '')
-            ->groupBy('nmao')
+            ->whereNotNull('kdaoh')
+            ->where('kdaoh', '!=', '')
+            ->groupBy('kdaoh')
             ->orderBy('total_outstanding', 'desc')
             ->limit(5)
             ->get()
@@ -277,7 +346,8 @@ class ExportController extends Controller
                     : 0;
 
                 return [
-                    'nmao' => $item->nmao,
+                    'ao_key' => $item->kdaoh,
+                    'nmao' => $this->getAoDisplayName($item->kdaoh),
                     'total_nasabah' => $item->total_nasabah,
                     'total_outstanding' => $item->total_outstanding,
                     'total_plafon' => $item->total_plafon,
