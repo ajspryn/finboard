@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 class FinancialHighlight extends Model
 {
     use Searchable;
+
+    public const CACHE_TTL_MINUTES = 60;
+    public const DASHBOARD_CACHE_TTL_MINUTES = 30;
+    public const DEFAULT_COMPARISON = 'MOM';
+    public const COMPARISON_TYPES = ['MOM', 'YOY'];
+
     protected $fillable = [
         'period_year',
         'period_month',

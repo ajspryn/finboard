@@ -58,13 +58,15 @@ class ProcessCsvUpload implements ShouldQueue
 
         // Aggressive database optimizations for maximum performance
         DB::disableQueryLog();
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        DB::statement('SET UNIQUE_CHECKS=0;');
-        // DB::statement('SET AUTOCOMMIT=0;'); // Removed - causing transaction issues
-        DB::statement('SET SQL_MODE="";'); // Disable strict mode for faster inserts
-        // DB::statement('SET SESSION innodb_buffer_pool_size = 134217728;'); // Removed - global variable
-        // DB::statement('SET SESSION innodb_log_buffer_size = 16777216;'); // Removed - global variable
-        DB::statement('SET SESSION bulk_insert_buffer_size = 268435456;'); // 256MB bulk insert buffer
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            DB::statement('SET UNIQUE_CHECKS=0;');
+            // DB::statement('SET AUTOCOMMIT=0;'); // Removed - causing transaction issues
+            DB::statement('SET SQL_MODE="";'); // Disable strict mode for faster inserts
+            // DB::statement('SET SESSION innodb_buffer_pool_size = 134217728;'); // Removed - global variable
+            // DB::statement('SET SESSION innodb_log_buffer_size = 16777216;'); // Removed - global variable
+            DB::statement('SET SESSION bulk_insert_buffer_size = 268435456;'); // 256MB bulk insert buffer
+        }
 
         // Fetch status records from database
         $statusRecords = CsvUploadStatus::whereIn('id', array_values($this->statusIds))->get()->keyBy('upload_type');
@@ -138,8 +140,10 @@ class ProcessCsvUpload implements ShouldQueue
             throw $e;
         } finally {
             // Re-enable database optimizations
-            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-            DB::statement('SET UNIQUE_CHECKS=1;');
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+                DB::statement('SET UNIQUE_CHECKS=1;');
+            }
             // DB::statement('SET AUTOCOMMIT=1;'); // Removed - not needed
             DB::enableQueryLog();
 
@@ -368,7 +372,13 @@ class ProcessCsvUpload implements ShouldQueue
                 $record = $this->createRecordFromCsvRow($data, $header, $jenis, $lineNumber, $month, $year);
 
                 if ($record === null) {
-                    continue; // Skip invalid records
+                    continue;
+                }
+
+                if (is_array($record) && ($record['__invalid'] ?? false)) {
+                    $errors++;
+                    $errorDetails[] = "{$jenis} Baris {$lineNumber}: " . ($record['message'] ?? 'Data tidak valid');
+                    continue;
                 }
 
                 $batchData[] = $record;
@@ -421,8 +431,9 @@ class ProcessCsvUpload implements ShouldQueue
         if ($jenis === 'PEMBIAYAAN') {
             // Use the existing validateAndConvertData method for pembiayaan
             if (count($header) !== count($data)) {
-                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
-                return null;
+                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
+                Log::warning("{$message} (baris {$lineNumber})");
+                return ['__invalid' => true, 'message' => $message];
             }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
@@ -430,13 +441,14 @@ class ProcessCsvUpload implements ShouldQueue
                 return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing PEMBIAYAAN row {$lineNumber}: " . $e->getMessage());
-                return null; // Skip this row
+                return ['__invalid' => true, 'message' => $e->getMessage()];
             }
         } elseif ($jenis === 'TABUNGAN') {
             // Use array_combine and validation like PEMBIAYAAN
             if (count($header) !== count($data)) {
-                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
-                return null;
+                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
+                Log::warning("{$message} (baris {$lineNumber})");
+                return ['__invalid' => true, 'message' => $message];
             }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
@@ -444,13 +456,14 @@ class ProcessCsvUpload implements ShouldQueue
                 return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing TABUNGAN row {$lineNumber}: " . $e->getMessage());
-                return null; // Skip this row
+                return ['__invalid' => true, 'message' => $e->getMessage()];
             }
         } elseif ($jenis === 'DEPOSITO') {
             // Use array_combine and validation like PEMBIAYAAN
             if (count($header) !== count($data)) {
-                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
-                return null;
+                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
+                Log::warning("{$message} (baris {$lineNumber})");
+                return ['__invalid' => true, 'message' => $message];
             }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
@@ -458,13 +471,14 @@ class ProcessCsvUpload implements ShouldQueue
                 return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing DEPOSITO row {$lineNumber}: " . $e->getMessage());
-                return null; // Skip this row
+                return ['__invalid' => true, 'message' => $e->getMessage()];
             }
         } elseif ($jenis === 'LINKAGE') {
             // Use array_combine and validation like PEMBIAYAAN
             if (count($header) !== count($data)) {
-                Log::warning("Mismatch kolom header vs data di baris {$lineNumber}: header " . count($header) . ", data " . count($data));
-                return null;
+                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
+                Log::warning("{$message} (baris {$lineNumber})");
+                return ['__invalid' => true, 'message' => $message];
             }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
@@ -472,7 +486,7 @@ class ProcessCsvUpload implements ShouldQueue
                 return $record;
             } catch (\Exception $e) {
                 Log::warning("Error parsing LINKAGE row {$lineNumber}: " . $e->getMessage());
-                return null; // Skip this row
+                return ['__invalid' => true, 'message' => $e->getMessage()];
             }
         }
 
@@ -543,6 +557,37 @@ class ProcessCsvUpload implements ShouldQueue
         // Convert and validate dates with tolerance
         $tgleff = $this->parseDate($data['tgleff'] ?? '');
         $tglexp = $this->parseDate($data['tglexp'] ?? '');
+
+        // If a date is provided but cannot be parsed, treat it as a validation error
+        if (!empty($data['tgleff'] ?? null) && $tgleff === null) {
+            throw new \Exception("Field 'tgleff' tidak valid");
+        }
+        if (!empty($data['tglexp'] ?? null) && $tglexp === null) {
+            throw new \Exception("Field 'tglexp' tidak valid");
+        }
+
+        // Strict validation for core numeric fields when provided
+        foreach (['jw', 'plafon'] as $field) {
+            $raw = $data[$field] ?? null;
+            if ($raw === null) {
+                continue;
+            }
+            $raw = str_replace(' ', '', (string) $raw);
+            if ($raw === '') {
+                continue;
+            }
+
+            $normalized = $raw;
+            if (preg_match('/^-?\d+,\d{1,2}$/', $normalized)) {
+                $normalized = str_replace(',', '.', $normalized);
+            } else {
+                $normalized = str_replace(',', '', $normalized);
+            }
+
+            if (!preg_match('/^-?\d+(?:\.\d+)?$/', $normalized)) {
+                throw new \Exception("Field '{$field}' tidak valid");
+            }
+        }
 
         // Validate date ranges if both dates exist (but don't throw exception)
         if ($tgleff && $tglexp && strtotime($tgleff) > strtotime($tglexp)) {

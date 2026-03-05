@@ -94,12 +94,12 @@
 
                             <div class="mb-6 form-control-validation">
                                 <div class="auth-input-wrapper d-flex align-items-center justify-content-between numeral-mask-wrapper">
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin1" autofocus />
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin2" />
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin3" />
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin4" />
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin5" />
-                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin6" />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autofocus />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin2" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin3" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin5" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+                                    <input type="tel" class="form-control auth-input h-px-50 text-center numeral-mask mx-sm-1 my-2" maxlength="1" id="pin6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
                                 </div>
                                 <!-- Hidden field to store combined PIN -->
                                 <input type="hidden" name="pin" id="pin" />
@@ -181,11 +181,39 @@
 
         // Auto-focus and navigation between PIN inputs
         const pinInputs = ['pin1', 'pin2', 'pin3', 'pin4', 'pin5', 'pin6'];
+
+        function fillPinFromString(startIndex, value) {
+            const digits = (value || '').replace(/[^0-9]/g, '');
+            if (!digits) return;
+
+            for (let i = 0; i < digits.length; i++) {
+                const targetIndex = startIndex + i;
+                if (targetIndex >= pinInputs.length) break;
+                document.getElementById(pinInputs[targetIndex]).value = digits[i];
+            }
+
+            // Focus next empty input (or last input)
+            let focusIndex = startIndex;
+            while (focusIndex < pinInputs.length && document.getElementById(pinInputs[focusIndex]).value) {
+                focusIndex++;
+            }
+            document.getElementById(pinInputs[Math.min(focusIndex, pinInputs.length - 1)]).focus();
+        }
+
         pinInputs.forEach((id, index) => {
             const input = document.getElementById(id);
             input.addEventListener('input', function(e) {
                 // Remove non-numeric characters
-                this.value = this.value.replace(/[^0-9]/g, '');
+                const cleaned = this.value.replace(/[^0-9]/g, '');
+
+                // Handle OS autofill (often fills 6 digits at once into the first box)
+                if (cleaned.length > 1) {
+                    this.value = cleaned[0] || '';
+                    fillPinFromString(index, cleaned);
+                    return;
+                }
+
+                this.value = cleaned;
 
                 // Auto-move to next input
                 if (this.value.length === 1 && index < pinInputs.length - 1) {
@@ -204,16 +232,7 @@
                 e.preventDefault();
                 const paste = (e.clipboardData || window.clipboardData).getData('text');
                 const pasteNumbers = paste.replace(/[^0-9]/g, '').slice(0, 6);
-
-                for (let i = 0; i < pasteNumbers.length; i++) {
-                    if (index + i < pinInputs.length) {
-                        document.getElementById(pinInputs[index + i]).value = pasteNumbers[i];
-                    }
-                }
-
-                // Focus on next empty input or last input
-                const nextIndex = Math.min(index + pasteNumbers.length, pinInputs.length - 1);
-                document.getElementById(pinInputs[nextIndex]).focus();
+                fillPinFromString(index, pasteNumbers);
             });
         });
 

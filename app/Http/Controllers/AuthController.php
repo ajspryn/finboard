@@ -69,7 +69,7 @@ class AuthController extends Controller
                 ]);
             }
 
-            return redirect()->route('auth.verify-pin')->with('success', 'Kode PIN telah dikirim ke email Anda.');
+            return redirect()->route('auth.verify-pin.form')->with('success', 'Kode PIN telah dikirim ke email Anda.');
         } catch (\Exception $e) {
             if ($request->expectsJson()) {
                 return response()->json([
@@ -88,7 +88,7 @@ class AuthController extends Controller
     {
         // Redirect if no email in session
         if (!session()->has('login_email')) {
-            return redirect()->route('auth.login');
+            return redirect()->route('login');
         }
 
         return response()->view('auth.verify-pin')->header('Content-Type', 'text/html');

@@ -80,6 +80,8 @@
 
         <p>Anda telah meminta kode PIN untuk login ke akun Finboard. Berikut adalah kode PIN Anda:</p>
 
+        <p><strong>Kode PIN:</strong> {{ $pinCode }}</p>
+
         <div class="pin-code">
             <div class="pin-number">{{ $pinCode }}</div>
         </div>

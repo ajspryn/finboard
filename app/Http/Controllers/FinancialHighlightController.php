@@ -166,9 +166,20 @@ class FinancialHighlightController extends Controller
     public function getDashboardData(Request $request)
     {
         try {
-            $comparisonType = $request->get('comparison', 'MOM'); // MOM or YOY
-            $filterMonth = $request->get('month');
-            $filterYear = $request->get('year');
+            $comparisonType = (string) $request->get('comparison', FinancialHighlight::DEFAULT_COMPARISON); // MOM or YOY
+            if (!in_array($comparisonType, FinancialHighlight::COMPARISON_TYPES, true)) {
+                $comparisonType = FinancialHighlight::DEFAULT_COMPARISON;
+            }
+
+            $filterMonthRaw = $request->get('month');
+            $filterYearRaw = $request->get('year');
+
+            $filterMonth = (is_numeric($filterMonthRaw) && (int) $filterMonthRaw >= 1 && (int) $filterMonthRaw <= 12)
+                ? (int) $filterMonthRaw
+                : null;
+            $filterYear = (is_numeric($filterYearRaw) && (int) $filterYearRaw >= 2000 && (int) $filterYearRaw <= 2100)
+                ? (int) $filterYearRaw
+                : null;
 
             // Try to get from cache first
             $cachedData = $this->cacheService->getFinancialHighlights($filterYear, $filterMonth, $comparisonType);

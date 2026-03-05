@@ -214,7 +214,7 @@ class DashboardController extends Controller
             ->select('period_year', 'period_month')
             ->whereNotNull('period_year')
             ->whereNotNull('period_month')
-            ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+            ->orderByRaw('(period_year * 100 + period_month) DESC')
             ->first();
 
         $latestYear = $latestPeriod?->period_year;
@@ -742,7 +742,7 @@ class DashboardController extends Controller
                     $maxMonthInYear = Pembiayaan::query()
                         ->where('period_year', $endYear)
                         ->whereNotNull('period_month')
-                        ->orderByRaw('LPAD(period_month, 2, "0") DESC')
+                        ->orderBy('period_month', 'desc')
                         ->value('period_month');
 
                     $endMonth = $maxMonthInYear ? (int)$maxMonthInYear : 12;
@@ -769,7 +769,7 @@ class DashboardController extends Controller
                 $endKey = (int)$endDate->format('Ym');
 
                 $monthlyDataQuery->whereRaw(
-                    'CAST(CONCAT(period_year, LPAD(period_month, 2, "0")) AS UNSIGNED) BETWEEN ? AND ?',
+                    '(period_year * 100 + period_month) BETWEEN ? AND ?',
                     [$startKey, $endKey]
                 );
 
@@ -797,7 +797,7 @@ class DashboardController extends Controller
         }
 
         $monthlyData = $monthlyDataQuery
-            ->orderByRaw('period_year ASC, LPAD(period_month, 2, "0") ASC')
+            ->orderByRaw('(period_year * 100 + period_month) ASC')
             ->get();
 
         $monthlyTrends = [
@@ -1339,18 +1339,14 @@ class DashboardController extends Controller
 
         $jumlahNasabahBaru = count($uniqueKontrakBaru);
         $nominalNasabahBaru = 0;
-
         if ($jumlahNasabahBaru > 0) {
-            // Ambil mdlawal untuk setiap kontrak unique dari period bulan ini
-            foreach ($uniqueKontrakBaru as $nk) {
-                $kontrak = Pembiayaan::where('nokontrak', $nk)
-                    ->where('period_month', $filterMonthStr)
-                    ->where('period_year', $filterYear)
-                    ->first(['mdlawal']);
-                if ($kontrak) {
-                    $nominalNasabahBaru += $kontrak->mdlawal;
-                }
-            }
+            $nominalNasabahBaru = Pembiayaan::where('period_month', $filterMonthStr)
+                ->where('period_year', $filterYear)
+                ->whereIn('nokontrak', $uniqueKontrakBaru)
+                ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
+                ->groupBy('nokontrak')
+                ->get()
+                ->sum('mdlawal');
         }
 
         // Get kontrak yang hilang untuk pelunasan cepat dan lunas
@@ -1445,18 +1441,14 @@ class DashboardController extends Controller
 
             $jumlahNasabahBaru = count($uniqueKontrak);
             $nominalNasabahBaru = 0;
-
             if ($jumlahNasabahBaru > 0) {
-                // Ambil mdlawal untuk setiap kontrak unique dari period bulan ini
-                foreach ($uniqueKontrak as $nk) {
-                    $kontrak = Pembiayaan::where('nokontrak', $nk)
-                        ->where('period_month', $monthStr)
-                        ->where('period_year', $year)
-                        ->first(['mdlawal']);
-                    if ($kontrak) {
-                        $nominalNasabahBaru += $kontrak->mdlawal;
-                    }
-                }
+                $nominalNasabahBaru = Pembiayaan::where('period_month', $monthStr)
+                    ->where('period_year', $year)
+                    ->whereIn('nokontrak', $uniqueKontrak)
+                    ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
+                    ->groupBy('nokontrak')
+                    ->get()
+                    ->sum('mdlawal');
             }
 
             $nasabahBaruData[] = $jumlahNasabahBaru;
@@ -1493,7 +1485,10 @@ class DashboardController extends Controller
                 ->where('jw', '>', 0)
                 ->where('angs_ke', '>=', 1)
                 ->where('osmdlc', '<=', 2000000)
-                ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
+                ->where(function ($q) use ($year, $month) {
+                    $q->whereYear('tgleff', '!=', $year)
+                        ->orWhereMonth('tgleff', '!=', (int) $month);
+                })
                 ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as nominal')
                 ->first();
 
@@ -1507,7 +1502,10 @@ class DashboardController extends Controller
                 ->whereRaw('angs_ke >= jw')
                 ->where('jw', '>', 0)
                 ->where('osmdlc', '<=', 2000000)
-                ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
+                ->where(function ($q) use ($year, $month) {
+                    $q->whereYear('tgleff', '!=', $year)
+                        ->orWhereMonth('tgleff', '!=', (int) $month);
+                })
                 ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as nominal')
                 ->first();
 
@@ -1555,21 +1553,15 @@ class DashboardController extends Controller
                 ->pluck('nokontrak')
                 ->toArray();
 
-            // Ambil data untuk setiap kontrak unique dari period bulan ini
-            $kontrakData = collect();
-            foreach ($uniqueKontrak as $nk) {
-                $data = Pembiayaan::where('nokontrak', $nk)
-                    ->where('period_month', $monthStr)
-                    ->where('period_year', $year)
-                    ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
-                    ->first();
-                if ($data) {
-                    $kontrakData->push($data);
-                }
-            }
-
-            // Sort by mdlawal descending
-            $kontrakData = $kontrakData->sortByDesc('mdlawal')->values();
+            // Ambil data kontrak dalam 1 query (hindari N+1)
+            $kontrakData = Pembiayaan::where('period_month', $monthStr)
+                ->where('period_year', $year)
+                ->whereIn('nokontrak', $uniqueKontrak)
+                ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
+                ->orderByDesc('mdlawal')
+                ->get()
+                ->unique('nokontrak')
+                ->values();
 
             $totalKontrak = count($uniqueKontrak);
             $totalNominal = $kontrakData->sum('mdlawal');
@@ -1606,24 +1598,23 @@ class DashboardController extends Controller
                     ->where('jw', '>', 0)
                     ->where('angs_ke', '>=', 1)
                     ->where('osmdlc', '<=', 2000000)
-                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
+                    ->where(function ($q) use ($year, $month) {
+                        $q->whereYear('tgleff', '!=', $year)
+                            ->orWhereMonth('tgleff', '!=', (int) $month);
+                    })
                     ->selectRaw('DISTINCT nokontrak')
                     ->pluck('nokontrak')
                     ->toArray();
 
-                // Ambil data untuk setiap kontrak unique
-                $kontrakData = collect();
-                foreach ($uniqueNokontrak as $nk) {
-                    $data = Pembiayaan::where('period_month', $prevMonthStr)
-                        ->where('period_year', $prevYear)
-                        ->where('nokontrak', $nk)
-                        ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
-                        ->first();
-                    if ($data) {
-                        $kontrakData->push($data);
-                    }
-                }
-                $kontrakData = $kontrakData->sortByDesc('mdlawal')->values();
+                // Ambil data dalam 1 query (hindari N+1)
+                $kontrakData = Pembiayaan::where('period_month', $prevMonthStr)
+                    ->where('period_year', $prevYear)
+                    ->whereIn('nokontrak', $uniqueNokontrak)
+                    ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
+                    ->orderByDesc('mdlawal')
+                    ->get()
+                    ->unique('nokontrak')
+                    ->values();
             } else {
                 // Kontrak Lunas - ambil unique nokontrak dulu
                 $uniqueNokontrak = Pembiayaan::where('period_month', $prevMonthStr)
@@ -1632,24 +1623,23 @@ class DashboardController extends Controller
                     ->whereRaw('angs_ke >= jw')
                     ->where('jw', '>', 0)
                     ->where('osmdlc', '<=', 2000000)
-                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$year . '-' . $monthStr])
+                    ->where(function ($q) use ($year, $month) {
+                        $q->whereYear('tgleff', '!=', $year)
+                            ->orWhereMonth('tgleff', '!=', (int) $month);
+                    })
                     ->selectRaw('DISTINCT nokontrak')
                     ->pluck('nokontrak')
                     ->toArray();
 
-                // Ambil data untuk setiap kontrak unique
-                $kontrakData = collect();
-                foreach ($uniqueNokontrak as $nk) {
-                    $data = Pembiayaan::where('period_month', $prevMonthStr)
-                        ->where('period_year', $prevYear)
-                        ->where('nokontrak', $nk)
-                        ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
-                        ->first();
-                    if ($data) {
-                        $kontrakData->push($data);
-                    }
-                }
-                $kontrakData = $kontrakData->sortByDesc('mdlawal')->values();
+                // Ambil data dalam 1 query (hindari N+1)
+                $kontrakData = Pembiayaan::where('period_month', $prevMonthStr)
+                    ->where('period_year', $prevYear)
+                    ->whereIn('nokontrak', $uniqueNokontrak)
+                    ->select('nokontrak', 'nama', 'nocif', 'tgleff', 'mdlawal', 'osmdlc', 'angs_ke', 'jw', 'nmao')
+                    ->orderByDesc('mdlawal')
+                    ->get()
+                    ->unique('nokontrak')
+                    ->values();
             }
 
             $totalKontrak = $kontrakData->count();
@@ -1860,7 +1850,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->whereNotNull('period_year')
                 ->whereNotNull('period_month')
-                ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
                 ->first();
 
             $endYear = (int)($latestPeriod?->period_year ?: now()->year);
@@ -1897,7 +1887,7 @@ class DashboardController extends Controller
                 ->whereNotNull('kodeprd')
                 ->where('kodeprd', '!=', '')
                 ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + CAST(LPAD(period_month, 2, "0") AS UNSIGNED)) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
                 })
                 ->groupBy('kodeprd', 'period_year', 'period_month')
                 ->orderBy('period_year', 'desc')
@@ -1936,7 +1926,7 @@ class DashboardController extends Controller
                 ->whereNotNull('kdprd')
                 ->where('kdprd', '!=', '')
                 ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + CAST(LPAD(period_month, 2, "0") AS UNSIGNED)) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
                 })
                 ->groupBy('kdprd', 'period_year', 'period_month')
                 ->orderBy('period_year', 'desc')
@@ -1975,7 +1965,7 @@ class DashboardController extends Controller
                 ->whereNotNull('kelompok')
                 ->where('kelompok', '!=', '')
                 ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + CAST(LPAD(period_month, 2, "0") AS UNSIGNED)) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
                 })
                 ->groupBy('kelompok', 'period_year', 'period_month')
                 ->orderBy('period_year', 'desc')
@@ -2014,7 +2004,7 @@ class DashboardController extends Controller
                 ->whereNotNull('kelompok')
                 ->where('kelompok', '!=', '')
                 ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + CAST(LPAD(period_month, 2, "0") AS UNSIGNED)) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
                 })
                 ->groupBy('kelompok', 'period_year', 'period_month')
                 ->orderBy('period_year', 'desc')
@@ -2048,7 +2038,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->distinct()
                 ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + CAST(LPAD(period_month, 2, "0") AS UNSIGNED)) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
                 })
                 ->orderBy('period_year', 'desc')
                 ->orderBy('period_month', 'desc')
@@ -2398,7 +2388,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->whereNotNull('period_year')
                 ->whereNotNull('period_month')
-                ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
                 ->first();
 
             $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
@@ -2473,7 +2463,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->whereNotNull('period_year')
                 ->whereNotNull('period_month')
-                ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
                 ->first();
 
             $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
@@ -3031,7 +3021,10 @@ class DashboardController extends Controller
                     ->where('jw', '>', 0)
                     ->where('angs_ke', '>=', 1) // Minimal 1x bayar
                     ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
-                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
+                    ->where(function ($q) use ($filterYear, $filterMonth) {
+                        $q->whereYear('tgleff', '!=', $filterYear)
+                            ->orWhereMonth('tgleff', '!=', (int) $filterMonth);
+                    }); // Exclude nasabah baru
 
                 $title = 'Pelunasan Cepat (Lunas Sebelum Tenor Selesai)';
                 break;
@@ -3058,7 +3051,10 @@ class DashboardController extends Controller
                     ->whereRaw('angs_ke >= jw')
                     ->where('jw', '>', 0)
                     ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
-                    ->whereRaw("DATE_FORMAT(tgleff, '%Y-%m') != ?", [$filterYear . '-' . str_pad($filterMonth, 2, '0', STR_PAD_LEFT)]); // Exclude nasabah baru
+                    ->where(function ($q) use ($filterYear, $filterMonth) {
+                        $q->whereYear('tgleff', '!=', $filterYear)
+                            ->orWhereMonth('tgleff', '!=', (int) $filterMonth);
+                    }); // Exclude nasabah baru
 
                 $title = 'Nasabah Lunas (Lunas Tepat Waktu)';
                 break;
@@ -3132,7 +3128,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->whereNotNull('period_year')
                 ->whereNotNull('period_month')
-                ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
                 ->first();
 
             $resolvedYear = (string)($latestPeriod?->period_year ?: date('Y'));
@@ -3324,14 +3320,15 @@ class DashboardController extends Controller
         $monthlyData = [];
         for ($month = 1; $month <= 12; $month++) {
             $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+            $startOfMonth = sprintf('%04d-%02d-01', (int) $currentYear, (int) $month);
+            $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
 
             // Get deposito data for this month - depositos that exist in this period AND were opened in this month
             $depositos = DB::table('depositos')
                 ->where('kodeaoh', $kodeaoh)
                 ->where('period_month', $monthStr)
                 ->where('period_year', $currentYear)
-                ->whereRaw("MONTH(tglbuka) = ?", [$monthStr])
-                ->whereRaw("YEAR(tglbuka) = ?", [$currentYear])
+                ->whereBetween('tglbuka', [$startOfMonth, $endOfMonth])
                 ->where('stsrec', 'A')
                 ->get();
 
@@ -3397,7 +3394,10 @@ class DashboardController extends Controller
         // Calculate totals - sum of all depositos opened throughout the year
         $allOpenedDepositos = DB::table('depositos')
             ->where('kodeaoh', $kodeaoh)
-            ->whereRaw("YEAR(tglbuka) = ?", [$currentYear])
+            ->whereBetween('tglbuka', [
+                sprintf('%04d-01-01', (int) $currentYear),
+                sprintf('%04d-12-31', (int) $currentYear),
+            ])
             ->where('stsrec', 'A')
             ->get();
 
@@ -3486,12 +3486,13 @@ class DashboardController extends Controller
 
         if ($month !== 'all') {
             $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+            $startOfMonth = sprintf('%04d-%02d-01', (int) $currentYear, (int) $month);
+            $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
             // For pencairan, don't filter by opening date since withdrawn depositos could be opened in any month
             if ($category !== 'pencairan') {
                 $query->where('period_month', $monthStr)
                     ->where('period_year', $currentYear)
-                    ->whereRaw("MONTH(tglbuka) = ?", [$monthStr])
-                    ->whereRaw("YEAR(tglbuka) = ?", [$currentYear]);
+                    ->whereBetween('tglbuka', [$startOfMonth, $endOfMonth]);
             } else {
                 // For pencairan, just filter by period
                 $query->where('period_month', $monthStr)
@@ -3652,7 +3653,7 @@ class DashboardController extends Controller
                 ->select('period_year', 'period_month')
                 ->whereNotNull('period_year')
                 ->whereNotNull('period_month')
-                ->orderByRaw('period_year DESC, LPAD(period_month, 2, "0") DESC')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
                 ->first();
 
             $currentYear = (string)($latestPeriod?->period_year ?: date('Y'));

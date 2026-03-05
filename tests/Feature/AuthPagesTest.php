@@ -8,6 +8,8 @@ use Tests\TestCase;
 
 class AuthPagesTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * Test login page loads correctly
      */

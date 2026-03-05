@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\FundingController;
 use App\Http\Controllers\DailyActivityController;
 use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\FinancialHighlightController;
@@ -66,6 +67,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
         Route::post('/upload', [UploadController::class, 'upload'])->name('upload.store');
         Route::delete('/upload/clear', [UploadController::class, 'clear'])->name('upload.clear');
+
+        // Legacy route kept for backward compatibility
+        Route::post('/funding/upload', [FundingController::class, 'upload'])->name('funding.upload');
     });
 
     // User Settings Routes (Admin only)
