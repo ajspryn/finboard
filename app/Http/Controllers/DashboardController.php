@@ -3178,7 +3178,9 @@ class DashboardController extends Controller
         )
             ->orderBy('tgleff', 'desc')
             ->limit(100) // Limit to 100 records for performance
-            ->get();
+            ->get()
+            ->unique('nokontrak')
+            ->values();
 
         // Format data
         $formattedData = $data->map(function ($item) {
