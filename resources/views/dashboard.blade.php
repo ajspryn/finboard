@@ -1437,7 +1437,7 @@ function formatNominal($amount) {
                 <div class="card-header d-flex justify-content-between align-items-start gap-2">
                     <div>
                         <h5 class="card-title mb-0">📈 Tren Bulanan</h5>
-                        <small class="text-muted">Plafon vs Outstanding vs Pelunasan Cepat (Miliar Rupiah)</small>
+                        <small class="text-muted" id="monthlyTrendSubtitle">Plafon vs Outstanding vs Pelunasan Cepat (Nominal - Miliar Rupiah)</small>
                         <small class="text-muted d-block">
                             <i class="ti ti-calendar me-1"></i>
                             Range: {{ $trendRangeLabel ?? '-' }}
@@ -1446,6 +1446,10 @@ function formatNominal($amount) {
                             <i class="ti ti-clock me-1"></i>
                             Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
                         </small>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Toggle Tren Bulanan">
+                        <button type="button" class="btn btn-primary" id="btnMonthlyTrendNominal" onclick="toggleMonthlyTrendChart('nominal')">Nominal</button>
+                        <button type="button" class="btn btn-outline-primary" id="btnMonthlyTrendJumlah" onclick="toggleMonthlyTrendChart('jumlah')">Jumlah</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -2931,17 +2935,40 @@ function formatNominal(amount) {
 
     // 1. Monthly Trend Chart
     const monthlyTrendEl = document.querySelector("#monthlyTrendChart");
-    if (monthlyTrendEl) {
-        const monthlyTrendChart = new ApexCharts(monthlyTrendEl, {
+    let monthlyTrendChart;
+    const monthlyTrendData = {
+        nominal: {
+            funding: @json($monthlyTrends['funding']),
+            lending: @json($monthlyTrends['lending']),
+            pelunasan_cepat: @json($monthlyTrends['pelunasan_cepat'] ?? [])
+        },
+        jumlah: {
+            funding: @json($monthlyTrends['funding_count'] ?? []),
+            lending: @json($monthlyTrends['lending_count'] ?? []),
+            pelunasan_cepat: @json($monthlyTrends['pelunasan_cepat_count'] ?? [])
+        }
+    };
+
+    function createMonthlyTrendChart(type = 'nominal') {
+        if (!monthlyTrendEl) return;
+
+        if (monthlyTrendChart) {
+            monthlyTrendChart.destroy();
+        }
+
+        const isNominal = type === 'nominal';
+        const data = monthlyTrendData[type];
+
+        monthlyTrendChart = new ApexCharts(monthlyTrendEl, {
             series: [{
                 name: 'Plafon',
-                data: @json($monthlyTrends['funding'])
+                data: data.funding
             }, {
                 name: 'Outstanding',
-                data: @json($monthlyTrends['lending'])
+                data: data.lending
             }, {
                 name: 'Pelunasan Cepat',
-                data: @json($monthlyTrends['pelunasan_cepat'] ?? [])
+                data: data.pelunasan_cepat
             }],
             chart: {
                 height: 280,
@@ -2962,7 +2989,10 @@ function formatNominal(amount) {
             dataLabels: {
                 enabled: true,
                 formatter: function(val) {
-                    return 'Rp ' + val.toFixed(1) + 'M';
+                    if (isNominal) {
+                        return 'Rp ' + val.toFixed(1) + 'M';
+                    }
+                    return Math.round(val) + ' kontrak';
                 },
                 style: {
                     fontSize: '10px',
@@ -2983,22 +3013,59 @@ function formatNominal(amount) {
                 categories: @json($monthlyTrends['labels'])
             },
             yaxis: {
-                title: { text: 'Miliar Rupiah' },
+                title: { text: isNominal ? 'Miliar Rupiah' : 'Jumlah Kontrak' },
                 labels: {
                     formatter: function(val) {
-                        return 'Rp ' + val.toFixed(1) + 'M';
+                        if (isNominal) {
+                            return 'Rp ' + val.toFixed(1) + 'M';
+                        }
+                        return Math.round(val) + ' kontrak';
                     }
                 }
             },
             tooltip: {
                 y: {
                     formatter: function(val) {
-                        return 'Rp ' + val.toFixed(2) + ' Miliar';
+                        if (isNominal) {
+                            return 'Rp ' + val.toFixed(2) + ' Miliar';
+                        }
+                        return Math.round(val) + ' kontrak';
                     }
                 }
             }
         });
+
         monthlyTrendChart.render();
+    }
+
+    window.toggleMonthlyTrendChart = function(type) {
+        const btnNominal = document.getElementById('btnMonthlyTrendNominal');
+        const btnJumlah = document.getElementById('btnMonthlyTrendJumlah');
+        const subtitle = document.getElementById('monthlyTrendSubtitle');
+
+        if (type === 'nominal') {
+            btnNominal.classList.remove('btn-outline-primary');
+            btnNominal.classList.add('btn-primary');
+            btnJumlah.classList.remove('btn-primary');
+            btnJumlah.classList.add('btn-outline-primary');
+            if (subtitle) {
+                subtitle.textContent = 'Plafon vs Outstanding vs Pelunasan Cepat (Nominal - Miliar Rupiah)';
+            }
+        } else {
+            btnJumlah.classList.remove('btn-outline-primary');
+            btnJumlah.classList.add('btn-primary');
+            btnNominal.classList.remove('btn-primary');
+            btnNominal.classList.add('btn-outline-primary');
+            if (subtitle) {
+                subtitle.textContent = 'Plafon vs Outstanding vs Pelunasan Cepat (Jumlah Kontrak)';
+            }
+        }
+
+        createMonthlyTrendChart(type);
+    };
+
+    if (monthlyTrendEl) {
+        createMonthlyTrendChart('nominal');
     }
 
     // 2. NPF Distribution Chart (Per Segmentasi)
