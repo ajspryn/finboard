@@ -977,6 +977,13 @@ function formatNominal($amount) {
                                     {{ formatNominal($funding['total']) }}
                                 </h2>
                             </div>
+                            @if(!empty($svrPredictions) && !empty($svrPredictions['funding_total']))
+                                <small class="text-muted d-block">
+                                    Prediksi SVR {{ str_pad($svrPredictions['target_month'], 2, '0', STR_PAD_LEFT) }}/{{ $svrPredictions['target_year'] }}:
+                                    <strong>{{ formatNominal($svrPredictions['funding_total']['predicted_value']) }}</strong>
+                                    <span class="ms-1">(R² {{ $svrPredictions['funding_total']['r2'] !== null ? number_format($svrPredictions['funding_total']['r2'], 2) : '-' }}, MAPE {{ $svrPredictions['funding_total']['mape'] !== null ? number_format($svrPredictions['funding_total']['mape'], 2) . '%' : '-' }})</span>
+                                </small>
+                            @endif
                             <small class="{{ $funding['growth'] >= 0 ? 'text-success' : 'text-danger' }} fw-medium">
                                 <i class="ti ti-trending-{{ $funding['growth'] >= 0 ? 'up' : 'down' }} ti-sm"></i>
                                 <span>Pertumbuhan {{ $funding['growth'] }}%</span>
@@ -1186,6 +1193,13 @@ function formatNominal($amount) {
                                     {{ formatNominal($lending['total']) }}
                                 </h2>
                             </div>
+                            @if(!empty($svrPredictions) && !empty($svrPredictions['lending_outstanding']))
+                                <small class="text-muted d-block">
+                                    Prediksi SVR {{ str_pad($svrPredictions['target_month'], 2, '0', STR_PAD_LEFT) }}/{{ $svrPredictions['target_year'] }}:
+                                    <strong>{{ formatNominal($svrPredictions['lending_outstanding']['predicted_value']) }}</strong>
+                                    <span class="ms-1">(R² {{ $svrPredictions['lending_outstanding']['r2'] !== null ? number_format($svrPredictions['lending_outstanding']['r2'], 2) : '-' }}, MAPE {{ $svrPredictions['lending_outstanding']['mape'] !== null ? number_format($svrPredictions['lending_outstanding']['mape'], 2) . '%' : '-' }})</span>
+                                </small>
+                            @endif
                             <small class="text-muted">Total Pembiayaan</small>
                         </div>
                         <div class="avatar avatar-lg">
@@ -1305,6 +1319,13 @@ function formatNominal($amount) {
                                 {{ $npf['ratio'] }}%
                             </h2>
                             <small class="text-muted">NPF Ratio</small>
+                            @if(!empty($svrPredictions) && !empty($svrPredictions['npf_ratio']))
+                                <small class="text-muted d-block mt-1">
+                                    Prediksi SVR {{ str_pad($svrPredictions['target_month'], 2, '0', STR_PAD_LEFT) }}/{{ $svrPredictions['target_year'] }}:
+                                    <strong>{{ number_format($svrPredictions['npf_ratio']['predicted_value'], 2) }}%</strong>
+                                    <span class="ms-1">(R² {{ $svrPredictions['npf_ratio']['r2'] !== null ? number_format($svrPredictions['npf_ratio']['r2'], 2) : '-' }}, MAPE {{ $svrPredictions['npf_ratio']['mape'] !== null ? number_format($svrPredictions['npf_ratio']['mape'], 2) . '%' : '-' }})</span>
+                                </small>
+                            @endif
                         </div>
                         <div class="avatar avatar-lg">
                             <span class="avatar-initial rounded-3 bg-danger">
@@ -1416,7 +1437,7 @@ function formatNominal($amount) {
                 <div class="card-header d-flex justify-content-between align-items-start gap-2">
                     <div>
                         <h5 class="card-title mb-0">📈 Tren Bulanan</h5>
-                        <small class="text-muted">Plafon vs Outstanding (Miliar Rupiah)</small>
+                        <small class="text-muted">Plafon vs Outstanding vs Pelunasan Cepat (Miliar Rupiah)</small>
                         <small class="text-muted d-block">
                             <i class="ti ti-calendar me-1"></i>
                             Range: {{ $trendRangeLabel ?? '-' }}
@@ -2918,6 +2939,9 @@ function formatNominal(amount) {
             }, {
                 name: 'Outstanding',
                 data: @json($monthlyTrends['lending'])
+            }, {
+                name: 'Pelunasan Cepat',
+                data: @json($monthlyTrends['pelunasan_cepat'] ?? [])
             }],
             chart: {
                 height: 280,
@@ -2928,7 +2952,7 @@ function formatNominal(amount) {
                 curve: 'smooth',
                 width: 3
             },
-            colors: ['#696cff', '#71dd37'],
+            colors: ['#696cff', '#71dd37', '#ff3e1d'],
             markers: {
                 size: 4,
                 hover: {

@@ -6,6 +6,11 @@
 /storage/*.key
 /storage/pail
 /vendor
+
+# Local ML (SVR) virtualenv
+/ml/.venv/
+/ml/__pycache__/
+*.pyc
 .env
 .env.backup
 .env.production

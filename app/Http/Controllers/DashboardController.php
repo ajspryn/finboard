@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pembiayaan;
 use App\Models\Tabungan;
 use App\Models\Deposito;
+use App\Models\FinancialMetricPrediction;
 use App\Models\Linkage;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -827,12 +828,56 @@ class DashboardController extends Controller
             })->values()->toArray()
         ];
 
+        // Compute pelunasan cepat per month for monthly trend chart
+        $pelunasanCepatByMonth = [];
+        foreach ($monthlyData as $trendItem) {
+            $tMonth = (int)$trendItem->period_month;
+            $tYear  = (int)$trendItem->period_year;
+            $tMonthStr = str_pad($tMonth, 2, '0', STR_PAD_LEFT);
+            $tPrevMonth = $tMonth - 1;
+            $tPrevYear  = $tYear;
+            if ($tPrevMonth < 1) { $tPrevMonth = 12; $tPrevYear = $tYear - 1; }
+            $tPrevMonthStr = str_pad($tPrevMonth, 2, '0', STR_PAD_LEFT);
+
+            $tKontrakLalu = Pembiayaan::where('period_month', $tPrevMonthStr)
+                ->where('period_year', $tPrevYear)
+                ->selectRaw('DISTINCT nokontrak')
+                ->pluck('nokontrak')
+                ->toArray();
+            $tKontrakIni = Pembiayaan::where('period_month', $tMonthStr)
+                ->where('period_year', $tYear)
+                ->selectRaw('DISTINCT nokontrak')
+                ->pluck('nokontrak')
+                ->toArray();
+            $tHilang = array_diff($tKontrakLalu, $tKontrakIni);
+
+            if (!empty($tHilang)) {
+                $tNominal = Pembiayaan::where('period_month', $tPrevMonthStr)
+                    ->where('period_year', $tPrevYear)
+                    ->whereIn('nokontrak', $tHilang)
+                    ->whereRaw('angs_ke < jw')
+                    ->where('jw', '>', 0)
+                    ->where('angs_ke', '>=', 1)
+                    ->where('osmdlc', '<=', 2000000)
+                    ->where(function ($q) use ($tYear, $tMonth) {
+                        $q->whereYear('tgleff', '!=', $tYear)
+                            ->orWhereMonth('tgleff', '!=', $tMonth);
+                    })
+                    ->sum('mdlawal');
+                $pelunasanCepatByMonth[] = round(($tNominal ?? 0) / 1000000000, 2);
+            } else {
+                $pelunasanCepatByMonth[] = 0;
+            }
+        }
+        $monthlyTrends['pelunasan_cepat'] = $pelunasanCepatByMonth;
+
         // If no data, use default
         if (empty($monthlyTrends['labels'])) {
             $monthlyTrends = [
-                'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
-                'funding' => [0, 0, 0, 0, 0, 0],
-                'lending' => [0, 0, 0, 0, 0, 0]
+                'labels'          => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+                'funding'         => [0, 0, 0, 0, 0, 0],
+                'lending'         => [0, 0, 0, 0, 0, 0],
+                'pelunasan_cepat' => [0, 0, 0, 0, 0, 0],
             ];
         }
 
@@ -1292,9 +1337,52 @@ class DashboardController extends Controller
                 return $item;
             });
 
+        $svrPredictions = null;
+        if (Schema::hasTable('financial_metric_predictions') && ctype_digit((string)$filterYear) && ctype_digit((string)$filterMonth)) {
+            $filterYearInt = (int)$filterYear;
+            $filterMonthInt = (int)$filterMonth;
+
+            if ($filterYearInt > 0 && $filterMonthInt >= 1 && $filterMonthInt <= 12) {
+                $targetYear = $filterYearInt;
+                $targetMonth = $filterMonthInt;
+
+                try {
+                    $rows = FinancialMetricPrediction::query()
+                        ->where('model_name', 'svr')
+                        ->where('period_year', $targetYear)
+                        ->where('period_month', $targetMonth)
+                        ->whereIn('metric_key', ['funding_total', 'lending_outstanding', 'npf_ratio'])
+                        ->get()
+                        ->keyBy('metric_key');
+                } catch (\Throwable $e) {
+                    $rows = collect();
+                }
+
+                $svrPredictions = [
+                    'target_year' => $targetYear,
+                    'target_month' => $targetMonth,
+                    'funding_total' => $rows->has('funding_total') ? [
+                        'predicted_value' => (float)$rows['funding_total']->predicted_value,
+                        'r2' => $rows['funding_total']->r2 !== null ? (float)$rows['funding_total']->r2 : null,
+                        'mape' => $rows['funding_total']->mape !== null ? (float)$rows['funding_total']->mape : null,
+                    ] : null,
+                    'lending_outstanding' => $rows->has('lending_outstanding') ? [
+                        'predicted_value' => (float)$rows['lending_outstanding']->predicted_value,
+                        'r2' => $rows['lending_outstanding']->r2 !== null ? (float)$rows['lending_outstanding']->r2 : null,
+                        'mape' => $rows['lending_outstanding']->mape !== null ? (float)$rows['lending_outstanding']->mape : null,
+                    ] : null,
+                    'npf_ratio' => $rows->has('npf_ratio') ? [
+                        'predicted_value' => (float)$rows['npf_ratio']->predicted_value,
+                        'r2' => $rows['npf_ratio']->r2 !== null ? (float)$rows['npf_ratio']->r2 : null,
+                        'mape' => $rows['npf_ratio']->mape !== null ? (float)$rows['npf_ratio']->mape : null,
+                    ] : null,
+                ];
+            }
+        }
+
         $segmentCodes = $this->getSegmentCodes();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'startDay', 'endDay', 'topTabunganProducts', 'lastUpdated', 'segmentCodes', 'range', 'trendRangeLabel'));
+        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'startDay', 'endDay', 'topTabunganProducts', 'lastUpdated', 'segmentCodes', 'range', 'trendRangeLabel', 'svrPredictions'));
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
