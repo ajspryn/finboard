@@ -836,7 +836,10 @@ class DashboardController extends Controller
             $tMonthStr = str_pad($tMonth, 2, '0', STR_PAD_LEFT);
             $tPrevMonth = $tMonth - 1;
             $tPrevYear  = $tYear;
-            if ($tPrevMonth < 1) { $tPrevMonth = 12; $tPrevYear = $tYear - 1; }
+            if ($tPrevMonth < 1) {
+                $tPrevMonth = 12;
+                $tPrevYear = $tYear - 1;
+            }
             $tPrevMonthStr = str_pad($tPrevMonth, 2, '0', STR_PAD_LEFT);
 
             $tKontrakLalu = Pembiayaan::where('period_month', $tPrevMonthStr)
