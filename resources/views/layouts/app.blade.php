@@ -93,6 +93,12 @@
                             <div data-i18n="Daily Activity">Daily Activity Karyawan</div>
                         </a>
                     </li>
+                    <li class="menu-item {{ request()->is('display-board') ? 'active' : '' }}">
+                        <a href="{{ route('display.board') }}" class="menu-link" target="_blank">
+                            <i class="menu-icon tf-icons ti ti-device-tv"></i>
+                            <div data-i18n="Display Board">Display Board</div>
+                        </a>
+                    </li>
                     @endif
 
                     <!-- Module sections -->

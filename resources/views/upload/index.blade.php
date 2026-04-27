@@ -597,6 +597,30 @@
                         <h6 class="mb-3">
                             <i class="ti ti-info-circle me-2"></i>Informasi Format CSV
                         </h6>
+
+                        <!-- Download Template Buttons -->
+                        <div class="alert alert-light border mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="ti ti-download me-2 text-primary"></i>
+                                <strong>Download Template CSV</strong>
+                                <span class="text-muted ms-2 small">— unduh contoh format file sebelum upload</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ route('upload.template', 'pembiayaan') }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="ti ti-file-download me-1"></i>Template Pembiayaan
+                                </a>
+                                <a href="{{ route('upload.template', 'tabungan') }}" class="btn btn-sm btn-outline-info">
+                                    <i class="ti ti-file-download me-1"></i>Template Tabungan
+                                </a>
+                                <a href="{{ route('upload.template', 'deposito') }}" class="btn btn-sm btn-outline-success">
+                                    <i class="ti ti-file-download me-1"></i>Template Deposito
+                                </a>
+                                <a href="{{ route('upload.template', 'linkage') }}" class="btn btn-sm btn-outline-warning">
+                                    <i class="ti ti-file-download me-1"></i>Template Linkage
+                                </a>
+                            </div>
+                        </div>
+
                         <div class="accordion" id="formatAccordion">
                             <div class="accordion-item">
                                 <h2 class="accordion-header">
@@ -609,7 +633,12 @@
                                         <p>File harus berformat CSV dengan delimiter koma (,). Baris pertama harus berisi header kolom.</p>
                                         <strong>Header CSV:</strong>
                                         <br>
-                                        <code class="small">nocif,notab,kodeprd,sahirrp,fnama,namaqq,stsrec,saldoblok,stsrest,tax,tgltrnakh,avgeom,stspep,kdrisk,noid,hp,tgllhr,nmibu,ketsandi,namapt,kodeloc</code>
+                                        <code class="small">nokontrak,nocif,nama,tgleff,tglexp,jw,plafon,mdlawal,mgnawal,osmdlc,osmgnc,angsmdl,angsmgn,angs_ke,angske_x,sahirrp,tgkpok,tgkmgn,tgkdnd,haritgkmdl,haritgkmgn,tgkharilanjut,blntgkpok,blntgkmgn,blntgkdnd,colbaru,kdaoh,acpok,alamat,telprmh,hp,fnama,kdkolek,kdgroupdeb,kdgroupdana,kdprd,pokpby,kdloc,kelurahan,kecamatan,kota,nmao,colllanjut,kdmco,kdsektor,kdsub,tagmdl,tagmgn,inptgl</code>
+                                        <div class="mt-2">
+                                            <a href="{{ route('upload.template', 'pembiayaan') }}" class="btn btn-xs btn-outline-primary btn-sm">
+                                                <i class="ti ti-download me-1"></i>Download Template
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -622,9 +651,14 @@
                                 <div id="tabunganFormat" class="accordion-collapse collapse" data-bs-parent="#formatAccordion">
                                     <div class="accordion-body">
                                         <p>File harus berformat CSV dengan delimiter koma (,). Baris pertama harus berisi header kolom.</p>
-                                        <strong>Header CSV:</strong>
+                                        <strong>Header CSV (21 kolom):</strong>
                                         <br>
                                         <code class="small">nocif,notab,kodeprd,sahirrp,fnama,namaqq,stsrec,saldoblok,stsrest,tax,tgltrnakh,avgeom,stspep,kdrisk,noid,hp,tgllhr,nmibu,ketsandi,namapt,kodeloc</code>
+                                        <div class="mt-2">
+                                            <a href="{{ route('upload.template', 'tabungan') }}" class="btn btn-sm btn-outline-info">
+                                                <i class="ti ti-download me-1"></i>Download Template
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -637,9 +671,14 @@
                                 <div id="depositoFormat" class="accordion-collapse collapse" data-bs-parent="#formatAccordion">
                                     <div class="accordion-body">
                                         <p>File harus berformat CSV dengan delimiter koma (,). Baris pertama harus berisi header kolom.</p>
-                                        <strong>Header CSV:</strong>
+                                        <strong>Header CSV (44 kolom):</strong>
                                         <br>
-                                        <code class="small">nodep,nocif,nobilyet,nama,nomrp,stsrec,kdprd,jkwaktu,jnsjkwaktu,tglbuka,tgleff,tgljtempo,aro,nisbah,spread,equivrate,komitrate,ststrn,kdwil,kodeaoh,kodeaop,noacbng,tambahnom,noid,alamat,kota,telprmh,hp,stskait,golcustbi,kelurahan,kecamatan,kdpos,kdrisk,tax,bnghtg,nisbahrp,stspep,tgllhr,nmibu,ketsandi,namapt</code>
+                                        <code class="small">nodep,nocif,nobilyet,nama,nomrp,stsrec,kdprd,jkwaktu,jnsjkwaktu,tglbuka,tgleff,tgljtempo,aro,nisbah,spread,equivrate,komitrate,ststrn,kdwil,kodeaoh,kodeaop,noacbng,tambahnom,noid,alamat,kota,telprmh,hp,stskait,golcustbi,kelurahan,kecamatan,kdpos,kdrisk,tax,bnghtg,nisbahrp,stspep,noid,hp,tgllhr,nmibu,ketsandi,namapt</code>
+                                        <div class="mt-2">
+                                            <a href="{{ route('upload.template', 'deposito') }}" class="btn btn-sm btn-outline-success">
+                                                <i class="ti ti-download me-1"></i>Download Template
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -652,9 +691,14 @@
                                 <div id="linkageFormat" class="accordion-collapse collapse" data-bs-parent="#formatAccordion">
                                     <div class="accordion-body">
                                         <p>File harus berformat CSV dengan delimiter koma (,). Baris pertama harus berisi header kolom.</p>
-                                        <strong>Header CSV:</strong>
+                                        <strong>Header CSV (9 kolom):</strong>
                                         <br>
-                                        <code class="small">nokontrak,nocif,nama,tgleff,tgljt,kelompok,jnsakad,prsnisbah,plafon,os</code>
+                                        <code class="small">nocif,norek,fnama,namaqq,tgleff,tgljt,prsnisbah,plafon,os</code>
+                                        <div class="mt-2">
+                                            <a href="{{ route('upload.template', 'linkage') }}" class="btn btn-sm btn-outline-warning">
+                                                <i class="ti ti-download me-1"></i>Download Template
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

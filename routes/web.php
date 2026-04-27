@@ -60,6 +60,7 @@ Route::middleware(['auth'])->group(function () {
     });    // Daily Activity Routes (Admin and Pengurus only)
     Route::middleware(['role:admin,pengurus'])->group(function () {
         Route::get('/daily-activity', [DailyActivityController::class, 'index'])->name('daily.activity.index');
+        Route::get('/display-board', [DashboardController::class, 'displayBoard'])->name('display.board');
     });
 
     // Upload Routes (Admin and Lending roles)
@@ -67,6 +68,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
         Route::post('/upload', [UploadController::class, 'upload'])->name('upload.store');
         Route::delete('/upload/clear', [UploadController::class, 'clear'])->name('upload.clear');
+        Route::get('/upload/template/{type}', [UploadController::class, 'downloadTemplate'])->name('upload.template');
 
         // Legacy route kept for backward compatibility
         Route::post('/funding/upload', [FundingController::class, 'upload'])->name('funding.upload');
