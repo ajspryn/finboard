@@ -23,7 +23,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 #topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:52px;
   background:linear-gradient(90deg,#ffffffee,#f0f4ffee);
   border-bottom:1px solid var(--border);backdrop-filter:blur(12px);
-  display:flex;align-items:center;padding:0 24px;gap:16px}
+  display:flex;align-items:center;padding:0 14px;gap:10px}
 .logo{font-size:1.1rem;font-weight:800;letter-spacing:.03em;
   background:linear-gradient(135deg,var(--rp),var(--rs));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -35,25 +35,27 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 #dlbl{font-size:.73rem;color:var(--muted)}
 #pw{position:fixed;top:52px;left:0;right:0;z-index:200;height:3px;background:var(--border)}
 #pf{height:100%;width:0%;background:linear-gradient(90deg,var(--rp),var(--rs))}
-#dots{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;align-items:center}
+#dots{display:flex;gap:6px;align-items:center;margin:0 8px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--border2);cursor:pointer;transition:all .3s}
 .dot.active{background:var(--rp);transform:scale(1.4);box-shadow:0 0 8px var(--rp)}
-#sw{position:fixed;top:55px;left:0;right:0;bottom:32px;overflow:hidden}
-.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transform:translateX(30px);transition:opacity .55s ease,transform .55s ease;padding:10px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+#btn-play{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border2);background:rgba(255,255,255,.7);cursor:pointer;transition:all .2s;color:var(--rp);font-size:.95rem}
+#btn-play:hover{background:rgba(230,57,70,.1);border-color:var(--rp)}
+#sw{position:fixed;top:55px;left:0;right:0;bottom:0;overflow:hidden}
+.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transform:translateX(30px);transition:opacity .55s ease,transform .55s ease;padding:7px 12px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
 .slide.active{opacity:1;pointer-events:auto;transform:translateX(0)}
 .slide.out{opacity:0;transform:translateX(-30px)}
 .stitle{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .stitle i{font-size:1rem;opacity:.8}
 .gc{background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(248,249,252,.95));border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(8px);overflow:hidden;position:relative}
 .gc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ct,linear-gradient(90deg,var(--rp),var(--rs)));border-radius:14px 14px 0 0}
-.kpi-card{padding:11px 14px;display:flex;flex-direction:column;gap:4px}
+.kpi-card{padding:8px 12px;display:flex;flex-direction:column;gap:3px}
 .kpi-grid{display:grid;gap:8px;flex:1;align-content:start}
 .g3{grid-template-columns:repeat(3,1fr)}
 .g2{grid-template-columns:repeat(2,1fr)}
 .klbl{font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
 .kval{font-size:1.7rem;font-weight:800;line-height:1.1;color:var(--text)}
 .kval.xl{font-size:2.1rem}
-.kval.sm{font-size:1.3rem}
+.kval.sm{font-size:1.1rem}
 .ksub{font-size:.68rem;color:var(--muted)}
 .kb{display:inline-flex;align-items:center;gap:3px;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;width:fit-content}
 .kb.up{background:rgba(58,154,10,.12);color:var(--green)}
@@ -61,15 +63,15 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .kb.warn{background:rgba(201,128,0,.12);color:var(--yellow)}
 .kb.info{background:rgba(230,57,70,.1);color:var(--rp)}
 .kb.cy{background:rgba(0,149,182,.12);color:var(--cyan)}
-.chart-row{display:grid;gap:8px;flex:1;min-height:0}
+.chart-row{display:grid;gap:6px;flex:1;min-height:0}
 .cr21{grid-template-columns:2fr 1fr}
 .cr12{grid-template-columns:1fr 2fr}
-.cc{padding:8px 10px;display:flex;flex-direction:column;min-height:0}
-.cct{font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;flex-shrink:0}
+.cc{padding:6px 10px 12px;display:flex;flex-direction:column;min-height:0}
+.cct{font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;flex-shrink:0}
 .ca{flex:1;min-height:0}
 .nt{width:100%;border-collapse:collapse;font-size:.79rem}
-.nt th{color:var(--dim);text-align:left;font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:.62rem;letter-spacing:.06em}
-.nt td{padding:5px 8px;border-bottom:1px solid rgba(200,205,228,.6)}
+.nt th{color:var(--dim);text-align:left;font-weight:700;padding:3px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:.62rem;letter-spacing:.06em}
+.nt td{padding:4px 8px;border-bottom:1px solid rgba(200,205,228,.6)}
 .nt tr:last-child td{border-bottom:none}
 .nb{display:inline-block;padding:1px 8px;border-radius:20px;font-size:.63rem;font-weight:800}
 .nb1{background:rgba(58,154,10,.15);color:var(--green)}
@@ -78,13 +80,13 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .nb4{background:rgba(217,123,0,.15);color:var(--orange)}
 .nb5{background:rgba(230,57,70,.15);color:var(--red)}
 .top-dpk-wrap{overflow:hidden;flex:1;min-height:0;position:relative}.top-dpk-inner{display:flex;flex-direction:column;gap:0;animation:dpk-scroll 20s linear infinite}.top-dpk-inner:hover{animation-play-state:paused}@keyframes dpk-scroll{0%{transform:translateY(0)}100%{transform:translateY(-50%)}}.top-dpk-row{display:grid;grid-template-columns:1.2rem 1fr auto auto auto;gap:4px;align-items:center;padding:4px 6px;border-bottom:1px solid rgba(200,205,228,.5);font-size:.65rem}.top-dpk-row:last-child{border-bottom:none}
-.fh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;flex:0 0 auto}
-.fh-card{padding:9px 12px;display:flex;align-items:center;gap:10px}
-.fh-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+.fh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex:0 0 auto}
+.fh-card{padding:6px 10px;display:flex;align-items:center;gap:8px}
+.fh-icon{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1rem}
 .fh-body{flex:1;min-width:0}
-.fh-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:2px}
-.fh-val{font-size:1.1rem;font-weight:800;color:var(--text);line-height:1}
-.fh-chg{font-size:.65rem;margin-top:2px}
+.fh-lbl{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:1px}
+.fh-val{font-size:.95rem;font-weight:800;color:var(--text);line-height:1}
+.fh-chg{font-size:.63rem;margin-top:1px}
 .bar-row{display:flex;align-items:center;gap:8px;padding:4px 0}
 .bar-l{font-size:.7rem;color:var(--muted);min-width:62px}
 .bar-o{flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden}
@@ -97,7 +99,18 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 <div id="topbar">
   <span class="logo"><i class="ti ti-chart-bar"></i> FinBoard</span>
   <span class="pb"><i class="ti ti-calendar-event"></i> Periode: {{ $periodeLabel }}</span>
-  <div class="tr"><span id="dlbl"></span>&nbsp;<span id="clock"></span></div>
+  <div id="dots">
+    <div class="dot active" onclick="goSlide(0)" title="Financial Highlights"></div>
+    <div class="dot" onclick="goSlide(1)" title="Dana Pihak Ketiga"></div>
+    <div class="dot" onclick="goSlide(2)" title="Pembiayaan"></div>
+    <div class="dot" onclick="goSlide(3)" title="Segmentasi Pembiayaan"></div>
+    <div class="dot" onclick="goSlide(4)" title="Kualitas NPF"></div>
+    <div class="dot" onclick="goSlide(5)" title="Peta Sebaran Nasabah"></div>
+    <div class="dot" onclick="goSlide(6)" title="Performa AO"></div>
+  </div>
+  <div class="tr"><span id="dlbl"></span>&nbsp;<span id="clock"></span>
+    <div id="btn-play" onclick="togglePlay()" title="Play / Pause"><i id="ico-play" class="ti ti-pause"></i></div>
+  </div>
 </div>
 <div id="pw"><div id="pf"></div></div>
 <div id="sw">
@@ -184,19 +197,19 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
   <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;min-height:0">
     {{-- Left: KPIs + Komposisi DP --}}
     <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
-      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#e63946,#ff7b7b);flex-shrink:0;padding:10px 14px">
+      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#e63946,#ff7b7b);flex-shrink:0;padding:8px 12px">
         <div class="klbl">Total DPK</div>
         <div class="kval sm" style="color:var(--rp)">Rp {{ number_format($totalFunding/1e9,2) }} M</div>
         <span class="kb {{ $fundingGrowth>=0?'up':'dn' }}">{{ $fundingGrowth>=0?'&#9650;':'&#9660;' }} {{ abs($fundingGrowth) }}% MoM</span>
       </div>
       @php $tabPct=$totalFunding>0?round($totalTabungan/$totalFunding*100,1):0; @endphp
-      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#03c3ec,#71dd37);flex-shrink:0;padding:10px 14px">
+      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#03c3ec,#71dd37);flex-shrink:0;padding:8px 12px">
         <div class="klbl">Tabungan</div>
         <div class="kval sm" style="color:var(--cyan)">Rp {{ number_format($totalTabungan/1e9,2) }} M</div>
         <span class="kb cy">{{ $tabPct }}% dari DPK</span>
       </div>
       @php $depPct=$totalFunding>0?round($totalDeposito/$totalFunding*100,1):0; @endphp
-      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff9f43,#ffab00);flex-shrink:0;padding:10px 14px">
+      <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff9f43,#ffab00);flex-shrink:0;padding:8px 12px">
         <div class="klbl">Deposito</div>
         <div class="kval sm" style="color:var(--orange)">Rp {{ number_format($totalDeposito/1e9,2) }} M</div>
         <span class="kb warn">{{ $depPct }}% dari DPK</span>
@@ -204,8 +217,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
         <span class="kb dn" style="margin-top:2px">&#9660; Cair: {{ number_format($jumlahPencairan) }} bilyet &middot; Rp {{ number_format($totalPencairan/1e9,2) }} M</span>
         @endif
       </div>
-      <div class="gc cc" style="flex-shrink:0;padding:10px 14px">
-        <div class="cct" style="margin-bottom:6px">Komposisi Sumber Dana (DP1/DP2/DP3)</div>
+      <div class="gc cc" style="flex-shrink:0;padding:8px 12px">
+        <div class="cct" style="margin-bottom:4px">Komposisi Sumber Dana (DP1/DP2/DP3)</div>
         @php
           $dp1Pct=$totalDanaReal>0?round($dp1Modal/$totalDanaReal*100,1):0;
           $dp2Pct=$totalDanaReal>0?round($dp2LinkAbp/$totalDanaReal*100,1):0;
@@ -226,7 +239,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
           <div class="bar-o"><div class="bar-i" style="width:{{ $dp3Pct }}%;background:#03c3ec"></div></div>
           <div class="bar-v" style="color:#03c3ec;font-size:.67rem">{{ $dp3Pct }}%</div>
         </div>
-        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--border)">
           <div style="font-size:.67rem;color:var(--dim)">Total Dana:
             <span style="color:var(--text);font-weight:700">Rp {{ number_format($totalDanaReal/1e9,2) }} M</span>
           </div>
@@ -453,16 +466,16 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
   <div class="stitle"><i class="ti ti-alert-circle"></i> Kualitas Pembiayaan &amp; Kolektibilitas NPF</div>
   @php $npfKontrak=($kolCount['3']??0)+($kolCount['4']??0)+($kolCount['5']??0); @endphp
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex-shrink:0">
-    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff3e1d,#ff9f43);padding:10px 14px">
+    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff3e1d,#ff9f43);padding:8px 12px">
       <div class="klbl">Total OS NPF (Kol 3–5)</div>
       <div class="kval sm" style="color:var(--red)">Rp {{ number_format(($totalNPF??0)/1e9,2) }} M</div>
     </div>
-    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff3e1d,#ff9f43);padding:10px 14px">
+    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff3e1d,#ff9f43);padding:8px 12px">
       <div class="klbl">Rasio NPF</div>
       <div class="kval sm" style="color:var(--red)">{{ number_format($npfRatio,2) }}%</div>
       <span class="kb dn">Threshold 5%</span>
     </div>
-    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff9f43,#ffab00);padding:10px 14px">
+    <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff9f43,#ffab00);padding:8px 12px">
       <div class="klbl">Kontrak NPF</div>
       <div class="kval sm" style="color:var(--orange)">{{ number_format($npfKontrak) }}</div>
       <span class="kb warn">Kol 3 + 4 + 5</span>
@@ -522,24 +535,40 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 {{-- SLIDE 5 : PETA SEBARAN NASABAH                                     --}}
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div class="slide" id="s4">
-  <div class="stitle"><i class="ti ti-map-pin"></i> Peta Sebaran Nasabah &mdash; Distribusi per Kecamatan (Jawa Barat)</div>
+  <div class="stitle"><i class="ti ti-map-pin"></i> Peta Sebaran Nasabah &mdash; Distribusi per Kecamatan (Bogor)</div>
+  @php
+    $sebaranBogor = $sebaranNasabah->filter(fn($sb) => stripos($sb->kota ?? '', 'BOGOR') !== false)->values();
+    $sbTop    = $sebaranBogor->take(10);
+    $sbBottom = $sebaranBogor->slice(max(0, $sebaranBogor->count() - 10))->sortBy('jumlah')->values();
+  @endphp
   <div style="flex:1;display:grid;grid-template-columns:3fr 1fr;gap:8px;min-height:0">
     <div class="gc" style="overflow:hidden;position:relative">
       <div id="map-nasabah" style="width:100%;height:100%;border-radius:14px;z-index:1"></div>
     </div>
     <div class="gc cc" style="display:flex;flex-direction:column">
-      <div class="cct">Top Kecamatan (Jawa Barat)</div>
+      <div class="cct">Top 10 &amp; Bottom 10 Kecamatan &mdash; Bogor</div>
       <div class="nscr" style="flex:1">
         <table class="nt">
           <thead><tr><th>#</th><th>Kecamatan</th><th>Kab/Kota</th><th style="text-align:right">Nasabah</th><th style="text-align:right">OS (M)</th></tr></thead>
           <tbody>
-            @foreach($sebaranNasabah->take(20) as $i => $sb)
+            <tr><td colspan="5" style="background:rgba(105,108,255,.08);color:var(--blue);font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px">&#9650; Top 10 Terbanyak</td></tr>
+            @foreach($sbTop as $i => $sb)
             <tr>
               <td style="color:var(--dim);font-weight:700">{{ $i+1 }}</td>
               <td style="font-size:.72rem;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $sb->kecamatan }}</td>
               <td style="font-size:.65rem;color:var(--muted);max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $sb->kota }}</td>
               <td style="text-align:right;color:var(--blue);font-weight:700">{{ number_format($sb->jumlah) }}</td>
               <td style="text-align:right;color:var(--rp);font-size:.7rem">{{ number_format($sb->outstanding/1e9,1) }}</td>
+            </tr>
+            @endforeach
+            <tr><td colspan="5" style="background:rgba(230,57,70,.07);color:var(--red);font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px">&#9660; Bottom 10 Tersedikit</td></tr>
+            @foreach($sbBottom as $i => $sb)
+            <tr>
+              <td style="color:var(--dim)">{{ $i+1 }}</td>
+              <td style="font-size:.72rem;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">{{ $sb->kecamatan }}</td>
+              <td style="font-size:.65rem;color:var(--muted);max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $sb->kota }}</td>
+              <td style="text-align:right;color:var(--muted)">{{ number_format($sb->jumlah) }}</td>
+              <td style="text-align:right;color:var(--muted);font-size:.7rem">{{ number_format($sb->outstanding/1e9,1) }}</td>
             </tr>
             @endforeach
           </tbody>
@@ -640,16 +669,6 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 
 </div>{{-- end #sw --}}
 
-<div id="dots">
-  <div class="dot active" onclick="goSlide(0)" title="Financial Highlights"></div>
-  <div class="dot" onclick="goSlide(1)" title="Dana Pihak Ketiga"></div>
-  <div class="dot" onclick="goSlide(2)" title="Pembiayaan"></div>
-  <div class="dot" onclick="goSlide(3)" title="Segmentasi Pembiayaan"></div>
-  <div class="dot" onclick="goSlide(4)" title="Kualitas NPF"></div>
-  <div class="dot" onclick="goSlide(5)" title="Peta Sebaran Nasabah"></div>
-  <div class="dot" onclick="goSlide(6)" title="Performa AO"></div>
-</div>
-
 <script>
 // ── Data ─────────────────────────────────────────────────────────────────
 const TL  = @json($monthlyTrends['labels']);
@@ -699,7 +718,7 @@ function tick(){
 tick();setInterval(tick,1000);
 
 // ── ApexCharts base config ────────────────────────────────────────────────
-const AP={theme:{mode:'light'},chart:{background:'transparent',toolbar:{show:false},animations:{enabled:true,speed:600}},grid:{borderColor:'#dde0ef',strokeDashArray:4,padding:{top:0,right:10,bottom:0,left:10}},tooltip:{theme:'light',style:{fontSize:'12px'}},dataLabels:{enabled:false},legend:{labels:{colors:'#6c7293'},fontSize:'11px'},stroke:{curve:'smooth',width:2}};
+const AP={theme:{mode:'light'},chart:{background:'transparent',toolbar:{show:false},animations:{enabled:true,speed:600}},grid:{borderColor:'#dde0ef',strokeDashArray:4,padding:{top:0,right:10,bottom:20,left:10}},tooltip:{theme:'light',style:{fontSize:'12px'}},dataLabels:{enabled:false},legend:{labels:{colors:'#6c7293'},fontSize:'11px'},stroke:{curve:'smooth',width:2}};
 
 // ── Lazy chart init ─────────────────────────────────────────────────────
 let _leafletMap=null;
@@ -1088,13 +1107,14 @@ function _initCharts(idx){
         // CIMAHI
         'CIMAHI UTARA':[-6.868,107.544],
       };
-      _leafletMap=L.map(el,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView([-6.8,107.3],9);
+      _leafletMap=L.map(el,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView([-6.54,106.82],10);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
         maxZoom:18,attribution:'©OpenStreetMap ©CARTO'
       }).addTo(_leafletMap);
       L.control.attribution({position:'bottomright',prefix:false}).addAttribution('©<a href="https://carto.com">CARTO</a>').addTo(_leafletMap);
-      const maxJ=Math.max(...SEBARAN.map(s=>parseInt(s.jumlah)||0),1);
-      SEBARAN.forEach(function(s){
+      const SEBARAN_BOGOR=SEBARAN.filter(s=>(s.kota||'').toUpperCase().includes('BOGOR'));
+      const maxJ=Math.max(...SEBARAN_BOGOR.map(s=>parseInt(s.jumlah)||0),1);
+      SEBARAN_BOGOR.forEach(function(s){
         const k=(s.kecamatan||'').trim().toUpperCase();
         const c=COORDS[k];if(!c)return;
         const j=parseInt(s.jumlah)||0;
@@ -1132,17 +1152,34 @@ function _showSlide(n){
   if(_slides[_cur]) _slides[_cur].classList.add('active');
   if(_dots[_cur])   _dots[_cur].classList.add('active');
   _initCharts(_cur);
-  if(_cur===6&&_leafletMap)setTimeout(function(){_leafletMap.invalidateSize();},100);
+  if(_cur===5&&_leafletMap)setTimeout(function(){_leafletMap.invalidateSize();},100);
   clearTimeout(_autoTimer);
-  _startBar();
-  _autoTimer=setTimeout(()=>_showSlide(_cur+1), DUR);
+  if(_playing){
+    _startBar();
+    _autoTimer=setTimeout(()=>_showSlide(_cur+1), DUR);
+  }
 }
 
 window.goSlide=function(i){ clearTimeout(_autoTimer); _showSlide(i); };
 
+let _playing=true;
+window.togglePlay=function(){
+  _playing=!_playing;
+  const ico=document.getElementById('ico-play');
+  if(_playing){
+    ico.className='ti ti-pause';
+    _showSlide(_cur);
+  }else{
+    ico.className='ti ti-player-play';
+    clearTimeout(_autoTimer);
+    if(_pf){_pf.style.transition='none';_pf.style.width=_pf.style.width;}
+  }
+};
+
 document.addEventListener('keydown',function(e){
   if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); clearTimeout(_autoTimer); _showSlide(_cur+1); }
   if(e.key==='ArrowLeft'){               e.preventDefault(); clearTimeout(_autoTimer); _showSlide(_cur-1); }
+  if(e.key==='p'||e.key==='P'){          e.preventDefault(); togglePlay(); }
 });
 
 _initCharts(0);
