@@ -1129,7 +1129,7 @@ function _initCharts(idx){
 } // end _initCharts
 
 // ── Slideshow engine ──────────────────────────────────────────────────────
-const TOTAL=7, DUR=8000;
+const TOTAL=7, DUR=30000;
 let _cur=0, _autoTimer=null;
 const _slides=document.querySelectorAll('.slide');
 const _dots=document.querySelectorAll('.dot');
