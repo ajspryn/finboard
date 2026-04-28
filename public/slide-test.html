@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Slide Test</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #0f1117;
+        color: #e8edf5;
+        font-family: sans-serif;
+      }
+      #topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        background: #161b27;
+        border-bottom: 1px solid #2d3551;
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        gap: 16px;
+        z-index: 100;
+      }
+      #pw {
+        position: fixed;
+        top: 48px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #2d3551;
+        z-index: 100;
+      }
+      #pf {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #696cff, #03c3ec);
+      }
+      #dots {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #3a4468;
+        cursor: pointer;
+        transition: 0.3s;
+      }
+      .dot.active {
+        background: #696cff;
+        transform: scale(1.4);
+      }
+      #sw {
+        position: fixed;
+        top: 52px;
+        left: 0;
+        right: 0;
+        bottom: 36px;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: 800;
+      }
+      .slide.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      #s0 {
+        background: rgba(105, 108, 255, 0.1);
+        color: #696cff;
+      }
+      #s1 {
+        background: rgba(3, 195, 236, 0.1);
+        color: #03c3ec;
+      }
+      #s2 {
+        background: rgba(113, 221, 55, 0.1);
+        color: #71dd37;
+      }
+      #s3 {
+        background: rgba(255, 171, 0, 0.1);
+        color: #ffab00;
+      }
+      #s4 {
+        background: rgba(255, 62, 29, 0.1);
+        color: #ff3e1d;
+      }
+      #log {
+        position: fixed;
+        top: 60px;
+        right: 16px;
+        background: #161b27;
+        border: 1px solid #2d3551;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 12px;
+        color: #8892b0;
+        width: 280px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 200;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="topbar">
+      <b style="color: #696cff">Slide Test</b>
+      <span id="status" style="color: #8892b0; font-size: 0.8rem">Menunggu...</span>
+    </div>
+    <div id="pw"><div id="pf"></div></div>
+    <div id="dots">
+      <div class="dot active" onclick="window.goSlide(0)"></div>
+      <div class="dot" onclick="window.goSlide(1)"></div>
+      <div class="dot" onclick="window.goSlide(2)"></div>
+      <div class="dot" onclick="window.goSlide(3)"></div>
+      <div class="dot" onclick="window.goSlide(4)"></div>
+    </div>
+    <div id="sw">
+      <div class="slide active" id="s0">SLIDE 1 — KPI</div>
+      <div class="slide" id="s1">SLIDE 2 — Financial Highlights</div>
+      <div class="slide" id="s2">SLIDE 3 — Tren Bulanan</div>
+      <div class="slide" id="s3">SLIDE 4 — Kualitas NPF</div>
+      <div class="slide" id="s4">SLIDE 5 — Komposisi DPK</div>
+    </div>
+    <div id="log"></div>
+
+    <script>
+      const TOTAL = 5,
+        DUR = 3000;
+      let _cur = 0,
+        _autoTimer = null;
+      const _slides = document.querySelectorAll('.slide');
+      const _dots = document.querySelectorAll('.dot');
+      const _pf = document.getElementById('pf');
+      const _log = document.getElementById('log');
+      const _status = document.getElementById('status');
+
+      function log(msg) {
+        const t = new Date().toLocaleTimeString('id-ID');
+        _log.innerHTML =
+          '<div style="border-bottom:1px solid #2d3551;padding:2px 0">[' +
+          t +
+          '] ' +
+          msg +
+          '</div>' +
+          _log.innerHTML;
+      }
+
+      function _startBar() {
+        if (!_pf) return log('ERROR: #pf not found!');
+        _pf.style.transition = 'none';
+        _pf.style.width = '0%';
+        void _pf.offsetWidth;
+        _pf.style.transition = 'width ' + DUR + 'ms linear';
+        _pf.style.width = '100%';
+      }
+
+      function _showSlide(n) {
+        const next = ((n % TOTAL) + TOTAL) % TOTAL;
+        log('_showSlide(' + n + ') → next=' + next + ', cur=' + _cur);
+        if (_slides[_cur]) _slides[_cur].classList.remove('active');
+        if (_dots[_cur]) _dots[_cur].classList.remove('active');
+        _cur = next;
+        if (_slides[_cur]) _slides[_cur].classList.add('active');
+        if (_dots[_cur]) _dots[_cur].classList.add('active');
+        _status.textContent = 'Slide ' + (next + 1) + '/5 — next in ' + DUR / 1000 + 's';
+        clearTimeout(_autoTimer);
+        _startBar();
+        _autoTimer = setTimeout(() => _showSlide(_cur + 1), DUR);
+      }
+
+      window.goSlide = function (i) {
+        clearTimeout(_autoTimer);
+        _showSlide(i);
+      };
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+          e.preventDefault();
+          clearTimeout(_autoTimer);
+          _showSlide(_cur + 1);
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          clearTimeout(_autoTimer);
+          _showSlide(_cur - 1);
+        }
+      });
+
+      log('slides found: ' + _slides.length);
+      log('dots found: ' + _dots.length);
+      log('pf found: ' + !!_pf);
+      _startBar();
+      _autoTimer = setTimeout(() => _showSlide(1), DUR);
+      _status.textContent = 'Slide 1/5 — next in ' + DUR / 1000 + 's';
+      log('Engine started, DUR=' + DUR + 'ms');
+    </script>
+  </body>
+</html>

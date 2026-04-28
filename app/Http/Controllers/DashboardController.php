@@ -2304,6 +2304,16 @@ class DashboardController extends Controller
                     2
                 );
             })->values()->toArray(),
+            'tabungan' => $monthlyData->map(function ($r) {
+                $m = str_pad((int) $r->period_month, 2, '0', STR_PAD_LEFT);
+                $y = (int) $r->period_year;
+                return round(Tabungan::where('period_month', $m)->where('period_year', $y)->sum('sahirrp') / 1e9, 2);
+            })->values()->toArray(),
+            'deposito' => $monthlyData->map(function ($r) {
+                $m = str_pad((int) $r->period_month, 2, '0', STR_PAD_LEFT);
+                $y = (int) $r->period_year;
+                return round(Deposito::where('period_month', $m)->where('period_year', $y)->sum('nomrp') / 1e9, 2);
+            })->values()->toArray(),
         ];
 
         // ── NPF trend ─────────────────────────────────────────────────────
@@ -2317,12 +2327,135 @@ class DashboardController extends Controller
         })->values()->toArray();
         $monthlyTrends['npf_ratio'] = $npfTrend;
 
-        // ── Top 5 NPF ─────────────────────────────────────────────────────
+        // ── Pelunasan Cepat trend (same logic as main dashboard: kontrak hilang + angs_ke < jw) ──
+        $pelunasanCepatByMonth = [];
+        $pelunasanCepatCountByMonth = [];
+        foreach ($monthlyData as $trendItem) {
+            $tMonth    = (int) $trendItem->period_month;
+            $tYear     = (int) $trendItem->period_year;
+            $tMonthStr = str_pad($tMonth, 2, '0', STR_PAD_LEFT);
+            $tPrevMonth = $tMonth - 1;
+            $tPrevYear  = $tYear;
+            if ($tPrevMonth < 1) {
+                $tPrevMonth = 12;
+                $tPrevYear = $tYear - 1;
+            }
+            $tPrevMonthStr = str_pad($tPrevMonth, 2, '0', STR_PAD_LEFT);
+
+            $tKontrakLalu = Pembiayaan::where('period_month', $tPrevMonthStr)
+                ->where('period_year', $tPrevYear)
+                ->pluck('nokontrak')->unique()->toArray();
+            $tKontrakIni = Pembiayaan::where('period_month', $tMonthStr)
+                ->where('period_year', $tYear)
+                ->pluck('nokontrak')->unique()->toArray();
+            $tHilang = array_diff($tKontrakLalu, $tKontrakIni);
+
+            if (!empty($tHilang)) {
+                $pelunasanCepatContracts = Pembiayaan::where('period_month', $tPrevMonthStr)
+                    ->where('period_year', $tPrevYear)
+                    ->whereIn('nokontrak', $tHilang)
+                    ->whereRaw('angs_ke < jw')
+                    ->where('jw', '>', 0)
+                    ->select('nokontrak', 'mdlawal')
+                    ->get()->unique('nokontrak')->values();
+                $pelunasanCepatByMonth[]      = round($pelunasanCepatContracts->sum('mdlawal') / 1e9, 2);
+                $pelunasanCepatCountByMonth[] = $pelunasanCepatContracts->count();
+            } else {
+                $pelunasanCepatByMonth[]      = 0;
+                $pelunasanCepatCountByMonth[] = 0;
+            }
+        }
+        $monthlyTrends['pelunasan_cepat']       = $pelunasanCepatByMonth;
+        $monthlyTrends['pelunasan_cepat_count']  = $pelunasanCepatCountByMonth;
+
+        // ── Deposito Jatuh Tempo trend ─────────────────────────────────────
+        $latestDepRaw = DB::table('depositos')
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->selectRaw('MAX(period_year*100+period_month) as latest')
+            ->value('latest');
+        $latestDepYear  = $latestDepRaw ? (int) substr((string) $latestDepRaw, 0, 4) : (int) $filterYear;
+        $latestDepMonth = $latestDepRaw
+            ? str_pad((int) substr((string) $latestDepRaw, 4), 2, '0', STR_PAD_LEFT)
+            : $filterMonth;
+
+        $depositoJtRaw = DB::table('depositos')
+            ->selectRaw('YEAR(tgljtempo) as yr, MONTH(tgljtempo) as mo, SUM(nomrp) as total, COUNT(*) as n')
+            ->where('period_year', $latestDepYear)
+            ->where('period_month', $latestDepMonth)
+            ->whereNotNull('tgljtempo')
+            ->groupByRaw('YEAR(tgljtempo), MONTH(tgljtempo)')
+            ->get()
+            ->keyBy(fn($r) => $r->yr . str_pad((int) $r->mo, 2, '0', STR_PAD_LEFT));
+
+        $monthlyTrends['deposito_jatuh_tempo'] = $monthlyData->map(function ($r) use ($depositoJtRaw) {
+            $key = $r->period_year . str_pad((int) $r->period_month, 2, '0', STR_PAD_LEFT);
+            $val = $depositoJtRaw->get($key);
+            return $val ? round((float) $val->total / 1e9, 2) : 0;
+        })->values()->toArray();
+
+        $monthlyTrends['deposito_jatuh_tempo_count'] = $monthlyData->map(function ($r) use ($depositoJtRaw) {
+            $key = $r->period_year . str_pad((int) $r->period_month, 2, '0', STR_PAD_LEFT);
+            $val = $depositoJtRaw->get($key);
+            return $val ? (int) $val->n : 0;
+        })->values()->toArray();
+
+        // ── Pencairan Deposito monthly trend (same logic as main dashboard: nobilyet comparison) ──
+        $displayPeriods = $monthlyData->map(fn($r) => [
+            'year'  => (int) $r->period_year,
+            'month' => str_pad((int) $r->period_month, 2, '0', STR_PAD_LEFT),
+        ])->values()->toArray();
+
+        $pencairanMonthly      = [];
+        $pencairanMonthlyCount = [];
+        foreach ($displayPeriods as $i => $currP) {
+            if ($i === 0) {
+                $pencairanMonthly[]      = 0;
+                $pencairanMonthlyCount[] = 0;
+                continue;
+            }
+            $prevP  = $displayPeriods[$i - 1];
+            $pcResult = DB::table('depositos as prev')
+                ->leftJoin('depositos as curr', function ($join) use ($currP) {
+                    $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                        ->where('curr.period_month', $currP['month'])
+                        ->where('curr.period_year',  $currP['year']);
+                })
+                ->where('prev.period_month', $prevP['month'])
+                ->where('prev.period_year',  $prevP['year'])
+                ->whereNull('curr.nobilyet')
+                ->selectRaw('COUNT(*) as n, SUM(prev.nomrp) as total')
+                ->first();
+            $pencairanMonthly[]      = round(($pcResult->total ?? 0) / 1e9, 2);
+            $pencairanMonthlyCount[] = (int) ($pcResult->n ?? 0);
+        }
+        $monthlyTrends['deposito_pencairan']       = $pencairanMonthly;
+        $monthlyTrends['deposito_pencairan_count'] = $pencairanMonthlyCount;
+
+        // ── Kolektibilitas count trend per bulan ──────────────────────────
+        $kolCountRaw = Pembiayaan::select('period_year', 'period_month', 'colbaru', DB::raw('COUNT(*) as cnt'))
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->whereIn('colbaru', ['1', '2', '3', '4', '5'])
+            ->groupBy('period_year', 'period_month', 'colbaru')
+            ->get()
+            ->groupBy(fn($r) => $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT));
+        foreach (['1', '2', '3', '4', '5'] as $kol) {
+            $monthlyTrends['kol_count_' . $kol] = $monthlyData->map(function ($r) use ($kolCountRaw, $kol) {
+                $key = $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                $row = ($kolCountRaw->get($key) ?? collect())->firstWhere('colbaru', $kol);
+                return $row ? (int)$row->cnt : 0;
+            })->values()->toArray();
+        }
+
+        // Current period pencairan for KPI card
+        $jumlahPencairan = (int) end($pencairanMonthlyCount);
+        $totalPencairan  = (float) (end($pencairanMonthly) * 1e9);
+
+        // ── Top 10 NPF ─────────────────────────────────────────────────────
         $topNpf = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
             ->whereIn('colbaru', ['3', '4', '5'])
-            ->select('nama', 'nokontrak', 'osmdlc', 'colbaru', 'segmen')
+            ->select('nama', 'nokontrak', 'osmdlc', 'colbaru', 'kdprd')
             ->orderByDesc('osmdlc')
-            ->limit(5)->get();
+            ->limit(10)->get();
 
         // ── Top 5 NPF by kolektibilitas ───────────────────────────────────
         $topKol3 = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
@@ -2379,29 +2512,306 @@ class DashboardController extends Controller
                 'fdr',
                 'npf',
                 'bopo',
+                'cash_ratio',
                 'aset',
                 'dpk',
                 'pembiayaan',
                 'laba_rugi',
+                'biaya',
                 'pendapatan'
             )
             ->get();
 
         $fhTrends = [
-            'labels'    => $fhHistory->map(
+            'labels'     => $fhHistory->map(
                 fn($r) => ($monthNamesShort[str_pad($r->period_month, 2, '0', STR_PAD_LEFT)] ?? $r->period_month)
                     . ' ' . $r->period_year
             )->values()->toArray(),
-            'car'       => $fhHistory->map(fn($r) => (float) $r->car)->values()->toArray(),
-            'roa'       => $fhHistory->map(fn($r) => (float) $r->roa)->values()->toArray(),
-            'fdr'       => $fhHistory->map(fn($r) => (float) $r->fdr)->values()->toArray(),
-            'npf'       => $fhHistory->map(fn($r) => (float) $r->npf)->values()->toArray(),
-            'bopo'      => $fhHistory->map(fn($r) => (float) $r->bopo)->values()->toArray(),
-            'aset'      => $fhHistory->map(fn($r) => round((float) $r->aset / 1e9, 2))->values()->toArray(),
-            'dpk'       => $fhHistory->map(fn($r) => round((float) $r->dpk / 1e9, 2))->values()->toArray(),
-            'laba_rugi' => $fhHistory->map(fn($r) => round((float) $r->laba_rugi / 1e9, 2))->values()->toArray(),
+            'car'        => $fhHistory->map(fn($r) => (float) $r->car)->values()->toArray(),
+            'roa'        => $fhHistory->map(fn($r) => (float) $r->roa)->values()->toArray(),
+            'roe'        => $fhHistory->map(fn($r) => (float) $r->roe)->values()->toArray(),
+            'fdr'        => $fhHistory->map(fn($r) => (float) $r->fdr)->values()->toArray(),
+            'npf'        => $fhHistory->map(fn($r) => (float) $r->npf)->values()->toArray(),
+            'bopo'       => $fhHistory->map(fn($r) => (float) $r->bopo)->values()->toArray(),
+            'cash_ratio' => $fhHistory->map(fn($r) => (float) $r->cash_ratio)->values()->toArray(),
+            'aset'       => $fhHistory->map(fn($r) => round((float) $r->aset / 1e9, 2))->values()->toArray(),
+            'dpk'        => $fhHistory->map(fn($r) => round((float) $r->dpk / 1e9, 2))->values()->toArray(),
+            'pembiayaan' => $fhHistory->map(fn($r) => round((float) $r->pembiayaan / 1e9, 2))->values()->toArray(),
+            'laba_rugi'  => $fhHistory->map(fn($r) => round((float) $r->laba_rugi / 1e9, 2))->values()->toArray(),
+            'biaya'      => $fhHistory->map(fn($r) => round((float) $r->biaya / 1e9, 2))->values()->toArray(),
             'pendapatan' => $fhHistory->map(fn($r) => round((float) $r->pendapatan / 1e9, 2))->values()->toArray(),
         ];
+
+        // ── Top 5 Produk Pembiayaan ──────────────────────────────────────
+        $productMapping = [
+            '55' => 'Musyarakah',
+            '50' => 'Murabahah',
+            '56' => 'MMQ',
+            '88' => 'Isthisna',
+            '86' => 'Multijasa Piutang',
+        ];
+        $topProducts = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->select('kdprd', DB::raw('COUNT(*) as total_kontrak'), DB::raw('SUM(osmdlc) as total_outstanding'))
+            ->whereNotNull('kdprd')->where('kdprd', '!=', '')
+            ->groupBy('kdprd')->orderByDesc('total_outstanding')->limit(7)->get()
+            ->map(function ($item) use ($productMapping) {
+                $item->nama_produk = $productMapping[$item->kdprd] ?? 'Produk ' . $item->kdprd;
+                return $item;
+            });
+
+        // ── Top 5 Produk Tabungan ────────────────────────────────────────
+        $tabunganProductMapping = [
+            '02' => 'Tabungan Beriman',
+            '04' => 'Tab. Beriman Gayatri',
+            '05' => 'Tab. Beriman Pegawai',
+            '10' => 'Simpanan Pelajar',
+            '11' => 'Simpanan Masyarakat',
+            '12' => 'Tabungan Haji',
+            '21' => 'Tabungan Tegar',
+            '22' => 'Tab. Simpanan Pelajar',
+            '25' => 'Tabungan Pasar',
+        ];
+        $topTabunganProducts = DB::table('tabungans')
+            ->select('kodeprd', DB::raw('SUM(sahirrp) as total_nominal'), DB::raw('COUNT(*) as jumlah_rekening'))
+            ->where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->whereNotNull('kodeprd')->where('kodeprd', '!=', '')
+            ->groupBy('kodeprd')->orderByDesc('total_nominal')->limit(5)->get()
+            ->map(function ($item) use ($tabunganProductMapping) {
+                $item->nama_produk = $tabunganProductMapping[$item->kodeprd] ?? 'Tabungan ' . $item->kodeprd;
+                return $item;
+            });
+
+        // ── Top 5 Produk Deposito ────────────────────────────────────────
+        $depositoProductMapping = ['31' => 'Deposito', '41' => 'ABP/Mudharabah'];
+        $topDepositoProducts = DB::table('depositos')
+            ->select('kdprd', DB::raw('SUM(nomrp) as total_nominal'), DB::raw('COUNT(*) as jumlah_bilyet'))
+            ->where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->whereNotNull('kdprd')->where('kdprd', '!=', '')
+            ->groupBy('kdprd')->orderByDesc('total_nominal')->limit(5)->get()
+            ->map(function ($item) use ($depositoProductMapping) {
+                $item->nama_produk = $depositoProductMapping[$item->kdprd] ?? 'Deposito ' . $item->kdprd;
+                return $item;
+            });
+
+        // ── Top 5 AO Lending ────────────────────────────────────────────
+        $topAOLending = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->select(
+                'kdaoh',
+                DB::raw('COUNT(*) as total_nasabah'),
+                DB::raw('SUM(osmdlc) as total_outstanding'),
+                DB::raw('SUM(CASE WHEN colbaru >= 3 THEN osmdlc ELSE 0 END) as total_npf')
+            )
+            ->whereNotNull('kdaoh')->where('kdaoh', '!=', '')
+            ->groupBy('kdaoh')->orderByDesc('total_outstanding')->limit(7)->get()
+            ->map(function ($item) {
+                $npfRatio = $item->total_outstanding > 0
+                    ? round(($item->total_npf / $item->total_outstanding) * 100, 2) : 0;
+                return [
+                    'nmao'             => $this->getAoDisplayName($item->kdaoh),
+                    'total_nasabah'    => $item->total_nasabah,
+                    'total_outstanding' => $item->total_outstanding,
+                    'npf_ratio'        => $npfRatio,
+                ];
+            });
+
+        // ── Top 5 AO Funding (Deposito) ──────────────────────────────────
+        $topAOFunding = DB::table('depositos')
+            ->select('kodeaoh', DB::raw('SUM(nomrp) as total_funding'), DB::raw('COUNT(*) as total_bilyet'))
+            ->where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->whereNotNull('kodeaoh')->where('kodeaoh', '!=', '')
+            ->groupBy('kodeaoh')->orderByDesc('total_funding')->limit(7)->get()
+            ->map(function ($item) {
+                return [
+                    'nmao'         => $this->getAoDisplayName($item->kodeaoh),
+                    'total_funding' => $item->total_funding,
+                    'total_bilyet' => $item->total_bilyet,
+                ];
+            });
+
+        // ── Segmentasi full table (for display-board slide) ──────────────
+        $segmentasiData = $this->getSegmentasiData(null, null, $filterMonth, $filterYear);
+
+        // ── Segmentasi (kdprd) distribution ─────────────────────────────
+        $segmentasiDistrib = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->select('kdprd', DB::raw('COUNT(*) as jumlah'), DB::raw('SUM(osmdlc) as outstanding'))
+            ->whereNotNull('kdprd')->where('kdprd', '!=', '')
+            ->groupBy('kdprd')->orderByDesc('outstanding')->get()
+            ->map(function ($item) use ($productMapping) {
+                $item->nama = $productMapping[$item->kdprd] ?? 'Produk ' . $item->kdprd;
+                return $item;
+            });
+
+        // ── AO Lending monthly trend (top 5 by current period) ───────────
+        $top5AOLendingKodes = $topAOLending->pluck('nmao')->take(5)->toArray();
+        $top5AOLendingKodeIds = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->select('kdaoh', DB::raw('SUM(osmdlc) as os'))
+            ->whereNotNull('kdaoh')->where('kdaoh', '!=', '')
+            ->groupBy('kdaoh')->orderByDesc('os')->limit(5)->pluck('kdaoh')->toArray();
+        $aoLendingTrendRaw = Pembiayaan::select('period_year', 'period_month', 'kdaoh', DB::raw('SUM(osmdlc) as os'))
+            ->whereIn('kdaoh', $top5AOLendingKodeIds)
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month', 'kdaoh')
+            ->orderByRaw('(period_year*100+period_month) ASC')->get()
+            ->groupBy('kdaoh');
+        $aoTrendLabels = $monthlyData->map(
+            fn($r) => ($monthNamesShort[str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT)] ?? $r->period_month) . ' ' . $r->period_year
+        )->values()->toArray();
+        $aoLendingTrend = ['labels' => $aoTrendLabels, 'datasets' => []];
+        $lendChartColors = ['#4fc3f7', '#81c784', '#ffb74d', '#f06292', '#ce93d8'];
+        foreach ($top5AOLendingKodeIds as $ci => $kd) {
+            $byPeriod = ($aoLendingTrendRaw->get($kd) ?? collect())->keyBy(
+                fn($r) => $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT)
+            );
+            $aoLendingTrend['datasets'][] = [
+                'label' => $this->getAoDisplayName($kd),
+                'color' => $lendChartColors[$ci % 5],
+                'data'  => $monthlyData->map(function ($r) use ($byPeriod) {
+                    $key = $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                    $row = $byPeriod->get($key);
+                    return $row ? round($row->os / 1e9, 2) : 0;
+                })->values()->toArray(),
+            ];
+        }
+
+        // ── AO Funding monthly trend (top 5 by current period) ───────────
+        $top5AOFundingKodeIds = DB::table('depositos')
+            ->select('kodeaoh', DB::raw('SUM(nomrp) as fn'))
+            ->where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->whereNotNull('kodeaoh')->where('kodeaoh', '!=', '')
+            ->groupBy('kodeaoh')->orderByDesc('fn')->limit(5)->pluck('kodeaoh')->toArray();
+        $depPeriods = DB::table('depositos')->select('period_year', 'period_month')
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month')
+            ->orderByRaw('(period_year*100+period_month) ASC')->get();
+        $depLabels = $depPeriods->map(
+            fn($r) => ($monthNamesShort[str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT)] ?? $r->period_month) . ' ' . $r->period_year
+        )->values()->toArray();
+        $aoFundingTrendRaw = DB::table('depositos')
+            ->select('period_year', 'period_month', 'kodeaoh', DB::raw('SUM(nomrp) as fn'))
+            ->whereIn('kodeaoh', $top5AOFundingKodeIds)
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month', 'kodeaoh')
+            ->orderByRaw('(period_year*100+period_month) ASC')->get()
+            ->groupBy('kodeaoh');
+        $aoFundingTrend = ['labels' => $depLabels, 'datasets' => []];
+        $fundChartColors = ['#4dd0e1', '#aed581', '#ffd54f', '#ef9a9a', '#b39ddb'];
+        foreach ($top5AOFundingKodeIds as $ci => $kd) {
+            $byPeriod = ($aoFundingTrendRaw->get($kd) ?? collect())->keyBy(
+                fn($r) => $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT)
+            );
+            $aoFundingTrend['datasets'][] = [
+                'label' => $this->getAoDisplayName($kd),
+                'color' => $fundChartColors[$ci % 5],
+                'data'  => $depPeriods->map(function ($r) use ($byPeriod) {
+                    $key = $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                    $row = $byPeriod->get($key);
+                    return $row ? round($row->fn / 1e9, 2) : 0;
+                })->values()->toArray(),
+            ];
+        }
+
+        // ── Segmentasi Pembiayaan trend per bulan ─────────────────────────
+        $topSegKodes = $segmentasiDistrib->take(5)->pluck('kdprd')->toArray();
+        $segTrendRaw = Pembiayaan::select('period_year', 'period_month', 'kdprd', DB::raw('SUM(osmdlc) as os'))
+            ->whereIn('kdprd', $topSegKodes)
+            ->whereNotNull('period_year')->whereNotNull('period_month')
+            ->groupBy('period_year', 'period_month', 'kdprd')
+            ->orderByRaw('(period_year*100+period_month) ASC')->get()
+            ->groupBy('kdprd');
+        $segmentasiTrend = ['labels' => $aoTrendLabels, 'datasets' => []];
+        $segColors = ['#4fc3f7', '#81c784', '#ffb74d', '#f06292', '#ce93d8'];
+        foreach ($topSegKodes as $si => $kd) {
+            $byPeriod = ($segTrendRaw->get($kd) ?? collect())->keyBy(
+                fn($r) => $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT)
+            );
+            $namaMap = $productMapping;
+            $segmentasiTrend['datasets'][] = [
+                'label' => $namaMap[$kd] ?? 'Produk ' . $kd,
+                'color' => $segColors[$si % 5],
+                'data'  => $monthlyData->map(function ($r) use ($byPeriod) {
+                    $key = $r->period_year . str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                    $row = $byPeriod->get($key);
+                    return $row ? round($row->os / 1e9, 2) : 0;
+                })->values()->toArray(),
+            ];
+        }
+
+        // ── Produk Funding trend per bulan (Tabungan + Deposito by produk) ─
+        $fundingProdukTrend = [
+            'labels'   => $depLabels,
+            'tabungan' => $depPeriods->map(function ($r) {
+                $m = str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                return round(DB::table('tabungans')->where('period_month', $m)->where('period_year', $r->period_year)->sum('sahirrp') / 1e9, 2);
+            })->values()->toArray(),
+            'deposito' => $depPeriods->map(function ($r) {
+                $m = str_pad((int)$r->period_month, 2, '0', STR_PAD_LEFT);
+                return round(DB::table('depositos')->where('period_month', $m)->where('period_year', $r->period_year)->sum('nomrp') / 1e9, 2);
+            })->values()->toArray(),
+        ];
+
+        // ── Komposisi DPK ────────────────────────────────────────────────
+        $abpTotal   = DB::table('depositos')->where('period_month', $filterMonth)->where('period_year', $filterYear)->where('kdprd', '41')->sum('nomrp');
+        $linkageTotal = DB::table('linkages')->where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('plafon') ?? 0;
+        $dp1Modal   = 75000000000; // Modal Utama (konstanta)
+        $dp3TabDep  = $totalTabungan + ($totalDeposito - $abpTotal);
+        $dp2LinkAbp = $linkageTotal + $abpTotal;
+        $totalDanaReal = $dp1Modal + $dp2LinkAbp + $dp3TabDep;
+
+        // ── Sebaran Nasabah per Kecamatan (Jawa Barat only) ──────────────
+        $jabarKota = [
+            'BANDUNG',
+            'BANDUNG BARAT',
+            'BANJAR',
+            'BEKASI',
+            'BOGOR',
+            'CIAMIS',
+            'CIANJUR',
+            'CIMAHI',
+            'CIREBON',
+            'DEPOK',
+            'GARUT',
+            'INDRAMAYU',
+            'KARAWANG',
+            'KUNINGAN',
+            'MAJALENGKA',
+            'PANGANDARAN',
+            'PURWAKARTA',
+            'SUBANG',
+            'SUKABUMI',
+            'SUMEDANG',
+            'TASIKMALAYA',
+        ];
+        $sebaranNasabah = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)
+            ->select('kecamatan', 'kota', DB::raw('COUNT(*) as jumlah'), DB::raw('SUM(osmdlc) as outstanding'))
+            ->whereIn('kota', $jabarKota)
+            ->whereNotNull('kecamatan')->where('kecamatan', '!=', '')
+            ->groupBy('kecamatan', 'kota')->orderByDesc('jumlah')->get();
+
+        // ── Top 10 Nasabah DPK (Tabungan + Deposito) ─────────────────────
+        $topDpkNasabah = DB::table(DB::raw('(
+            SELECT nocif, fnama AS nama, SUM(sahirrp) AS tab_total, 0 AS dep_total
+            FROM tabungans
+            WHERE period_month = \'' . $filterMonth . '\' AND period_year = \'' . $filterYear . '\'
+              AND nocif IS NOT NULL AND nocif != \'\'
+            GROUP BY nocif, fnama
+            UNION ALL
+            SELECT nocif, nama, 0 AS tab_total, SUM(nomrp) AS dep_total
+            FROM depositos
+            WHERE period_month = \'' . $filterMonth . '\' AND period_year = \'' . $filterYear . '\'
+              AND nocif IS NOT NULL AND nocif != \'\'
+            GROUP BY nocif, nama
+        ) AS dpk_union'))
+            ->select(
+                'nocif',
+                DB::raw('MAX(nama) AS nama'),
+                DB::raw('SUM(tab_total) AS tab_total'),
+                DB::raw('SUM(dep_total) AS dep_total'),
+                DB::raw('SUM(tab_total + dep_total) AS grand_total')
+            )
+            ->groupBy('nocif')
+            ->orderByDesc('grand_total')
+            ->limit(10)
+            ->get();
 
         // ── Periode label ─────────────────────────────────────────────────
         $periodeLabel = ($monthNames[$filterMonth] ?? $filterMonth) . ' ' . $filterYear;
@@ -2410,6 +2820,8 @@ class DashboardController extends Controller
             'totalFunding',
             'totalTabungan',
             'totalDeposito',
+            'jumlahPencairan',
+            'totalPencairan',
             'totalLending',
             'totalPlafon',
             'totalNasabah',
@@ -2428,7 +2840,24 @@ class DashboardController extends Controller
             'fhPrev',
             'fhChanges',
             'fhTrends',
-            'periodeLabel'
+            'periodeLabel',
+            'topProducts',
+            'topTabunganProducts',
+            'topDepositoProducts',
+            'topAOLending',
+            'topAOFunding',
+            'segmentasiDistrib',
+            'segmentasiData',
+            'aoLendingTrend',
+            'aoFundingTrend',
+            'segmentasiTrend',
+            'fundingProdukTrend',
+            'dp1Modal',
+            'dp2LinkAbp',
+            'dp3TabDep',
+            'totalDanaReal',
+            'sebaranNasabah',
+            'topDpkNasabah'
         ));
     }
 

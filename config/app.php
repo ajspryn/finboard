@@ -147,4 +147,16 @@ return [
 
     'webhook_secret' => env('WEBHOOK_SECRET', 'your-webhook-secret-change-this'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Display Board Kiosk Token
+    |--------------------------------------------------------------------------
+    |
+    | Token untuk akses display board tanpa login (mode kiosk/TV).
+    | Set DISPLAY_BOARD_TOKEN di .env dengan nilai yang kuat dan rahasia.
+    |
+    */
+
+    'display_board_token' => env('DISPLAY_BOARD_TOKEN'),
+
 ];

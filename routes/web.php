@@ -29,6 +29,12 @@ Route::post('/auth/verify-pin', [AuthController::class, 'verifyPin'])->name('aut
 Route::post('/auth/resend-pin', [AuthController::class, 'resendPin'])->name('auth.resend-pin');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
+// Display Board Kiosk — akses tanpa login menggunakan token rahasia di URL
+// Contoh: https://finboard.test/tv?token=<DISPLAY_BOARD_TOKEN>
+Route::get('/tv', [DashboardController::class, 'displayBoard'])
+    ->middleware('display.token')
+    ->name('display.board.kiosk');
+
 // Protected Dashboard Routes (require authentication)
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

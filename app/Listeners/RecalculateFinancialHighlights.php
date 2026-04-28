@@ -29,16 +29,39 @@ class RecalculateFinancialHighlights
                          ->first();
 
                     if ($highlight) {
-                         // Update existing record with recalculated values
-                         $highlight->calculateDerivedValues();
+                         // Recalculate auto-calculated fields (dpk, pembiayaan, npf, fdr)
+                         // but only overwrite existing non-zero values if the new calculation also returns non-zero.
+                         // This prevents a CSV import for a different data type from resetting good values to 0.
+                         $newDpk        = FinancialHighlight::calculateDpk($periodYear, $periodMonth);
+                         $newPembiayaan = FinancialHighlight::calculatePembiayaan($periodYear, $periodMonth);
+                         $newNpf        = FinancialHighlight::calculateNpf($periodYear, $periodMonth);
+                         $newFdr        = FinancialHighlight::calculateFdr($periodYear, $periodMonth);
+
+                         if ($newDpk > 0 || !$highlight->dpk)               $highlight->dpk        = $newDpk;
+                         if ($newPembiayaan > 0 || !$highlight->pembiayaan)  $highlight->pembiayaan = $newPembiayaan;
+                         if ($newNpf > 0 || !$highlight->npf)                $highlight->npf        = $newNpf;
+                         if ($newFdr > 0 || !$highlight->fdr)                $highlight->fdr        = $newFdr;
+
                          $highlight->save();
 
                          Log::info("Updated FinancialHighlight for period {$periodMonth}/{$periodYear}");
                     } else {
-                         // Create new record if it doesn't exist
+                         // Create new record – seed manually-entered fields from the previous month
+                         // so they are not left blank after an import.
                          $highlight = new FinancialHighlight();
                          $highlight->period_month = $periodMonth;
-                         $highlight->period_year = $periodYear;
+                         $highlight->period_year  = $periodYear;
+
+                         $prevHighlight = FinancialHighlight::getPreviousPeriod($periodYear, $periodMonth, 'MOM');
+                         if ($prevHighlight) {
+                              $manualFields = ['car', 'roa', 'roe', 'aset', 'laba_rugi', 'biaya', 'pendapatan', 'bopo', 'cash_ratio'];
+                              foreach ($manualFields as $field) {
+                                   $highlight->$field = $prevHighlight->$field;
+                              }
+                              Log::info("Seeded manual fields from previous period for {$periodMonth}/{$periodYear}");
+                         }
+
+                         // Always calculate the auto-calculated fields from the newly imported data
                          $highlight->calculateDerivedValues();
                          $highlight->save();
 
