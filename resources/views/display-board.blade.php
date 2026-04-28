@@ -39,15 +39,15 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .dot{width:8px;height:8px;border-radius:50%;background:var(--border2);cursor:pointer;transition:all .3s}
 .dot.active{background:var(--rp);transform:scale(1.4);box-shadow:0 0 8px var(--rp)}
 #sw{position:fixed;top:55px;left:0;right:0;bottom:32px;overflow:hidden}
-.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transform:translateX(30px);transition:opacity .55s ease,transform .55s ease;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transform:translateX(30px);transition:opacity .55s ease,transform .55s ease;padding:10px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
 .slide.active{opacity:1;pointer-events:auto;transform:translateX(0)}
 .slide.out{opacity:0;transform:translateX(-30px)}
 .stitle{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .stitle i{font-size:1rem;opacity:.8}
 .gc{background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(248,249,252,.95));border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(8px);overflow:hidden;position:relative}
 .gc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ct,linear-gradient(90deg,var(--rp),var(--rs)));border-radius:14px 14px 0 0}
-.kpi-card{padding:16px 18px;display:flex;flex-direction:column;gap:5px}
-.kpi-grid{display:grid;gap:10px;flex:1;align-content:start}
+.kpi-card{padding:11px 14px;display:flex;flex-direction:column;gap:4px}
+.kpi-grid{display:grid;gap:8px;flex:1;align-content:start}
 .g3{grid-template-columns:repeat(3,1fr)}
 .g2{grid-template-columns:repeat(2,1fr)}
 .klbl{font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
@@ -61,15 +61,15 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .kb.warn{background:rgba(201,128,0,.12);color:var(--yellow)}
 .kb.info{background:rgba(230,57,70,.1);color:var(--rp)}
 .kb.cy{background:rgba(0,149,182,.12);color:var(--cyan)}
-.chart-row{display:grid;gap:12px;flex:1;min-height:0}
+.chart-row{display:grid;gap:8px;flex:1;min-height:0}
 .cr21{grid-template-columns:2fr 1fr}
 .cr12{grid-template-columns:1fr 2fr}
-.cc{padding:12px 14px;display:flex;flex-direction:column;min-height:0}
-.cct{font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;flex-shrink:0}
+.cc{padding:8px 10px;display:flex;flex-direction:column;min-height:0}
+.cct{font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;flex-shrink:0}
 .ca{flex:1;min-height:0}
 .nt{width:100%;border-collapse:collapse;font-size:.79rem}
 .nt th{color:var(--dim);text-align:left;font-weight:700;padding:4px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:.62rem;letter-spacing:.06em}
-.nt td{padding:7px 8px;border-bottom:1px solid rgba(200,205,228,.6)}
+.nt td{padding:5px 8px;border-bottom:1px solid rgba(200,205,228,.6)}
 .nt tr:last-child td{border-bottom:none}
 .nb{display:inline-block;padding:1px 8px;border-radius:20px;font-size:.63rem;font-weight:800}
 .nb1{background:rgba(58,154,10,.15);color:var(--green)}
@@ -78,13 +78,13 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .nb4{background:rgba(217,123,0,.15);color:var(--orange)}
 .nb5{background:rgba(230,57,70,.15);color:var(--red)}
 .top-dpk-wrap{overflow:hidden;flex:1;min-height:0;position:relative}.top-dpk-inner{display:flex;flex-direction:column;gap:0;animation:dpk-scroll 20s linear infinite}.top-dpk-inner:hover{animation-play-state:paused}@keyframes dpk-scroll{0%{transform:translateY(0)}100%{transform:translateY(-50%)}}.top-dpk-row{display:grid;grid-template-columns:1.2rem 1fr auto auto auto;gap:4px;align-items:center;padding:4px 6px;border-bottom:1px solid rgba(200,205,228,.5);font-size:.65rem}.top-dpk-row:last-child{border-bottom:none}
-.fh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:0 0 auto}
-.fh-card{padding:14px 16px;display:flex;align-items:center;gap:14px}
-.fh-icon{width:48px;height:48px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.fh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;flex:0 0 auto}
+.fh-card{padding:9px 12px;display:flex;align-items:center;gap:10px}
+.fh-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
 .fh-body{flex:1;min-width:0}
 .fh-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:2px}
-.fh-val{font-size:1.25rem;font-weight:800;color:var(--text);line-height:1}
-.fh-chg{font-size:.65rem;margin-top:3px}
+.fh-val{font-size:1.1rem;font-weight:800;color:var(--text);line-height:1}
+.fh-chg{font-size:.65rem;margin-top:2px}
 .bar-row{display:flex;align-items:center;gap:8px;padding:4px 0}
 .bar-l{font-size:.7rem;color:var(--muted);min-width:62px}
 .bar-o{flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden}
@@ -162,7 +162,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
     @endforeach
   </div>
   @if(count($fhTrends['labels'])>1)
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;min-height:0">
     <div class="gc cc">
       <div class="cct">Tren Rasio Kinerja &mdash; CAR &middot; ROA &middot; ROE &middot; FDR &middot; NPF &middot; BOPO (%)</div>
       <div class="ca" id="fh-trend-chart"></div>
@@ -181,7 +181,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div class="slide" id="s1">
   <div class="stitle"><i class="ti ti-database"></i> Dana Pihak Ketiga &mdash; Tabungan &amp; Deposito</div>
-  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px;min-height:0">
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;min-height:0">
     {{-- Left: KPIs + Komposisi DP --}}
     <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
       <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#e63946,#ff7b7b);flex-shrink:0;padding:10px 14px">
@@ -255,8 +255,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
       </div>
     </div>
     {{-- Right: Charts --}}
-    <div style="display:grid;grid-template-rows:1fr 1fr;gap:12px;min-height:0">
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;min-height:0">
+    <div style="display:grid;grid-template-rows:1fr 1fr;gap:8px;min-height:0">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;min-height:0">
         <div class="gc cc">
           <div class="cct">Tren DPK &amp; Pencairan Deposito per Bulan (Rp Miliar)</div>
           <div class="ca" id="ch-dpk-trend"></div>
@@ -266,7 +266,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
           <div class="ca" id="ch-dpk-pie"></div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;min-height:0">
+      <div style="display:grid;grid-template-columns:3fr 2fr;gap:8px;min-height:0">
         <div class="gc cc">
           <div class="cct">Top 5 Produk Tabungan &mdash; Nominal (Rp M)</div>
           <div class="ca" id="ch-tab-bar"></div>
@@ -285,7 +285,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div class="slide" id="s2">
   <div class="stitle"><i class="ti ti-credit-card"></i> Pembiayaan &amp; Portofolio Lending</div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;flex-shrink:0">
     <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#71dd37,#03c3ec)">
       <div class="klbl">Outstanding Pokok</div>
       <div class="kval sm" style="color:var(--green)">Rp {{ number_format($totalLending/1e9,2) }} M</div>
@@ -308,7 +308,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
       <span class="kb dn">Rp {{ number_format(($totalNPF??0)/1e9,2) }} M NPF</span>
     </div>
   </div>
-  <div style="flex:1;display:grid;grid-template-columns:3fr 2fr;gap:12px;min-height:0">
+  <div style="flex:1;display:grid;grid-template-columns:3fr 2fr;gap:8px;min-height:0">
     <div class="gc cc">
       <div class="cct">Tren Plafon vs Outstanding Pembiayaan (Rp Miliar)</div>
       <div class="ca" id="ch-lend-trend"></div>
@@ -452,7 +452,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 <div class="slide" id="s3">
   <div class="stitle"><i class="ti ti-alert-circle"></i> Kualitas Pembiayaan &amp; Kolektibilitas NPF</div>
   @php $npfKontrak=($kolCount['3']??0)+($kolCount['4']??0)+($kolCount['5']??0); @endphp
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex-shrink:0">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex-shrink:0">
     <div class="gc kpi-card" style="--ct:linear-gradient(90deg,#ff3e1d,#ff9f43);padding:10px 14px">
       <div class="klbl">Total OS NPF (Kol 3–5)</div>
       <div class="kval sm" style="color:var(--red)">Rp {{ number_format(($totalNPF??0)/1e9,2) }} M</div>
@@ -469,7 +469,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
     </div>
   </div>
   <div class="chart-row cr21" style="flex:1;min-height:0">
-    <div style="display:grid;grid-template-rows:1fr 1fr;gap:12px;min-height:0">
+    <div style="display:grid;grid-template-rows:1fr 1fr;gap:8px;min-height:0">
       <div class="gc cc">
         <div class="cct">Distribusi Kolektibilitas &mdash; Outstanding (Rp M)</div>
         <div class="ca" id="ch-kol"></div>
@@ -499,8 +499,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
           </tbody>
         </table>
       </div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-        <div class="cct" style="margin-bottom:8px">Outstanding per Kolektibilitas</div>
+      <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+        <div class="cct" style="margin-bottom:4px">Outstanding per Kolektibilitas</div>
         @php
           $kolLbl=['1'=>'Lancar','2'=>'Dlm Perhatian','3'=>'Kur. Lancar','4'=>'Diragukan','5'=>'Macet'];
           $kolCol=['1'=>'var(--green)','2'=>'var(--cyan)','3'=>'var(--yellow)','4'=>'var(--orange)','5'=>'var(--red)'];
@@ -523,7 +523,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div class="slide" id="s4">
   <div class="stitle"><i class="ti ti-map-pin"></i> Peta Sebaran Nasabah &mdash; Distribusi per Kecamatan (Jawa Barat)</div>
-  <div style="flex:1;display:grid;grid-template-columns:3fr 1fr;gap:12px;min-height:0">
+  <div style="flex:1;display:grid;grid-template-columns:3fr 1fr;gap:8px;min-height:0">
     <div class="gc" style="overflow:hidden;position:relative">
       <div id="map-nasabah" style="width:100%;height:100%;border-radius:14px;z-index:1"></div>
     </div>
@@ -554,10 +554,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 <div class="slide" id="s5">
   <div class="stitle"><i class="ti ti-users"></i> Performa Account Officer &mdash; Lending &amp; Funding</div>
-  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0">
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0">
 
     {{-- ═══════════ LENDING COLUMN (LEFT) ═══════════ --}}
-    <div style="display:flex;flex-direction:column;gap:10px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
 
       {{-- Row 1: Top AO Lending --}}
       <div class="gc cc" style="flex:0 0 auto">
@@ -597,7 +597,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
     </div>
 
     {{-- ═══════════ FUNDING COLUMN (RIGHT) ═══════════ --}}
-    <div style="display:flex;flex-direction:column;gap:10px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
 
       {{-- Row 1: Top AO Funding --}}
       <div class="gc cc" style="flex:0 0 auto">
