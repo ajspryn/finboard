@@ -157,8 +157,9 @@ class ProcessCsvUpload implements ShouldQueue
 
     private function processCsvFile($filePath, $jenis, $month, $year)
     {
-        // Delete existing data for this period before importing new data
-        $this->deleteExistingDataForPeriod($jenis, $month, $year);
+        // Perform delete+insert inside a DB transaction so failures roll back
+        DB::beginTransaction();
+        $transactionOpened = true;
 
         $handle = fopen($filePath, 'r');
         // Skip BOM if present
@@ -333,6 +334,17 @@ class ProcessCsvUpload implements ShouldQueue
 
         fclose($handle);
 
+        try {
+            if (!empty($transactionOpened)) {
+                DB::commit();
+            }
+        } catch (\Exception $e) {
+            if (!empty($transactionOpened)) {
+                DB::rollBack();
+            }
+            throw $e;
+        }
+
         return [
             'imported' => $imported,
             'updated' => $updated,
@@ -346,8 +358,9 @@ class ProcessCsvUpload implements ShouldQueue
      */
     private function processCsvFileOptimized($filePath, $jenis, $month, $year)
     {
-        // Delete existing data for this period before importing new data
-        $this->deleteExistingDataForPeriod($jenis, $month, $year);
+        // Perform delete+insert inside a DB transaction so failures roll back
+        DB::beginTransaction();
+        $transactionOpened = true;
 
         $handle = fopen($filePath, 'r');
         // Skip BOM if present
@@ -414,6 +427,17 @@ class ProcessCsvUpload implements ShouldQueue
         }
 
         fclose($handle);
+
+        try {
+            if (!empty($transactionOpened)) {
+                DB::commit();
+            }
+        } catch (\Exception $e) {
+            if (!empty($transactionOpened)) {
+                DB::rollBack();
+            }
+            throw $e;
+        }
 
         return [
             'imported' => $imported,
