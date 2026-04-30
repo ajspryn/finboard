@@ -47,7 +47,7 @@ class BackupController extends Controller
           $script = base_path('scripts/db_backup.sh');
           // Ensure common Homebrew mysql-client paths are available to the executed process
           $homebrewPaths = '/opt/homebrew/bin:/opt/homebrew/opt/mysql-client/bin:/usr/local/opt/mysql-client/bin:/usr/local/bin';
-          $cmd = 'PATH="' . $homebrewPaths . ':$PATH" ' . escapeshellcmd($script) . ' 2>&1';
+          $cmd = 'PATH="' . $homebrewPaths . ':$PATH" ' . $this->shellEscapeArg($script) . ' 2>&1';
           exec($cmd, $output, $return);
           if ($return !== 0) {
                $msg = implode("\n", $output);
@@ -70,7 +70,7 @@ class BackupController extends Controller
           }
 
           $script = base_path('scripts/db_restore.sh');
-          $cmd = escapeshellcmd($script) . ' ' . escapeshellarg($storagePath) . ' 2>&1';
+          $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
           exec($cmd, $output, $return);
           if ($return !== 0) {
                $msg = implode("\n", $output ?? []);
@@ -107,7 +107,7 @@ class BackupController extends Controller
                if ($request->input('auto_restore')) {
                     $script = base_path('scripts/db_restore.sh');
                     $storagePath = $destPath;
-                    $cmd = escapeshellcmd($script) . ' ' . escapeshellarg($storagePath) . ' 2>&1';
+                    $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
                     exec($cmd, $output, $return);
                     if ($return !== 0) {
                          $resp['restore'] = 'failed';
@@ -130,5 +130,48 @@ class BackupController extends Controller
                abort(404);
           }
           return response()->download($path, $file);
+     }
+
+     /**
+      * Delete a backup file from storage/backups.
+      */
+     public function delete(Request $request)
+     {
+          $request->validate(['file' => 'required|string']);
+          $file = basename($request->input('file'));
+          $path = storage_path('backups/' . $file);
+          if (!file_exists($path)) {
+               if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['status' => 'error', 'message' => 'File not found'], 404);
+               }
+               return redirect()->route('admin.backups.index')->with('error', 'Backup file not found.');
+          }
+
+          try {
+               unlink($path);
+          } catch (\Throwable $e) {
+               if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+               }
+               return redirect()->route('admin.backups.index')->with('error', 'Failed to delete backup: ' . $e->getMessage());
+          }
+
+          if ($request->wantsJson() || $request->ajax()) {
+               return response()->json(['status' => 'deleted', 'file' => $file]);
+          }
+
+          return redirect()->route('admin.backups.index')->with('status', 'Deleted backup: ' . $file);
+     }
+
+     /**
+      * Escape a string as a shell argument, with fallback if the PHP helper is unavailable.
+      */
+     private function shellEscapeArg(string $value): string
+     {
+          if (function_exists('escapeshellarg')) {
+               return \escapeshellarg($value);
+          }
+          // Fallback: single-quote and escape single quotes inside
+          return "'" . str_replace("'", "'\\''", $value) . "'";
      }
 }

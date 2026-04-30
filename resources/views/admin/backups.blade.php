@@ -57,6 +57,11 @@
                         <input type="hidden" name="file" value="{{ $file['name'] }}" />
                         <button class="btn btn-danger" type="submit">Restore</button>
                     </form>
+                    <form method="POST" action="{{ route('admin.backups.delete') }}" style="display:inline" onsubmit="return confirm('Delete backup file permanently?');">
+                        @csrf
+                        <input type="hidden" name="file" value="{{ $file['name'] }}" />
+                        <button class="btn btn-outline-danger" type="submit">Delete</button>
+                    </form>
                 </td>
             </tr>
         @endforeach
