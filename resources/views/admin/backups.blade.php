@@ -89,8 +89,9 @@
 </div>
 @endsection
 
-@push('scripts')
+@section('scripts')
 <script>
+console.log('Backups upload script loaded');
 document.addEventListener('DOMContentLoaded', function(){
     const input = document.getElementById('backupInput');
     const selected = document.getElementById('selectedFile');
@@ -157,4 +158,4 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 });
 </script>
-@endpush
+@endsection

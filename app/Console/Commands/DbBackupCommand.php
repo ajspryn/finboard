@@ -16,7 +16,7 @@ class DbBackupCommand extends Command
           $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($dest ?? '');
 
           $this->info('Running backup...');
-          [$output, $return] = $this->runCommand($cmd);
+          [$output, $return] = $this->runShellCommand($cmd);
 
           foreach ($output as $line) {
                $this->line($line);
@@ -31,7 +31,7 @@ class DbBackupCommand extends Command
           return 0;
      }
 
-     private function shellEscapeArg(string $value): string
+     protected function shellEscapeArg(string $value): string
      {
           if (function_exists('escapeshellarg')) {
                return \escapeshellarg($value);
@@ -39,7 +39,7 @@ class DbBackupCommand extends Command
           return "'" . str_replace("'", "'\\''", $value) . "'";
      }
 
-     private function runCommand(string $cmd): array
+     protected function runShellCommand(string $cmd): array
      {
           if (function_exists('exec')) {
                $out = [];

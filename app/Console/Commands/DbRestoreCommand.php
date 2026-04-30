@@ -24,26 +24,48 @@ class DbRestoreCommand extends Command
                return 1;
           }
 
-          $cmd = escapeshellcmd($script) . ' ' . escapeshellarg($path);
+            $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($path);
           $this->warn('This command will DROP and recreate the target database.');
           if (!$this->confirm('Proceed with restore?')) {
                $this->info('Restore aborted.');
                return 0;
           }
+            [$output, $return] = $this->runShellCommand($cmd);
+            foreach ($output as $line) {
+                  $this->line($line);
+            }
 
-          $output = [];
-          $return = 0;
-          exec($cmd, $output, $return);
-          foreach ($output as $line) {
-               $this->line($line);
+            if ($return !== 0) {
+                  $this->error('Restore failed.');
+                  return 1;
+            }
+
+            $this->info('Restore complete.');
+            return 0;
+     }
+
+     protected function shellEscapeArg(string $value): string
+     {
+          if (function_exists('escapeshellarg')) {
+               return \escapeshellarg($value);
           }
+          return "'" . str_replace("'", "'\\''", $value) . "'";
+     }
 
-          if ($return !== 0) {
-               $this->error('Restore failed.');
-               return 1;
+     protected function runShellCommand(string $cmd): array
+     {
+          if (function_exists('exec')) {
+               $out = [];
+               $ret = 0;
+               \exec($cmd, $out, $ret);
+               return [$out, $ret];
           }
-
-          $this->info('Restore complete.');
-          return 0;
+          if (function_exists('shell_exec')) {
+               $o = \shell_exec($cmd);
+               $lines = $o === null ? [] : explode("\n", trim($o));
+               return [$lines, strlen($o) ? 0 : 1];
+          }
+          $msg = 'Command execution disabled in PHP (disabled_functions). Run this command from the CLI instead: php artisan db:restore <file>';
+          return [[$msg], 1];
      }
 }
