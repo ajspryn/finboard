@@ -48,7 +48,7 @@ class BackupController extends Controller
           // Ensure common Homebrew mysql-client paths are available to the executed process
           $homebrewPaths = '/opt/homebrew/bin:/opt/homebrew/opt/mysql-client/bin:/usr/local/opt/mysql-client/bin:/usr/local/bin';
           $cmd = 'PATH="' . $homebrewPaths . ':$PATH" ' . $this->shellEscapeArg($script) . ' 2>&1';
-          exec($cmd, $output, $return);
+          [$output, $return] = $this->runCommand($cmd);
           if ($return !== 0) {
                $msg = implode("\n", $output);
                // Suggest installation if mysqldump not found
@@ -71,7 +71,7 @@ class BackupController extends Controller
 
           $script = base_path('scripts/db_restore.sh');
           $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
-          exec($cmd, $output, $return);
+          [$output, $return] = $this->runCommand($cmd);
           if ($return !== 0) {
                $msg = implode("\n", $output ?? []);
                return redirect()->route('admin.backups.index')->with('error', 'Restore failed: ' . Str::limit($msg, 250));
@@ -108,7 +108,7 @@ class BackupController extends Controller
                     $script = base_path('scripts/db_restore.sh');
                     $storagePath = $destPath;
                     $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
-                    exec($cmd, $output, $return);
+                    [$output, $return] = $this->runCommand($cmd);
                     if ($return !== 0) {
                          $resp['restore'] = 'failed';
                          $resp['message'] = implode("\n", $output ?? []);
@@ -173,5 +173,31 @@ class BackupController extends Controller
           }
           // Fallback: single-quote and escape single quotes inside
           return "'" . str_replace("'", "'\\''", $value) . "'";
+     }
+
+     /**
+      * Run a shell command and return array([$outputLines], $returnCode).
+      * If PHP execution functions are disabled, return a helpful error.
+      */
+     private function runCommand(string $cmd): array
+     {
+          // Prefer exec if available
+          if (function_exists('exec')) {
+               $out = [];
+               $ret = 0;
+               \exec($cmd, $out, $ret);
+               return [$out, $ret];
+          }
+
+          // Fallback to shell_exec if available (no return code)
+          if (function_exists('shell_exec')) {
+               $o = \shell_exec($cmd);
+               $lines = $o === null ? [] : explode("\n", trim($o));
+               return [$lines, strlen($o) ? 0 : 1];
+          }
+
+          // Couldn't execute commands from PHP (disabled_functions). Return instructive error.
+          $msg = 'Command execution disabled in PHP (disabled_functions). Run backup/restore from the CLI instead: php artisan db:backup or php artisan db:restore <file>';
+          return [[$msg], 1];
      }
 }
