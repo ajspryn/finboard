@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 
 class DbRestoreCommand extends Command
 {
-     protected $signature = 'db:restore {file}';
+     protected $signature = 'db:restore {file} {--force : Skip confirmation and run non-interactively}';
      protected $description = 'Restore database from a backup file using scripts/db_restore.sh';
 
      public function handle()
@@ -24,24 +24,27 @@ class DbRestoreCommand extends Command
                return 1;
           }
 
-            $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($path);
+          $cmd = 'NONINTERACTIVE=1 ' . $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($path) . ($force ? ' --force' : '');
           $this->warn('This command will DROP and recreate the target database.');
-          if (!$this->confirm('Proceed with restore?')) {
-               $this->info('Restore aborted.');
-               return 0;
+          $force = $this->option('force') || !$this->input->isInteractive();
+          if (!$force) {
+               if (!$this->confirm('Proceed with restore?')) {
+                    $this->info('Restore aborted.');
+                    return 0;
+               }
           }
-            [$output, $return] = $this->runShellCommand($cmd);
-            foreach ($output as $line) {
-                  $this->line($line);
-            }
+          [$output, $return] = $this->runShellCommand($cmd);
+          foreach ($output as $line) {
+               $this->line($line);
+          }
 
-            if ($return !== 0) {
-                  $this->error('Restore failed.');
-                  return 1;
-            }
+          if ($return !== 0) {
+               $this->error('Restore failed.');
+               return 1;
+          }
 
-            $this->info('Restore complete.');
-            return 0;
+          $this->info('Restore complete.');
+          return 0;
      }
 
      protected function shellEscapeArg(string $value): string

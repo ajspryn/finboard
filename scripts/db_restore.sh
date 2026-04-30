@@ -13,6 +13,11 @@ if [[ $# -lt 1 ]]; then
 fi
 
 BACKUP_FILE="$1"
+# optional second arg: --force or --yes to skip interactive confirmation
+SKIP_CONFIRM=0
+if [[ "${2:-}" == "--force" || "${2:-}" == "--yes" || "${NONINTERACTIVE:-}" == "1" ]]; then
+  SKIP_CONFIRM=1
+fi
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$PROJECT_ROOT/.env"
 
@@ -36,10 +41,12 @@ if [[ ! -f "$BACKUP_FILE" ]]; then
   exit 3
 fi
 
-read -p "This will DROP and restore database '$DB_DATABASE'. Proceed? [y/N] " CONFIRM
-if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-  echo "Aborted by user."
-  exit 0
+if [[ $SKIP_CONFIRM -ne 1 ]]; then
+  read -p "This will DROP and restore database '$DB_DATABASE'. Proceed? [y/N] " CONFIRM
+  if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+    echo "Aborted by user."
+    exit 0
+  fi
 fi
 
 # Drop and recreate database (requires privileges)

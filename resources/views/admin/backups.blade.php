@@ -62,11 +62,15 @@
                 <td>{{ date('Y-m-d H:i:s', $file['mtime']) }}</td>
                 <td>
                     <a class="btn btn-secondary" href="{{ route('admin.backups.download', ['file' => $file['name']]) }}">Download</a>
-                    <form method="POST" action="{{ route('admin.backups.restore') }}" style="display:inline" onsubmit="return confirm('Restore will DROP and recreate the database. Continue?');">
-                        @csrf
-                        <input type="hidden" name="file" value="{{ $file['name'] }}" />
-                        <button class="btn btn-danger" type="submit">Restore</button>
-                    </form>
+                    @if(!empty($canRunCommands))
+                        <form method="POST" action="{{ route('admin.backups.restore') }}" style="display:inline" onsubmit="return confirm('Restore will DROP and recreate the database. Continue?');">
+                            @csrf
+                            <input type="hidden" name="file" value="{{ $file['name'] }}" />
+                            <button class="btn btn-danger" type="submit">Restore</button>
+                        </form>
+                    @else
+                        <button class="btn btn-danger" disabled title="Restore disabled: server cannot execute shell commands">Restore (disabled)</button>
+                    @endif
                     <form method="POST" action="{{ route('admin.backups.delete') }}" style="display:inline" onsubmit="return confirm('Delete backup file permanently?');">
                         @csrf
                         <input type="hidden" name="file" value="{{ $file['name'] }}" />

@@ -3991,16 +3991,17 @@ class DashboardController extends Controller
 
             $customers = DB::table('depositos as prev')
                 ->leftJoin('depositos as curr', function ($join) use ($currMonth, $currYear) {
-                    $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                    // Join on nodep which is a stable deposit identifier across imports
+                    $join->on('prev.nodep', '=', 'curr.nodep')
                         ->where('curr.period_month', $currMonth)
                         ->where('curr.period_year', (string)$currYear);
                 })
                 ->where('prev.period_month', $prevMonth)
                 ->where('prev.period_year', (string)$prevYear)
-                ->whereNull('curr.nobilyet')
+                ->whereNull('curr.nodep')
                 ->select(
                     'prev.nama',
-                    'prev.nobilyet',
+                    'prev.nodep as nobilyet',
                     'prev.nomrp',
                     'prev.period_year',
                     'prev.period_month'

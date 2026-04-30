@@ -75,7 +75,8 @@ class BackupController extends Controller
           }
 
           $script = base_path('scripts/db_restore.sh');
-          $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
+          // When restore is triggered from web, run non-interactively and force the script
+          $cmd = 'NONINTERACTIVE=1 ' . $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' --force 2>&1';
           [$output, $return] = $this->runCommand($cmd);
           if ($return !== 0) {
                $msg = implode("\n", $output ?? []);
