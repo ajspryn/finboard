@@ -87,6 +87,23 @@ class ProcessCsvUpload implements ShouldQueue
                         'message' => "Memvalidasi dan memproses data " . ucfirst($type) . "..."
                     ]);
 
+                    // Ensure uploaded file still exists before attempting to open it
+                    if (!Storage::exists($filePath)) {
+                        $msg = "File tidak ditemukan: {$filePath}";
+                        Log::error($msg);
+                        $status->update([
+                            'status' => 'error',
+                            'message' => $msg,
+                            'error_count' => 1,
+                            'errors' => [ $msg ]
+                        ]);
+                        // skip this file and continue
+                        continue;
+                    }
+
+                    // Delete existing data for this period to avoid duplicate key errors
+                    $this->deleteExistingDataForPeriod(strtoupper($type), $this->month, $this->year);
+
                     // Process each file in its own transaction for better performance
                     $result = $this->processCsvFileOptimized(Storage::path($filePath), strtoupper($type), $this->month, $this->year);
 
@@ -94,11 +111,22 @@ class ProcessCsvUpload implements ShouldQueue
                     $totalImported += $result['imported'];
                     $totalErrors += $result['errors'];
 
+                    // Sanitize error messages to avoid JSON encoding errors (malformed UTF-8)
+                    $rawErrors = $result['errorDetails'] ?? [];
+                    $sanitizedErrors = [];
+                    foreach ($rawErrors as $err) {
+                        if (is_string($err)) {
+                            $sanitizedErrors[] = @iconv('UTF-8', 'UTF-8//IGNORE', $err);
+                        } else {
+                            $sanitizedErrors[] = $err;
+                        }
+                    }
+
                     $status->update([
                         'status' => $result['errors'] > 0 ? 'completed_with_errors' : 'completed',
                         'processed_records' => $result['imported'],
                         'error_count' => $result['errors'],
-                        'errors' => $result['errorDetails'] ?? null,
+                        'errors' => $sanitizedErrors ?: null,
                         'message' => ucfirst($type) . ": {$result['imported']} record berhasil diimport" .
                             ($result['errors'] > 0 ? ", {$result['errors']} error" : "")
                     ]);
@@ -172,7 +200,7 @@ class ProcessCsvUpload implements ShouldQueue
         $errors = 0;
         $errorDetails = [];
         $batchData = [];
-        $batchSize = 50; // Reduced batch size to prevent memory exhaustion
+        $batchSize = 20; // Reduced batch size to prevent memory exhaustion
 
         $lineNumber = 1;
 
@@ -373,7 +401,7 @@ class ProcessCsvUpload implements ShouldQueue
         $errors = 0;
         $errorDetails = [];
         $batchData = [];
-        $batchSize = 50; // Reduced batch size to prevent memory exhaustion
+        $batchSize = 20; // Reduced batch size to prevent memory exhaustion
 
         $lineNumber = 1;
 
