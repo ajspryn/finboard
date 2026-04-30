@@ -39,7 +39,12 @@ class BackupController extends Controller
                'query' => request()->query(),
           ]);
 
-          return view('admin.backups', ['files' => $paginator]);
+          $canRunCommands = function_exists('exec') || function_exists('shell_exec');
+
+          return view('admin.backups', [
+               'files' => $paginator,
+               'canRunCommands' => $canRunCommands,
+          ]);
      }
 
      public function createBackup()

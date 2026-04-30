@@ -4,10 +4,20 @@
 <div class="container">
     <h1>Database Backups</h1>
 
-    <form method="POST" action="{{ route('admin.backups.create') }}">
-        @csrf
-        <button class="btn btn-primary" type="submit">Create Backup</button>
-    </form>
+    @if(!empty($canRunCommands))
+        <form method="POST" action="{{ route('admin.backups.create') }}">
+            @csrf
+            <button class="btn btn-primary" type="submit">Create Backup</button>
+        </form>
+    @else
+        <div class="alert alert-warning">
+            <strong>Backup via web disabled:</strong> PHP cannot execute shell commands on this host (disabled_functions).
+            Use the CLI to create backups or enable `exec`/`shell_exec` in php.ini and restart PHP-FPM.
+            <div class="mt-2"><small>CLI command:</small>
+                <pre class="p-2 bg-light">php artisan db:backup --no-interaction</pre>
+            </div>
+        </div>
+    @endif
 
     <hr />
 
