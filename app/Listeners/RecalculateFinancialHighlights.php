@@ -30,17 +30,33 @@ class RecalculateFinancialHighlights
 
                     if ($highlight) {
                          // Recalculate auto-calculated fields (dpk, pembiayaan, npf, fdr)
-                         // but only overwrite existing non-zero values if the new calculation also returns non-zero.
-                         // This prevents a CSV import for a different data type from resetting good values to 0.
-                         $newDpk        = FinancialHighlight::calculateDpk($periodYear, $periodMonth);
-                         $newPembiayaan = FinancialHighlight::calculatePembiayaan($periodYear, $periodMonth);
-                         $newNpf        = FinancialHighlight::calculateNpf($periodYear, $periodMonth);
-                         $newFdr        = FinancialHighlight::calculateFdr($periodYear, $periodMonth);
+                         // Update only when new calculation > 0. If the new value is 0 and the
+                         // existing highlight field is 0 (or empty), fall back to the previous
+                         // month's value so a missing import doesn't wipe meaningful data.
+                         $prevHighlight = FinancialHighlight::getPreviousPeriod($periodYear, $periodMonth, 'MOM');
 
-                         if ($newDpk > 0 || !$highlight->dpk)               $highlight->dpk        = $newDpk;
-                         if ($newPembiayaan > 0 || !$highlight->pembiayaan)  $highlight->pembiayaan = $newPembiayaan;
-                         if ($newNpf > 0 || !$highlight->npf)                $highlight->npf        = $newNpf;
-                         if ($newFdr > 0 || !$highlight->fdr)                $highlight->fdr        = $newFdr;
+                         $autoFields = [
+                              'dpk' => 'calculateDpk',
+                              'pembiayaan' => 'calculatePembiayaan',
+                              'npf' => 'calculateNpf',
+                              'fdr' => 'calculateFdr',
+                         ];
+
+                         foreach ($autoFields as $field => $calcMethod) {
+                              $newVal = FinancialHighlight::{$calcMethod}($periodYear, $periodMonth);
+
+                              if ($newVal > 0) {
+                                   $highlight->$field = $newVal;
+                              } else {
+                                   // newVal is zero: if current value is zero or null, try previous month
+                                   if (empty($highlight->$field) || $highlight->$field == 0) {
+                                        if ($prevHighlight && !empty($prevHighlight->$field) && $prevHighlight->$field > 0) {
+                                             $highlight->$field = $prevHighlight->$field;
+                                        }
+                                   }
+                                   // otherwise keep existing non-zero value
+                              }
+                         }
 
                          $highlight->save();
 
@@ -63,6 +79,19 @@ class RecalculateFinancialHighlights
 
                          // Always calculate the auto-calculated fields from the newly imported data
                          $highlight->calculateDerivedValues();
+
+                         // If any auto-calculated field ended up 0, try to seed from previous month
+                         if ($prevHighlight) {
+                              $autoFields = ['dpk', 'pembiayaan', 'npf', 'fdr'];
+                              foreach ($autoFields as $field) {
+                                   if (empty($highlight->$field) || $highlight->$field == 0) {
+                                        if (!empty($prevHighlight->$field) && $prevHighlight->$field > 0) {
+                                             $highlight->$field = $prevHighlight->$field;
+                                        }
+                                   }
+                              }
+                         }
+
                          $highlight->save();
 
                          Log::info("Created new FinancialHighlight for period {$periodMonth}/{$periodYear}");
