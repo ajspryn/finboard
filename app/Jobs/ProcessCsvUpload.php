@@ -60,7 +60,8 @@ class ProcessCsvUpload implements ShouldQueue
         DB::disableQueryLog();
         if (DB::getDriverName() === 'mysql') {
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-            DB::statement('SET UNIQUE_CHECKS=0;');
+            // Do NOT disable UNIQUE_CHECKS — disabling it can allow duplicate
+            // rows to be inserted for the same period. Preserve unique checks.
             // DB::statement('SET AUTOCOMMIT=0;'); // Removed - causing transaction issues
             DB::statement('SET SQL_MODE="";'); // Disable strict mode for faster inserts
             // DB::statement('SET SESSION innodb_buffer_pool_size = 134217728;'); // Removed - global variable
@@ -70,6 +71,24 @@ class ProcessCsvUpload implements ShouldQueue
 
         // Fetch status records from database
         $statusRecords = CsvUploadStatus::whereIn('id', array_values($this->statusIds))->get()->keyBy('upload_type');
+
+        // Acquire a named advisory lock per import period to prevent concurrent
+        // imports for the same year/month which can produce duplicate rows.
+        $lockName = "csv_import_{$this->year}_{$this->month}";
+        $gotLock = false;
+        try {
+            $res = DB::select('SELECT GET_LOCK(?, 10) as got_lock', [$lockName]);
+            if (!empty($res) && isset($res[0]->got_lock) && intval($res[0]->got_lock) === 1) {
+                $gotLock = true;
+            } else {
+                Log::warning("Could not acquire import lock {$lockName}, another import may be running.");
+                // If we can't get the lock, throw to retry later
+                throw new \Exception("Import lock busy for period {$this->month}/{$this->year}");
+            }
+        } catch (\Exception $e) {
+            // Re-throw so job is retried by queue worker
+            throw $e;
+        }
 
         try {
             $totalImported = 0;
@@ -170,6 +189,7 @@ class ProcessCsvUpload implements ShouldQueue
             // Re-enable database optimizations
             if (DB::getDriverName() === 'mysql') {
                 DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+                // UNIQUE_CHECKS should remain enabled; ensure it's set to 1
                 DB::statement('SET UNIQUE_CHECKS=1;');
             }
             // DB::statement('SET AUTOCOMMIT=1;'); // Removed - not needed
@@ -180,6 +200,15 @@ class ProcessCsvUpload implements ShouldQueue
             Tabungan::$disableElasticsearchIndexing = false;
             Deposito::$disableElasticsearchIndexing = false;
             Linkage::$disableElasticsearchIndexing = false;
+
+            // Release advisory lock if acquired
+            try {
+                if (!empty($gotLock) && !empty($lockName)) {
+                    DB::select('SELECT RELEASE_LOCK(?)', [$lockName]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to release import lock: ' . $e->getMessage());
+            }
         }
     }
 
