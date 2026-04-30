@@ -95,7 +95,7 @@ class ProcessCsvUpload implements ShouldQueue
                             'status' => 'error',
                             'message' => $msg,
                             'error_count' => 1,
-                            'errors' => [ $msg ]
+                            'errors' => [$msg]
                         ]);
                         // skip this file and continue
                         continue;
