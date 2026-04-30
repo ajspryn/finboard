@@ -139,6 +139,12 @@
                             <div data-i18n="User Settings">Pengaturan User</div>
                         </a>
                     </li>
+                    <li class="menu-item {{ request()->is('admin/backups') ? 'active' : '' }}">
+                        <a href="/admin/backups" class="menu-link">
+                            <i class="menu-icon tf-icons ti ti-database"></i>
+                            <div data-i18n="Backups">Database Backups</div>
+                        </a>
+                    </li>
                     @endif
                 </ul>
             </aside>
