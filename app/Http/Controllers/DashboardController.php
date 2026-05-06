@@ -181,19 +181,75 @@ class DashboardController extends Controller
     /**
      * Show the dashboard with banking data
      */
+    /**
+     * Shell – respons instan dengan skeleton screen, tanpa query berat.
+     * Data dashboard dimuat oleh browser via AJAX ke /dashboard/render.
+     */
     public function index(Request $request)
+    {
+        // Jika ini request AJAX render, delegasikan ke renderContent()
+        if ($request->boolean('_render')) {
+            return $this->renderContent($request);
+        }
+
+        // Resolusi periode dengan 1 query ringan
+        $filterMonth = $request->input('month');
+        $filterYear  = $request->input('year');
+        $range       = $this->normalizeDashboardRange($request->input('range', 'all'));
+        $startDay    = $request->input('start_day', '');
+        $endDay      = $request->input('end_day',   '');
+
+        if (! $filterMonth || ! $filterYear) {
+            $latest = Pembiayaan::query()
+                ->select('period_year', 'period_month')
+                ->whereNotNull('period_year')
+                ->whereNotNull('period_month')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
+                ->first();
+
+            $filterMonth = $filterMonth ?: str_pad((string)(int)($latest?->period_month ?: date('m')), 2, '0', STR_PAD_LEFT);
+            $filterYear  = $filterYear  ?: (string)($latest?->period_year ?: date('Y'));
+
+            // Redirect agar URL mempunyai parameter yang sudah di-resolve
+            return redirect()->route('dashboard', array_merge(
+                $request->query(),
+                ['month' => $filterMonth, 'year' => $filterYear]
+            ));
+        }
+
+        return view('dashboard-shell', compact('filterMonth', 'filterYear', 'range', 'startDay', 'endDay'));
+    }
+
+    /**
+     * Render penuh – melakukan semua query berat, mengembalikan JSON
+     * { html, styles, scripts } untuk di-inject oleh skeleton JS.
+     */
+    public function renderContent(Request $request)
     {
         // Get current user
         $user = Auth::user();
 
         // Get filter parameters
         $requestedMonth = $request->input('month');
-        $requestedYear = $request->input('year');
+        $requestedYear  = $request->input('year');
 
         $startDay = $request->input('start_day');
-        $endDay = $request->input('end_day');
-        $filterMonth = $request->input('month', date('m')); // Default bulan berjalan
-        $filterYear = $request->input('year', date('Y'));   // Default tahun berjalan
+        $endDay   = $request->input('end_day');
+
+        // Resolve latest available period first — used as fallback when no params are given
+        $latestPeriod = Pembiayaan::query()
+            ->select('period_year', 'period_month')
+            ->whereNotNull('period_year')
+            ->whereNotNull('period_month')
+            ->orderByRaw('(period_year * 100 + period_month) DESC')
+            ->first();
+
+        $latestYear  = $latestPeriod?->period_year;
+        $latestMonth = $latestPeriod?->period_month;
+
+        // Default to latest available period (never fallback to current wall-clock date)
+        $filterMonth = $request->input('month') ?: str_pad((string)(int)($latestMonth ?: date('m')), 2, '0', STR_PAD_LEFT);
+        $filterYear  = $request->input('year')  ?: (string)($latestYear  ?: date('Y'));
 
         // Quick range filter
         $range = $this->normalizeDashboardRange($request->input('range', 'all'));
@@ -209,21 +265,6 @@ class DashboardController extends Controller
         ];
 
         $rangeMonths = $rangeMonthsMap[$range];
-
-        // If month/year not explicitly provided, use latest available period in pembiayaan
-        $latestPeriod = Pembiayaan::query()
-            ->select('period_year', 'period_month')
-            ->whereNotNull('period_year')
-            ->whereNotNull('period_month')
-            ->orderByRaw('(period_year * 100 + period_month) DESC')
-            ->first();
-
-        $latestYear = $latestPeriod?->period_year;
-        $latestMonth = $latestPeriod?->period_month;
-        if (!$request->has('month') && !$request->has('year') && $latestYear && $latestMonth) {
-            $filterYear = (string)$latestYear;
-            $filterMonth = str_pad((string)(int)$latestMonth, 2, '0', STR_PAD_LEFT);
-        }
 
         // Normalize 'all' period selection to a concrete snapshot period.
         // The dashboard calculations rely on a single (month, year) snapshot in many places.
@@ -258,10 +299,16 @@ class DashboardController extends Controller
             $queryParams = $request->query();
             $queryParams['month'] = $filterMonth;
             $queryParams['year'] = $filterYear;
-            unset($queryParams['start_day'], $queryParams['end_day']);
+            unset($queryParams['start_day'], $queryParams['end_day'], $queryParams['_render']);
 
             $qs = http_build_query($queryParams);
-            return redirect()->to($request->url() . ($qs ? ('?' . $qs) : ''));
+            // Always redirect to the dashboard shell page (not the render endpoint)
+            $redirectUrl = route('dashboard') . ($qs ? ('?' . $qs) : '');
+
+            if ($request->boolean('_render') || $request->ajax() || $request->expectsJson()) {
+                return response()->json(['redirect' => $redirectUrl]);
+            }
+            return redirect()->to($redirectUrl);
         }
 
         // Build base query with combined filters
@@ -1408,7 +1455,48 @@ class DashboardController extends Controller
 
         $segmentCodes = $this->getSegmentCodes();
 
-        return view('dashboard', compact('funding', 'lending', 'npf', 'monthlyTrends', 'npfDistribution', 'topNpfContributors', 'collectibilityStats', 'topProducts', 'topAreas', 'segmentasiData', 'segmentasiDistribution', 'kolektibilitasDistribution', 'kolektibilitasComparison', 'topProductsChart', 'portfolioSummary', 'kecamatanData', 'topAOData', 'aoFundingData', 'nasabahStatusData', 'nasabahTrendData', 'fundingDetails', 'nasabahBothFunding', 'nasabahLending', 'user', 'filterMonth', 'filterYear', 'startDay', 'endDay', 'topTabunganProducts', 'lastUpdated', 'segmentCodes', 'range', 'trendRangeLabel', 'svrPredictions'));
+        $sections = view('dashboard', compact(
+            'funding',
+            'lending',
+            'npf',
+            'monthlyTrends',
+            'npfDistribution',
+            'topNpfContributors',
+            'collectibilityStats',
+            'topProducts',
+            'topAreas',
+            'segmentasiData',
+            'segmentasiDistribution',
+            'kolektibilitasDistribution',
+            'kolektibilitasComparison',
+            'topProductsChart',
+            'portfolioSummary',
+            'kecamatanData',
+            'topAOData',
+            'aoFundingData',
+            'nasabahStatusData',
+            'nasabahTrendData',
+            'fundingDetails',
+            'nasabahBothFunding',
+            'nasabahLending',
+            'user',
+            'filterMonth',
+            'filterYear',
+            'startDay',
+            'endDay',
+            'topTabunganProducts',
+            'lastUpdated',
+            'segmentCodes',
+            'range',
+            'trendRangeLabel',
+            'svrPredictions'
+        ))->renderSections();
+
+        return response()->json([
+            'html'    => $sections['content'] ?? '',
+            'styles'  => $sections['styles']  ?? '',
+            'scripts' => $sections['scripts'] ?? '',
+        ]);
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -3331,7 +3419,8 @@ class DashboardController extends Controller
     {
         return [
             'FIX INCOME' => [
-                'PPPK' => ['PPPK', 'P3KDINKES', 'P3KDISDIK'],
+                'PPPKPW' => ['PPPKPW'],
+                'PPPK' => ['PPPK', 'P3KDINKES', 'P3KDISDIK',],
                 'SKPD' => [
                     '061',
                     '13',

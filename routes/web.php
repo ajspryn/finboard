@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UploadController;
@@ -21,6 +22,15 @@ use App\Http\Controllers\ExportController;
 |
 */
 
+// ── DEV-ONLY: auto-login (remove before production) ──────────────────────
+if (app()->isLocal()) {
+    Route::get('/dev-login/{id?}', function ($id = 1) {
+        $user = App\Models\User::findOrFail($id);
+        Auth::login($user);
+        return redirect()->route('dashboard');
+    })->name('dev.login');
+}
+
 // Authentication Routes
 Route::get('/', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/auth/send-pin', [AuthController::class, 'sendPin'])->name('auth.send-pin');
@@ -38,6 +48,7 @@ Route::get('/tv', [DashboardController::class, 'displayBoard'])
 // Protected Dashboard Routes (require authentication)
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/render', [DashboardController::class, 'renderContent'])->name('dashboard.render');
     Route::get('/dashboard-simple', [DashboardController::class, 'indexSimple'])->name('dashboard.simple');
     Route::get('/dashboard/segmentasi-detail/{category}/{type}', [DashboardController::class, 'getSegmentasiDetail'])->name('dashboard.segmentasi.detail');
     Route::get('/dashboard/segmentasi-kol-detail/{category}/{type}/{kol}', [DashboardController::class, 'getSegmentasiKolDetail'])->name('dashboard.segmentasi.kol.detail');

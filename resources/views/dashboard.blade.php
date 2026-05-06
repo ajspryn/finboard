@@ -765,7 +765,6 @@ function formatNominal($amount) {
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
-
 </style>
 @endsection
 
@@ -797,6 +796,7 @@ function formatNominal($amount) {
             return $date->format('d M Y H:i');
         }
     @endphp
+
 
     <!-- Search Bar Row -->
     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'pengurus')
