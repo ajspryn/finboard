@@ -379,7 +379,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
   }
 
   // ── Build render URL (provided by server — handles both token & auth routes) ──
-  var _renderUrl = '{{ $renderUrl }}';
+  var _renderUrl = '{!! $renderUrl !!}';
 
   // ── Main: fetch display board content ───────────────────────────────
   setProgress(5);
