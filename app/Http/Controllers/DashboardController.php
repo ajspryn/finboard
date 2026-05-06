@@ -2281,7 +2281,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function displayBoard()
+    public function displayBoard(Request $request)
     {
         $monthNamesShort = [
             '01' => 'Jan',
@@ -2323,6 +2323,21 @@ class DashboardController extends Controller
         $filterMonth = $latestPeriod
             ? str_pad((string) (int) $latestPeriod->period_month, 2, '0', STR_PAD_LEFT)
             : date('m');
+
+        $periodeLabel = ($monthNames[$filterMonth] ?? $filterMonth) . ' ' . $filterYear;
+
+        // Fast path: return skeleton shell immediately (before any heavy DB queries)
+        if (! $request->boolean('_render')) {
+            // Determine the render endpoint:
+            //   - Token-based (/tv): render at /tv/render?token=X&_render=1
+            //   - Auth-based (/display-board): render at /display-board/render?_render=1
+            if ($request->has('token')) {
+                $renderUrl = url('/tv/render') . '?token=' . rawurlencode($request->query('token')) . '&_render=1';
+            } else {
+                $renderUrl = url('/display-board/render') . '?_render=1';
+            }
+            return view('display-board-shell', compact('periodeLabel', 'renderUrl'));
+        }
 
         // ── Lending ───────────────────────────────────────────────────────
         $totalLending = Pembiayaan::where('period_month', $filterMonth)->where('period_year', $filterYear)->sum('osmdlc');
@@ -2901,10 +2916,8 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        // ── Periode label ─────────────────────────────────────────────────
-        $periodeLabel = ($monthNames[$filterMonth] ?? $filterMonth) . ' ' . $filterYear;
-
-        return view('display-board', compact(
+        // ── Render and return JSON ─────────────────────────────────────────
+        $sections = view('display-board', compact(
             'totalFunding',
             'totalTabungan',
             'totalDeposito',
@@ -2946,7 +2959,12 @@ class DashboardController extends Controller
             'totalDanaReal',
             'sebaranNasabah',
             'topDpkNasabah'
-        ));
+        ))->renderSections();
+
+        return response()->json([
+            'html'    => $sections['content'] ?? '',
+            'scripts' => $sections['scripts'] ?? '',
+        ]);
     }
 
     public function indexSimple(Request $request)
@@ -3419,8 +3437,8 @@ class DashboardController extends Controller
     {
         return [
             'FIX INCOME' => [
-                'PPPKPW' => ['PPPKPW'],
-                'PPPK' => ['PPPK', 'P3KDINKES', 'P3KDISDIK',],
+                'PPPK PARUH WAKTU' => ['PPPK-PW'],
+                'PPPK' => ['PPPK', 'P3KDINKES', 'P3KDISDIK', 'P3K'],
                 'SKPD' => [
                     '061',
                     '13',
@@ -3540,7 +3558,8 @@ class DashboardController extends Controller
         // Definisi struktur segmentasi yang akan ditampilkan
         $segmentStructure = [
             'FIX INCOME' => [
-                ['label' => 'PPPK', 'codes' => ['PPPK', 'P3KDINKES', 'P3KDISDIK']],
+                ['label' => 'PPPK PARUH WAKTU', 'codes' => ['PPPK-PW']],
+                ['label' => 'PPPK', 'codes' => ['PPPK', 'P3KDINKES', 'P3KDISDIK', 'P3K']],
                 ['label' => 'SKPD', 'codes' => [
                     '061',
                     '13',

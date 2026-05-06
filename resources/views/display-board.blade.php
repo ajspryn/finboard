@@ -1,14 +1,5 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Display Board — FinBoard</title>
-<link rel="stylesheet" href="/vendor/tabler-icons/tabler-icons.min.css"/>
-<link rel="stylesheet" href="/template/assets/vendor/libs/apex-charts/apex-charts.css"/>
-<script src="/template/assets/vendor/libs/apex-charts/apexcharts.js"></script>
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css"/>
-<script src="/vendor/leaflet/leaflet.js" defer></script>
+@extends('layouts.bare')
+@section('styles')
 <style>
 :root{
   --bg:#f0f2f8;--s1:#ffffff;--s2:#f8f9fc;
@@ -94,8 +85,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 .bar-v{font-size:.7rem;color:var(--text);min-width:68px;text-align:right;font-weight:600}
 .nscr{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 </style>
-</head>
-<body>
+@endsection
+@section('content')
 <div id="topbar">
   <span class="logo"><i class="ti ti-chart-bar"></i> FinBoard</span>
   <span class="pb"><i class="ti ti-calendar-event"></i> Periode: {{ $periodeLabel }}</span>
@@ -668,7 +659,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:va
 
 
 </div>{{-- end #sw --}}
+@endsection
 
+@section('scripts')
 <script>
 // ── Data ─────────────────────────────────────────────────────────────────
 const TL  = @json($monthlyTrends['labels']);
@@ -1186,5 +1179,4 @@ _initCharts(0);
 _startBar();
 _autoTimer=setTimeout(()=>_showSlide(1), DUR);
 </script>
-</body>
-</html>
+@endsection

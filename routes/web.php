@@ -45,6 +45,11 @@ Route::get('/tv', [DashboardController::class, 'displayBoard'])
     ->middleware('display.token')
     ->name('display.board.kiosk');
 
+// Display Board Render — AJAX endpoint (same token middleware)
+Route::get('/tv/render', [DashboardController::class, 'displayBoard'])
+    ->middleware('display.token')
+    ->name('display.board.render');
+
 // Protected Dashboard Routes (require authentication)
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -78,6 +83,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:admin,pengurus'])->group(function () {
         Route::get('/daily-activity', [DailyActivityController::class, 'index'])->name('daily.activity.index');
         Route::get('/display-board', [DashboardController::class, 'displayBoard'])->name('display.board');
+        Route::get('/display-board/render', [DashboardController::class, 'displayBoard'])->name('display.board.render.auth');
     });
 
     // Upload Routes (Admin and Lending roles)
