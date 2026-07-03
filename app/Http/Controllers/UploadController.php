@@ -253,6 +253,8 @@ class UploadController extends Controller
         try {
             $month = $request->input('month');
             $year = $request->input('year');
+            $processMode = $request->input('process_mode', 'sync');
+            $useSyncProcessing = $processMode !== 'queue';
 
             // Handle pembiayaan (background processing)
             if (in_array('pembiayaan', $uploadTypes)) {
@@ -272,10 +274,17 @@ class UploadController extends Controller
                     'upload_type' => 'pembiayaan'
                 ]);
 
-                // Dispatch the background job with optimized config
+                // Process immediately (sync) or via queue based on selected mode
                 $queueConfig = $this->getOptimizedQueueConfig();
-                ProcessCsvUpload::dispatch(['pembiayaan' => $filePath], $month, $year, $userId, ['pembiayaan' => $status->id])
-                    ->onQueue($queueConfig['queue']);
+                $this->dispatchUploadProcessing(
+                    ['pembiayaan' => $filePath],
+                    $month,
+                    $year,
+                    $userId,
+                    ['pembiayaan' => $status->id],
+                    $useSyncProcessing,
+                    $queueConfig['queue']
+                );
             }
 
             // Handle funding data (asynchronous processing with status tracking)
@@ -321,10 +330,17 @@ class UploadController extends Controller
                     $filePaths['linkage'] = $this->storeFileStreamOptimized($request->file('csv_linkage'), 'funding_linkage', $userId);
                 }
 
-                // Dispatch the background job with optimized config
+                // Process immediately (sync) or via queue based on selected mode
                 $queueConfig = $this->getOptimizedQueueConfig();
-                ProcessCsvUpload::dispatch($filePaths, $month, $year, $userId, $statusIds)
-                    ->onQueue($queueConfig['queue']);
+                $this->dispatchUploadProcessing(
+                    $filePaths,
+                    $month,
+                    $year,
+                    $userId,
+                    $statusIds,
+                    $useSyncProcessing,
+                    $queueConfig['queue']
+                );
             }
 
             $monthName = $this->getMonthName($month);
@@ -332,11 +348,15 @@ class UploadController extends Controller
             $successMessage = "Upload berhasil untuk periode {$monthName} {$year}.\n\n";
 
             if (in_array('pembiayaan', $uploadTypes)) {
-                $successMessage .= "Data Pembiayaan sedang diproses di background.\n";
+                $successMessage .= $useSyncProcessing
+                    ? "Data Pembiayaan diproses langsung tanpa queue worker manual.\n"
+                    : "Data Pembiayaan sedang diproses di background.\n";
             }
 
             if (!empty($fundingTypes)) {
-                $successMessage .= "Data Funding sedang diproses di background.\n";
+                $successMessage .= $useSyncProcessing
+                    ? "Data Funding diproses langsung tanpa queue worker manual.\n"
+                    : "Data Funding sedang diproses di background.\n";
             }
 
             return redirect()->back()->with('success', $successMessage);
@@ -924,6 +944,27 @@ class UploadController extends Controller
             'memory' => 512, // 512MB memory limit
             'queue' => 'default' // Use default queue
         ];
+    }
+
+    /**
+     * Dispatch CSV processing either synchronously or to queue.
+     */
+    private function dispatchUploadProcessing(
+        array $filePaths,
+        string $month,
+        string $year,
+        int $userId,
+        array $statusIds,
+        bool $useSyncProcessing,
+        string $queueName = 'default'
+    ): void {
+        if ($useSyncProcessing) {
+            ProcessCsvUpload::dispatchSync($filePaths, $month, $year, $userId, $statusIds);
+            return;
+        }
+
+        ProcessCsvUpload::dispatch($filePaths, $month, $year, $userId, $statusIds)
+            ->onQueue($queueName);
     }
 
     /**
