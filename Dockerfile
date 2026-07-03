@@ -1,5 +1,5 @@
 # ─── Stage 1: Build dependencies ─────────────────────────────────────────────
-FROM php:8.2-fpm AS base
+FROM php:8.4-fpm AS base
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
