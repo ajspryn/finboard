@@ -189,6 +189,10 @@ FinBoard telah dioptimasi dengan fitur-fitur performance terdepan:
 
 Lihat [`BACKEND_PERFORMANCE_README.md`](BACKEND_PERFORMANCE_README.md) untuk dokumentasi lengkap.
 
+Deploy Dokploy yang direkomendasikan (Dockerfile, bukan Nixpacks):
+
+- [DOKPLOY_DOCKERFILE_DEPLOY.md](DOKPLOY_DOCKERFILE_DEPLOY.md)
+
 ### 7. Setup WebSocket untuk Real-time Updates (Opsional)
 
 Untuk fitur real-time updates, setup WebSocket server:
