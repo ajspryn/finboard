@@ -2,6 +2,14 @@
 
 use Illuminate\Support\Str;
 
+$pdoMysqlAttrSslCa = defined('Pdo\\Mysql::ATTR_SSL_CA')
+    ? constant('Pdo\\Mysql::ATTR_SSL_CA')
+    : PDO::MYSQL_ATTR_SSL_CA;
+
+$pdoMysqlAttrInitCommand = defined('Pdo\\Mysql::ATTR_INIT_COMMAND')
+    ? constant('Pdo\\Mysql::ATTR_INIT_COMMAND')
+    : PDO::MYSQL_ATTR_INIT_COMMAND;
+
 return [
 
     /*
@@ -58,8 +66,8 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                PDO::MYSQL_ATTR_INIT_COMMAND => "SET SESSION sort_buffer_size=8388608, SESSION tmp_table_size=8388608, SESSION max_heap_table_size=8388608",
+                $pdoMysqlAttrSslCa => env('MYSQL_ATTR_SSL_CA'),
+                $pdoMysqlAttrInitCommand => "SET SESSION sort_buffer_size=8388608, SESSION tmp_table_size=8388608, SESSION max_heap_table_size=8388608",
             ]) : [],
         ],
 
@@ -79,7 +87,7 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                $pdoMysqlAttrSslCa => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 

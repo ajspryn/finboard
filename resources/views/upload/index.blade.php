@@ -344,7 +344,6 @@
                 <div class="card-body">
                     <form id="uploadForm" action="{{ route('upload.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        <input type="hidden" name="process_mode" id="processMode" value="sync">
 
                         <!-- Pilih Periode -->
                         <div class="row mb-4">
@@ -466,7 +465,7 @@
                             </div>
                             <div class="alert alert-info mt-3">
                                 <i class="ti ti-info-circle me-2"></i>
-                                <strong>Pilih jenis data yang ingin Anda upload.</strong> Anda dapat memilih satu atau lebih jenis data sesuai kebutuhan. Default submit akan memproses data langsung tanpa perlu menjalankan queue worker manual.
+                                <strong>Pilih jenis data yang ingin Anda upload.</strong> Anda dapat memilih satu atau lebih jenis data sesuai kebutuhan. Data pembiayaan akan diproses di background.
                             </div>
                         </div>
 
@@ -588,13 +587,9 @@
 
                         <!-- Submit Button -->
                         <div class="text-center" id="submitButton" style="display: none;">
-                            <button type="submit" class="btn btn-primary btn-lg me-2" onclick="setProcessMode('sync')">
-                                <i class="ti ti-player-play me-1"></i><span id="submitNowButtonText">Upload & Proses Sekarang</span>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="ti ti-upload me-1"></i><span id="submitButtonText">Upload Data</span>
                             </button>
-                            <button type="submit" class="btn btn-outline-secondary btn-lg" onclick="setProcessMode('queue')">
-                                <i class="ti ti-stack-forward me-1"></i>Upload ke Antrian
-                            </button>
-                            <div class="small text-muted mt-2">Gunakan "Upload ke Antrian" hanya jika worker queue sudah berjalan.</div>
                         </div>
                     </form>
 
@@ -792,7 +787,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const depositoSection = document.getElementById('depositoSection');
     const linkageSection = document.getElementById('linkageSection');
     const submitButton = document.getElementById('submitButton');
-    const submitNowButtonText = document.getElementById('submitNowButtonText');
+    const submitButtonText = document.getElementById('submitButtonText');
 
     // File input elements
     const csvPembiayaan = document.getElementById('csvPembiayaan');
@@ -875,7 +870,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     default: return type;
                 }
             });
-            submitNowButtonText.textContent = `Upload & Proses ${typeNames.join(', ')}`;
+            submitButtonText.textContent = `Upload ${typeNames.join(', ')}`;
         } else {
             submitButton.style.display = 'none';
         }
@@ -988,13 +983,6 @@ function changePerPage(perPage) {
 function confirmClear() {
     if (confirm('Apakah Anda yakin ingin menghapus SEMUA data (Pembiayaan, Tabungan, Deposito, dan Linkage)? Tindakan ini tidak dapat dibatalkan!')) {
         document.getElementById('clearForm').submit();
-    }
-}
-
-function setProcessMode(mode) {
-    const processModeInput = document.getElementById('processMode');
-    if (processModeInput) {
-        processModeInput.value = mode;
     }
 }
 </script>
