@@ -2332,9 +2332,9 @@ class DashboardController extends Controller
             //   - Token-based (/tv): render at /tv/render?token=X&_render=1
             //   - Auth-based (/display-board): render at /display-board/render?_render=1
             if ($request->has('token')) {
-                $renderUrl = url('/tv/render') . '?token=' . rawurlencode($request->query('token')) . '&_render=1';
+                $renderUrl = '/tv/render?token=' . rawurlencode($request->query('token')) . '&_render=1';
             } else {
-                $renderUrl = url('/display-board/render') . '?_render=1';
+                $renderUrl = '/display-board/render?_render=1';
             }
             return view('display-board-shell', compact('periodeLabel', 'renderUrl'));
         }
