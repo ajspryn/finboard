@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\Storage;
 
 class UploadController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $historyData = $this->getUploadHistoryData($request);
+
         // Get last upload from all tables
         $lastUploadTabungan = Tabungan::max('updated_at');
         $lastUploadDeposito = Deposito::max('updated_at');
@@ -37,6 +39,36 @@ class UploadController extends Controller
         $totalSaldoDeposito = Deposito::sum('nomrp');
         $totalSaldoLinkage = Linkage::sum('os');
         $totalSaldoPembiayaan = Pembiayaan::sum('plafon');
+
+        return view('upload.index', [
+            'lastUpload' => $lastUpload,
+            'totalData' => $totalData,
+            'totalSaldoTabungan' => $totalSaldoTabungan,
+            'totalSaldoDeposito' => $totalSaldoDeposito,
+            'totalSaldoLinkage' => $totalSaldoLinkage,
+            'totalSaldoPembiayaan' => $totalSaldoPembiayaan,
+            'uploadHistory' => $historyData['uploadHistory'],
+            'perPageOptions' => $historyData['perPageOptions'],
+            'hasProcessingUploads' => $historyData['hasProcessingUploads'],
+        ]);
+    }
+
+    public function history(Request $request)
+    {
+        $historyData = $this->getUploadHistoryData($request);
+
+        return response()->json([
+            'html' => view('upload.partials.history', [
+                'uploadHistory' => $historyData['uploadHistory'],
+                'perPageOptions' => $historyData['perPageOptions'],
+                'hasProcessingUploads' => $historyData['hasProcessingUploads'],
+            ])->render(),
+            'hasProcessingUploads' => $historyData['hasProcessingUploads'],
+        ]);
+    }
+
+    private function getUploadHistoryData(Request $request): array
+    {
 
         // Get upload history with periods
         $uploadHistory = collect();
@@ -183,9 +215,9 @@ class UploadController extends Controller
 
         // Sort by created_at descending and paginate
         $sortedUploads = $combinedUploads->sortByDesc('created_at')->values();
-        $perPage = request()->get('per_page', 5); // Allow user to choose items per page
+        $perPage = $request->get('per_page', 5); // Allow user to choose items per page
         $perPage = in_array($perPage, [5, 10, 25, 50, 100]) ? $perPage : 5; // Validate per_page values
-        $currentPage = request()->get('page', 1);
+        $currentPage = $request->get('page', 1);
         $offset = ($currentPage - 1) * $perPage;
 
         $paginatedItems = $sortedUploads->slice($offset, $perPage);
@@ -195,7 +227,7 @@ class UploadController extends Controller
             $perPage,
             $currentPage,
             [
-                'path' => request()->url(),
+                'path' => route('upload.index'),
                 'pageName' => 'page',
                 'perPage' => $perPage
             ]
@@ -207,7 +239,13 @@ class UploadController extends Controller
         // Add per_page options for the view
         $perPageOptions = [5, 10, 25, 50, 100];
 
-        return view('upload.index', compact('lastUpload', 'totalData', 'totalSaldoTabungan', 'totalSaldoDeposito', 'totalSaldoLinkage', 'totalSaldoPembiayaan', 'uploadHistory', 'perPageOptions'));
+        return [
+            'uploadHistory' => $uploadHistory,
+            'perPageOptions' => $perPageOptions,
+            'hasProcessingUploads' => $combinedUploads->contains(function ($upload) {
+                return ($upload['type'] ?? null) === 'processing' && ($upload['status'] ?? null) === 'processing';
+            }),
+        ];
     }
 
     public function upload(Request $request)
@@ -256,7 +294,7 @@ class UploadController extends Controller
 
             // Handle pembiayaan (background processing)
             if (in_array('pembiayaan', $uploadTypes)) {
-                $userId = auth()->id();
+                $userId = $this->getAuthenticatedUserId($request);
                 $file = $request->file('csv_file');
 
                 // Store the uploaded file with optimized streaming
@@ -281,7 +319,7 @@ class UploadController extends Controller
             // Handle funding data (asynchronous processing with status tracking)
             $fundingTypes = array_intersect($uploadTypes, ['tabungan', 'deposito', 'linkage']);
             if (!empty($fundingTypes)) {
-                $userId = auth()->id();
+                $userId = $this->getAuthenticatedUserId($request);
 
                 // Create status records for each funding type
                 $statusIds = [];
@@ -922,8 +960,19 @@ class UploadController extends Controller
     {
         return [
             'memory' => 512, // 512MB memory limit
-            'queue' => 'default' // Use default queue
+            'queue' => 'uploads' // Isolate heavy CSV imports from the default queue
         ];
+    }
+
+    private function getAuthenticatedUserId(Request $request): int
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            throw new \RuntimeException('Authenticated user is required for upload processing.');
+        }
+
+        return (int) $user->getAuthIdentifier();
     }
 
     /**

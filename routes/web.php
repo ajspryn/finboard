@@ -1,11 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UploadController;
-use App\Http\Controllers\FundingController;
 use App\Http\Controllers\DailyActivityController;
 use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\FinancialHighlightController;
@@ -26,7 +24,6 @@ use App\Http\Controllers\ExportController;
 if (app()->isLocal()) {
     Route::get('/dev-login/{id?}', function ($id = 1) {
         $user = App\Models\User::findOrFail($id);
-        Auth::login($user);
         return redirect()->route('dashboard');
     })->name('dev.login');
 }
@@ -89,12 +86,14 @@ Route::middleware(['auth'])->group(function () {
     // Upload Routes (Admin and Lending roles)
     Route::middleware(['role:admin,lending'])->group(function () {
         Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
+        Route::get('/upload/history', [UploadController::class, 'history'])->name('upload.history');
         Route::post('/upload', [UploadController::class, 'upload'])->name('upload.store');
         Route::delete('/upload/clear', [UploadController::class, 'clear'])->name('upload.clear');
         Route::get('/upload/template/{type}', [UploadController::class, 'downloadTemplate'])->name('upload.template');
 
-        // Legacy route kept for backward compatibility
-        Route::post('/funding/upload', [FundingController::class, 'upload'])->name('funding.upload');
+        // Legacy route kept for backward compatibility, but handled by the
+        // async upload pipeline so old funding pages do not process CSV inline.
+        Route::post('/funding/upload', [UploadController::class, 'upload'])->name('funding.upload');
     });
 
     // User Settings Routes (Admin only)

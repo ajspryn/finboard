@@ -243,7 +243,7 @@ ECHO_PID=$!
 
 # Optional: Start queue worker
 echo "Starting queue worker..."
-php artisan queue:work --sleep=3 --tries=3 &
+php artisan queue:work --queue=uploads,default --sleep=3 --tries=3 --timeout=600 &
 QUEUE_PID=$!
 
 echo "Services started!"
