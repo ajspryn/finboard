@@ -8,46 +8,68 @@ use Illuminate\Support\Facades\Log;
 
 class ElasticsearchService
 {
-    protected Client $client;
+    protected ?Client $client = null;
+    protected bool $configured = false;
     protected string $indexPrefix;
 
     public function __construct()
     {
+        $cloudId = config('elasticsearch.cloud_id');
+        $apiKey = config('elasticsearch.api_key');
+
+        if ($cloudId && $apiKey) {
+            $this->client = ClientBuilder::create()
+                ->setElasticCloudId($cloudId)
+                ->setApiKey($apiKey)
+                ->build();
+            $this->configured = true;
+            $this->indexPrefix = config('elasticsearch.index.prefix');
+
+            return;
+        }
+
         $hosts = config('elasticsearch.hosts', []);
         $formattedHosts = [];
 
         foreach ($hosts as $host) {
-            $formattedHost = '';
-            if (isset($host['scheme'])) {
-                $formattedHost .= $host['scheme'] . '://';
-            } else {
-                $formattedHost .= 'http://';
+            $hostName = trim((string)($host['host'] ?? ''));
+            if ($hostName === '') {
+                continue;
             }
 
-            if (isset($host['user']) && isset($host['pass'])) {
+            $formattedHost = ($host['scheme'] ?? 'http') . '://';
+
+            if (!empty($host['user']) && !empty($host['pass'])) {
                 $formattedHost .= $host['user'] . ':' . $host['pass'] . '@';
             }
 
-            $formattedHost .= $host['host'];
+            $formattedHost .= $hostName;
 
-            if (isset($host['port'])) {
+            if (!empty($host['port'])) {
                 $formattedHost .= ':' . $host['port'];
             }
 
             $formattedHosts[] = $formattedHost;
         }
 
-        $builder = ClientBuilder::create()
-            ->setHosts($formattedHosts);
+        if (!empty($formattedHosts)) {
+            $builder = ClientBuilder::create()
+                ->setHosts($formattedHosts);
 
-        $apiKey = config('elasticsearch.api_key');
-        if ($apiKey) {
-            $builder->setApiKey($apiKey);
+            if ($apiKey) {
+                $builder->setApiKey($apiKey);
+            }
+
+            $this->client = $builder->build();
+            $this->configured = true;
         }
 
-        $this->client = $builder->build();
-
         $this->indexPrefix = config('elasticsearch.index.prefix');
+    }
+
+    public function isConfigured(): bool
+    {
+        return $this->configured && $this->client !== null;
     }
 
     /**
@@ -55,6 +77,10 @@ class ElasticsearchService
      */
     public function getClient(): Client
     {
+        if (!$this->client) {
+            throw new \RuntimeException('Elasticsearch is not configured. Set ELASTICSEARCH_CLOUD_ID + ELASTICSEARCH_API_KEY, or ELASTICSEARCH_HOST.');
+        }
+
         return $this->client;
     }
 
@@ -71,6 +97,11 @@ class ElasticsearchService
      */
     public function createIndex(string $indexName, array $mapping = []): bool
     {
+        if (!$this->isConfigured()) {
+            Log::warning("Skipped Elasticsearch index creation for {$indexName}: client is not configured");
+            return false;
+        }
+
         try {
             $params = [
                 'index' => $this->getIndexName($indexName),
@@ -109,6 +140,11 @@ class ElasticsearchService
      */
     public function deleteIndex(string $indexName): bool
     {
+        if (!$this->isConfigured()) {
+            Log::warning("Skipped Elasticsearch index deletion for {$indexName}: client is not configured");
+            return false;
+        }
+
         try {
             $response = $this->client->indices()->delete([
                 'index' => $this->getIndexName($indexName),
@@ -129,6 +165,10 @@ class ElasticsearchService
      */
     public function indexExists(string $indexName): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         try {
             $response = $this->client->indices()->exists([
                 'index' => $this->getIndexName($indexName),
@@ -144,6 +184,10 @@ class ElasticsearchService
      */
     public function indexDocument(string $indexName, string $id, array $data): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         try {
             $response = $this->client->index([
                 'index' => $this->getIndexName($indexName),
@@ -167,6 +211,10 @@ class ElasticsearchService
      */
     public function updateDocument(string $indexName, string $id, array $data): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         try {
             $response = $this->client->update([
                 'index' => $this->getIndexName($indexName),
@@ -192,6 +240,10 @@ class ElasticsearchService
      */
     public function deleteDocument(string $indexName, string $id): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         try {
             $response = $this->client->delete([
                 'index' => $this->getIndexName($indexName),
@@ -213,6 +265,15 @@ class ElasticsearchService
      */
     public function search(string $indexName, array $query, int $from = 0, int $size = 10): array
     {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'error' => 'Elasticsearch is not configured. Set ELASTICSEARCH_CLOUD_ID + ELASTICSEARCH_API_KEY, or ELASTICSEARCH_HOST.',
+                'total' => 0,
+                'hits' => [],
+            ];
+        }
+
         try {
             // Fix match_all query format for Elasticsearch
             if (isset($query['match_all']) && $query['match_all'] === []) {
@@ -279,6 +340,17 @@ class ElasticsearchService
      */
     public function bulkIndex(string $indexName, array $documents): array
     {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'error' => 'Elasticsearch is not configured. Set ELASTICSEARCH_CLOUD_ID + ELASTICSEARCH_API_KEY, or ELASTICSEARCH_HOST.',
+                'total' => count($documents),
+                'successful' => 0,
+                'errors' => count($documents),
+                'items' => [],
+            ];
+        }
+
         try {
             $params = ['body' => []];
 
@@ -334,6 +406,17 @@ class ElasticsearchService
      */
     public function getIndexStats(string $indexName): array
     {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => false,
+                'error' => 'Elasticsearch is not configured. Set ELASTICSEARCH_CLOUD_ID + ELASTICSEARCH_API_KEY, or ELASTICSEARCH_HOST.',
+                'docs_count' => 0,
+                'docs_deleted' => 0,
+                'store_size' => 0,
+                'index_size' => 0,
+            ];
+        }
+
         try {
             $response = $this->client->indices()->stats([
                 'index' => $this->getIndexName($indexName),
@@ -369,6 +452,10 @@ class ElasticsearchService
      */
     public function countDocuments(string $indexName, array $query = []): int
     {
+        if (!$this->isConfigured()) {
+            return 0;
+        }
+
         try {
             $params = [
                 'index' => $this->getIndexName($indexName),

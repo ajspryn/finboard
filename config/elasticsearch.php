@@ -13,13 +13,15 @@ return [
 
      'hosts' => [
           [
-               'host' => env('ELASTICSEARCH_HOST', 'my-elasticsearch-project-fd9e80.es.us-central1.gcp.elastic.cloud'),
+               'host' => env('ELASTICSEARCH_HOST', ''),
                'port' => env('ELASTICSEARCH_PORT', 443),
                'scheme' => env('ELASTICSEARCH_SCHEME', 'https'),
                'user' => env('ELASTICSEARCH_USER', null),
                'pass' => env('ELASTICSEARCH_PASS', null),
           ],
      ],
+
+     'cloud_id' => env('ELASTICSEARCH_CLOUD_ID', null),
 
      'api_key' => env('ELASTICSEARCH_API_KEY', null),
 

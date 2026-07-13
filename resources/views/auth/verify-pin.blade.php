@@ -66,10 +66,20 @@
                         </div>
                         <!-- /Logo -->
 
+                        @php
+                            $lastChannel = session('login_last_pin_channel', 'email');
+                            $hasWhatsapp = session('login_has_whatsapp', false);
+                        @endphp
+
                         <h4 class="mb-1 pt-2 text-center">Verifikasi Kode PIN 💬</h4>
                         <p class="text-start mb-4">
-                            Kami telah mengirim kode verifikasi ke email Anda.
-                            <span class="fw-medium d-block mt-1 text-heading">{{ session('login_email') }}</span>
+                            @if($lastChannel === 'whatsapp')
+                                Kami telah mengirim kode verifikasi ke WhatsApp Anda.
+                                <span class="fw-medium d-block mt-1 text-heading">{{ session('login_whatsapp_number') }}</span>
+                            @else
+                                Kami telah mengirim kode verifikasi ke email Anda.
+                                <span class="fw-medium d-block mt-1 text-heading">{{ session('login_email') }}</span>
+                            @endif
                         </p>
                         <p class="mb-0">Masukkan kode PIN 6 digit</p>
 
@@ -119,12 +129,29 @@
                             </div>
 
                             <div class="text-center">
-                                <button type="button"
-                                        class="btn btn-link text-decoration-none"
-                                        onclick="resendPin()">
-                                    <i class="ti ti-refresh me-1"></i>
-                                    Kirim Ulang Kode PIN
-                                </button>
+                                @if($hasWhatsapp)
+                                    <div class="btn-group" role="group" aria-label="Pilih channel kirim ulang OTP">
+                                        <button type="button"
+                                                class="btn btn-outline-success btn-sm"
+                                                onclick="resendPin('whatsapp')">
+                                            <i class="ti ti-brand-whatsapp me-1"></i>
+                                            Kirim Ulang via WhatsApp
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm"
+                                                onclick="resendPin('email')">
+                                            <i class="ti ti-mail me-1"></i>
+                                            Kirim Ulang via Email
+                                        </button>
+                                    </div>
+                                @else
+                                    <button type="button"
+                                            class="btn btn-link text-decoration-none"
+                                            onclick="resendPin('email')">
+                                        <i class="ti ti-refresh me-1"></i>
+                                        Kirim Ulang Kode PIN via Email
+                                    </button>
+                                @endif
                             </div>
                         </form>
 
@@ -146,6 +173,7 @@
     <!-- Resend PIN Form (Hidden) -->
     <form id="resendForm" method="POST" action="{{ route('auth.resend-pin') }}" style="display: none;">
         @csrf
+        <input type="hidden" name="channel" id="resendChannel" value="">
     </form>
 
     <!-- Core JS -->
@@ -237,8 +265,10 @@
         });
 
         // Resend PIN function
-        function resendPin() {
-            if (confirm('Kirim ulang kode PIN ke email Anda?')) {
+        function resendPin(channel) {
+            const channelLabel = channel === 'whatsapp' ? 'WhatsApp' : 'email';
+            if (confirm(`Kirim ulang kode PIN ke ${channelLabel} Anda?`)) {
+                document.getElementById('resendChannel').value = channel;
                 document.getElementById('resendForm').submit();
             }
         }

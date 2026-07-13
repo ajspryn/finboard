@@ -39,7 +39,10 @@ public/storage
 fix-deployment.sh
 setup-production.sh
 migrate_data.php
-scripts/
+# Keep DB backup/restore scripts for admin backup menu inside container
+scripts/*
+!scripts/db_backup.sh
+!scripts/db_restore.sh
 
 # IDE files
 .idea/

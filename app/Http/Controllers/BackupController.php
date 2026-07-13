@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -50,6 +49,12 @@ class BackupController extends Controller
      public function createBackup()
      {
           $script = base_path('scripts/db_backup.sh');
+               if (!file_exists($script)) {
+                    return redirect()->route('admin.backups.index')->with(
+                         'error',
+                         'Backup failed: script tidak ditemukan di container (' . $script . '). Pastikan image Dokploy dibuild ulang setelah update .dockerignore.'
+                    );
+               }
           // Ensure common Homebrew mysql-client paths are available to the executed process
           $homebrewPaths = '/opt/homebrew/bin:/opt/homebrew/opt/mysql-client/bin:/usr/local/opt/mysql-client/bin:/usr/local/bin';
           $cmd = 'PATH="' . $homebrewPaths . ':$PATH" ' . $this->shellEscapeArg($script) . ' 2>&1';
@@ -75,6 +80,12 @@ class BackupController extends Controller
           }
 
           $script = base_path('scripts/db_restore.sh');
+          if (!file_exists($script)) {
+               return redirect()->route('admin.backups.index')->with(
+                    'error',
+                    'Restore failed: script tidak ditemukan di container (' . $script . '). Pastikan image Dokploy dibuild ulang setelah update .dockerignore.'
+               );
+          }
           // When restore is triggered from web, run non-interactively and force the script
           $cmd = 'NONINTERACTIVE=1 ' . $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' --force 2>&1';
           [$output, $return] = $this->runCommand($cmd);
@@ -112,6 +123,11 @@ class BackupController extends Controller
                // Optionally auto-restore
                if ($request->input('auto_restore')) {
                     $script = base_path('scripts/db_restore.sh');
+                    if (!file_exists($script)) {
+                         $resp['restore'] = 'failed';
+                         $resp['message'] = 'Restore failed: script tidak ditemukan di container (' . $script . '). Pastikan image Dokploy dibuild ulang setelah update .dockerignore.';
+                         return response()->json($resp, 500);
+                    }
                     $storagePath = $destPath;
                     $cmd = $this->shellEscapeArg($script) . ' ' . $this->shellEscapeArg($storagePath) . ' 2>&1';
                     [$output, $return] = $this->runCommand($cmd);

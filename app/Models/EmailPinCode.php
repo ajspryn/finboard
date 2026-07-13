@@ -33,10 +33,12 @@ class EmailPinCode extends Model
         // Generate 6-digit PIN
         $pinCode = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
 
+        $expiresInMinutes = (int) config('services.whatsapp.otp_expired_in_minutes', 10);
+
         return self::create([
             'email' => $email,
             'pin_code' => $pinCode,
-            'expires_at' => now()->addMinutes(10), // PIN expires in 10 minutes
+            'expires_at' => now()->addMinutes($expiresInMinutes),
         ]);
     }
 

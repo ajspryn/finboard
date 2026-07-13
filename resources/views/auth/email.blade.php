@@ -67,7 +67,7 @@
                         <!-- /Logo -->
 
                         <h4 class="mb-1 pt-2 text-center">Selamat Datang! 👋</h4>
-                        <p class="mb-4 text-center">Silakan masukkan email Anda untuk melanjutkan</p>
+                        <p class="mb-4 text-center">Masukkan email atau no. WhatsApp Anda untuk melanjutkan</p>
 
                         <!-- Alert Messages -->
                         @if(session('error'))
@@ -84,24 +84,55 @@
                             </div>
                         @endif
 
+                        @if(session('info'))
+                            <div class="alert alert-info alert-dismissible" role="alert">
+                                {{ session('info') }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        @endif
+
                         <!-- Login Form -->
                         <form method="POST" action="{{ route('auth.send-pin') }}" id="loginForm">
                             @csrf
 
+                            @php
+                                $requireWhatsappNumber = (bool) session('require_whatsapp_number') || old('whatsapp_number');
+                            @endphp
+
                             <div class="mb-6 form-control-validation">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email"
-                                       class="form-control @error('email') is-invalid @enderror"
-                                       id="email"
-                                       name="email"
-                                       value="{{ old('email') }}"
-                                       placeholder="Masukkan email Anda"
+                                <label for="identifier" class="form-label">Email / No. WhatsApp</label>
+                                <input type="text"
+                                       class="form-control @error('identifier') is-invalid @enderror @error('email') is-invalid @enderror"
+                                       id="identifier"
+                                       name="identifier"
+                                       value="{{ old('identifier', old('email', session('require_whatsapp_for_email'))) }}"
+                                        placeholder="contoh@email.com atau 081234567890 / 6281234567890"
                                        required
                                        autofocus>
+                                @error('identifier')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                                 @error('email')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+
+                            @if($requireWhatsappNumber)
+                                <div class="mb-6 form-control-validation">
+                                    <label for="whatsapp_number" class="form-label">Nomor WhatsApp</label>
+                                    <input type="text"
+                                           class="form-control @error('whatsapp_number') is-invalid @enderror"
+                                           id="whatsapp_number"
+                                           name="whatsapp_number"
+                                           value="{{ old('whatsapp_number') }}"
+                                           placeholder="Contoh: 081234567890 atau 6281234567890"
+                                           required>
+                                    <small class="text-muted">Nomor ini akan disimpan ke profil Anda untuk OTP WhatsApp berikutnya.</small>
+                                    @error('whatsapp_number')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            @endif
 
                             <div class="mb-6">
                                 <button type="submit"
@@ -122,9 +153,10 @@
                                     Cara Login:
                                 </h6>
                                 <ol class="text-start small mb-0">
-                                    <li>Masukkan email yang terdaftar</li>
+                                    <li>Masukkan email atau nomor WhatsApp yang terdaftar</li>
                                     <li>Klik "Kirim Kode PIN"</li>
-                                    <li>Periksa email Anda</li>
+                                    <li>Jika no. WhatsApp tersedia, kode dikirim via WhatsApp secara default</li>
+                                    <li>Jika no. WhatsApp tidak tersedia, kode dikirim via email</li>
                                     <li>Masukkan kode PIN 6 digit</li>
                                 </ol>
                             </div>
@@ -160,9 +192,14 @@
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Mengirim...';
         });
 
-        // Auto-focus email field
+        // Auto-focus identifier/WhatsApp field
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('email').focus();
+            const whatsappInput = document.getElementById('whatsapp_number');
+            if (whatsappInput) {
+                whatsappInput.focus();
+            } else {
+                document.getElementById('identifier').focus();
+            }
         });
     </script>
 </body>

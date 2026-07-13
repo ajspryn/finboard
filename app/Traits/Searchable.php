@@ -6,6 +6,9 @@ use App\Services\ElasticsearchService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 
+/**
+ * @mixin \Illuminate\Database\Eloquent\Model
+ */
 trait Searchable
 {
      /**
@@ -66,7 +69,12 @@ trait Searchable
       */
      public function elasticsearchIndex(): bool
      {
-          return $this->getElasticsearchService()->indexDocument(
+          $elasticsearch = $this->getElasticsearchService();
+          if (!$elasticsearch->isConfigured()) {
+               return false;
+          }
+
+          return $elasticsearch->indexDocument(
                $this->getSearchIndex(),
                $this->getKey(),
                $this->toSearchableArray()
@@ -78,7 +86,12 @@ trait Searchable
       */
      public function elasticsearchUpdate(): bool
      {
-          return $this->getElasticsearchService()->updateDocument(
+          $elasticsearch = $this->getElasticsearchService();
+          if (!$elasticsearch->isConfigured()) {
+               return false;
+          }
+
+          return $elasticsearch->updateDocument(
                $this->getSearchIndex(),
                $this->getKey(),
                $this->toSearchableArray()
@@ -90,7 +103,12 @@ trait Searchable
       */
      public function elasticsearchDelete(): bool
      {
-          return $this->getElasticsearchService()->deleteDocument(
+          $elasticsearch = $this->getElasticsearchService();
+          if (!$elasticsearch->isConfigured()) {
+               return false;
+          }
+
+          return $elasticsearch->deleteDocument(
                $this->getSearchIndex(),
                $this->getKey()
           );
@@ -103,6 +121,14 @@ trait Searchable
      {
           $instance = new static();
           $elasticsearch = $instance->getElasticsearchService();
+
+          if (!$elasticsearch->isConfigured()) {
+               return [
+                    'total' => 0,
+                    'hits' => [],
+                    'error' => 'Elasticsearch is not configured. Set ELASTICSEARCH_CLOUD_ID + ELASTICSEARCH_API_KEY, or ELASTICSEARCH_HOST.',
+               ];
+          }
 
           $searchQuery = [
                'multi_match' => [
@@ -171,6 +197,14 @@ trait Searchable
      {
           $instance = new static();
           $elasticsearch = $instance->getElasticsearchService();
+
+          if (!$elasticsearch->isConfigured()) {
+               return [
+                    'total_records' => 0,
+                    'indexed' => 0,
+                    'errors' => 0,
+               ];
+          }
 
           $query = static::query();
           $totalRecords = $query->count();

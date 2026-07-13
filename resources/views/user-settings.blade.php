@@ -40,7 +40,7 @@
                         @csrf
 
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="name" class="form-label">Nama Lengkap</label>
                                     <input type="text"
@@ -56,7 +56,7 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="email" class="form-label">Email</label>
                                     <input type="email"
@@ -72,7 +72,23 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="whatsapp_number" class="form-label">No. WhatsApp (opsional)</label>
+                                    <input type="text"
+                                           class="form-control @error('whatsapp_number') is-invalid @enderror"
+                                           id="whatsapp_number"
+                                           name="whatsapp_number"
+                                           value="{{ old('whatsapp_number') }}"
+                                         placeholder="Contoh: 081234567890 atau 6281234567890">
+                                     <small class="text-muted">Bisa diawali 0 atau 62.</small>
+                                    @error('whatsapp_number')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="role" class="form-label">Role</label>
                                     <select class="form-select @error('role') is-invalid @enderror"
@@ -120,6 +136,7 @@
                                     <tr>
                                         <th>Nama</th>
                                         <th>Email</th>
+                                        <th>No. WhatsApp</th>
                                         <th>Role</th>
                                         <th>Terakhir Login</th>
                                         <th>Dibuat</th>
@@ -145,6 +162,7 @@
                                                 </div>
                                             </td>
                                             <td>{{ $user->email }}</td>
+                                            <td>{{ $user->whatsapp_number ?: '-' }}</td>
                                             <td>
                                                 <span class="badge bg-label-{{ $user->role === 'admin' ? 'primary' : ($user->role === 'pengurus' ? 'info' : ($user->role === 'lending' ? 'warning' : 'success')) }}">
                                                     {{ ucfirst($user->role) }}
@@ -170,7 +188,7 @@
                                                         class="btn btn-sm btn-outline-primary me-1"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#editRoleModal"
-                                                        onclick="editUserRole({{ $user->id }}, '{{ $user->name }}', '{{ $user->role }}')">
+                                                        onclick="editUserRole({{ $user->id }}, @js($user->name), @js($user->role), @js($user->whatsapp_number))">
                                                     <i class="ti ti-edit"></i>
                                                 </button>
 
@@ -231,6 +249,14 @@
                             <option value="funding">Funding</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label for="editWhatsappNumber" class="form-label">No. WhatsApp (opsional)</label>
+                        <input type="text"
+                               class="form-control"
+                               id="editWhatsappNumber"
+                               name="whatsapp_number"
+                               placeholder="Contoh: 081234567890 atau 6281234567890">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -272,9 +298,10 @@
 
 @section('scripts')
 <script>
-function editUserRole(userId, userName, currentRole) {
+function editUserRole(userId, userName, currentRole, whatsappNumber) {
     document.getElementById('editUserName').value = userName;
     document.getElementById('editRole').value = currentRole;
+    document.getElementById('editWhatsappNumber').value = whatsappNumber || '';
     document.getElementById('editRoleForm').action = `/user-settings/${userId}`;
 }
 

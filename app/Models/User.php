@@ -20,6 +20,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'whatsapp_number',
         'role',
         'last_login',
     ];
@@ -89,5 +90,13 @@ class User extends Authenticatable
     public function updateLastLogin(): void
     {
         $this->update(['last_login' => now()]);
+    }
+
+    /**
+     * Route notifications for WhatsApp channel.
+     */
+    public function routeNotificationForWhatsapp($notification = null): ?string
+    {
+        return $this->whatsapp_number;
     }
 }
