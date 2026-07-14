@@ -47,7 +47,7 @@ class WhatsAppOtpSender
           $expiresInMinutes = (string) config('services.whatsapp.otp_expired_in_minutes', 10);
           $appName = (string) config('app.name', 'FinBoard');
 
-          $messageTemplate = str_replace('\\n', PHP_EOL, $messageTemplate);
+          $messageTemplate = $this->normalizeTemplate($messageTemplate);
 
           $message = strtr($messageTemplate, [
                ':app' => $appName,
@@ -78,5 +78,22 @@ class WhatsAppOtpSender
                     throw new RuntimeException('Fonte returned non-success status: ' . $response->body());
                }
           }
+     }
+
+     private function normalizeTemplate(string $template): string
+     {
+          // Support literal escaped newlines from .env values.
+          $template = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $template);
+
+          // Support shell-style line continuation (backslash + newline).
+          $template = preg_replace("/\\\\\r?\n/", "\n", $template) ?? $template;
+
+          // Remove stray trailing backslashes that may come from multiline env formatting.
+          $template = preg_replace('/[ \t]*\\\\$/m', '', $template) ?? $template;
+
+          // Normalize line endings and trim extra blank lines around content.
+          $template = str_replace(["\r\n", "\r"], "\n", $template);
+
+          return trim($template);
      }
 }

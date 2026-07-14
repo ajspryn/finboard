@@ -15,20 +15,27 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Load DB credentials from .env if present (simple parser)
 ENV_FILE="$PROJECT_ROOT/.env"
-DB_HOST="127.0.0.1"
-DB_PORT=3306
-DB_DATABASE="finboard"
-DB_USERNAME="root"
-DB_PASSWORD=""
+
+# Priority: runtime env (Dokploy) -> .env file -> hardcoded default
+DB_HOST="${DB_HOST:-}"
+DB_PORT="${DB_PORT:-}"
+DB_DATABASE="${DB_DATABASE:-}"
+DB_USERNAME="${DB_USERNAME:-}"
+DB_PASSWORD="${DB_PASSWORD:-}"
 
 if [[ -f "$ENV_FILE" ]]; then
-  export $(grep -v '^#' "$ENV_FILE" | grep -E 'DB_HOST|DB_PORT|DB_DATABASE|DB_USERNAME|DB_PASSWORD' | sed 's/\r//g') || true
-  : ${DB_HOST:=$DB_HOST}
-  : ${DB_PORT:=$DB_PORT}
-  : ${DB_DATABASE:=$DB_DATABASE}
-  : ${DB_USERNAME:=$DB_USERNAME}
-  : ${DB_PASSWORD:=$DB_PASSWORD}
+  [[ -z "$DB_HOST" ]] && DB_HOST="$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$DB_PORT" ]] && DB_PORT="$(grep -E '^DB_PORT=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$DB_DATABASE" ]] && DB_DATABASE="$(grep -E '^DB_DATABASE=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$DB_USERNAME" ]] && DB_USERNAME="$(grep -E '^DB_USERNAME=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$DB_PASSWORD" ]] && DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
 fi
+
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-3306}"
+DB_DATABASE="${DB_DATABASE:-finboard}"
+DB_USERNAME="${DB_USERNAME:-root}"
+DB_PASSWORD="${DB_PASSWORD:-}"
 
 mkdir -p "$DEST_DIR"
 BACKUP_FILE="$DEST_DIR/${DB_DATABASE}_$TIMESTAMP.sql.gz"
