@@ -165,14 +165,21 @@ class AuthController extends Controller
 
             return redirect()->route('auth.verify-pin.form')->with('success', $deliveryResult['message']);
         } catch (\Throwable $e) {
+            report($e);
+
+            $message = 'Gagal mengirim kode PIN. Silakan coba lagi.';
+            if ($e instanceof \RuntimeException) {
+                $message = $e->getMessage();
+            }
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Gagal mengirim kode PIN. Silakan coba lagi.'
+                    'message' => $message,
                 ], 500);
             }
 
-            return back()->with('error', 'Gagal mengirim kode PIN. Silakan coba lagi.');
+            return back()->with('error', $message);
         }
     }
 
@@ -356,7 +363,7 @@ class AuthController extends Controller
 
                 return [
                     'channel' => 'email',
-                    'message' => 'Pengiriman via WhatsApp gagal. Kode PIN dikirim ke email Anda.',
+                    'message' => 'Pengiriman via WhatsApp gagal. Kode PIN dikirim ke email Anda. Detail: ' . $e->getMessage(),
                 ];
             }
         }

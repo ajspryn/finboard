@@ -12,11 +12,11 @@
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "^3.1",
         "elasticsearch/elasticsearch": "^9.2",
+        "kstmostofa/laravel-whatsapp": "^1.0",
         "laravel/framework": "^12.0",
         "laravel/scout": "^10.22",
         "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.9",
-        "netflie/laravel-notification-whatsapp": "^1.4",
         "pusher/pusher-php-server": "^7.2"
     },
     "require-dev": {

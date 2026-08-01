@@ -41,17 +41,15 @@ return [
     ],
 
     'whatsapp' => [
-        'provider' => env('WHATSAPP_PROVIDER', 'meta'),
         'from-phone-number-id' => env('WHATSAPP_FROM_PHONE_NUMBER_ID'),
         'token' => env('WHATSAPP_TOKEN'),
         'otp_template_name' => env('WHATSAPP_OTP_TEMPLATE_NAME', 'finboard_otp_code'),
         'otp_template_language' => env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'id'),
+        'otp_template_url_button_index' => env('WHATSAPP_OTP_TEMPLATE_URL_BUTTON_INDEX'),
+        'otp_template_url_button_parameter' => env('WHATSAPP_OTP_TEMPLATE_URL_BUTTON_PARAMETER'),
         'otp_message_template' => env('WHATSAPP_OTP_MESSAGE_TEMPLATE', 'Kode OTP Anda: :otp. Berlaku :minutes menit.'),
         'otp_expired_in_minutes' => env('PIN_EXPIRES_IN_MINUTES', 10),
-        'fonte' => [
-            'token' => env('WHATSAPP_FONTE_TOKEN', env('FONTE_TOKEN')),
-            'endpoint' => env('WHATSAPP_FONTE_ENDPOINT', 'https://api.fonnte.com/send'),
-        ],
+        'use_template' => env('WHATSAPP_USE_TEMPLATE', false),
     ],
 
 ];
