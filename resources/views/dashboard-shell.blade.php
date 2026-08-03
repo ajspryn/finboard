@@ -478,14 +478,15 @@
         year:  '{{ $filterYear }}',
         range: '{{ $range }}',
         start_day: '{{ $startDay }}',
-        end_day:   '{{ $endDay }}'
+        end_day:   '{{ $endDay }}',
+        group_by: '{{ request('group_by', 'segmentasi') }}'
     };
 
     // ── Bangun query params dari URL saat ini ────────────────────────
     function buildRenderUrl() {
         var src    = new URLSearchParams(window.location.search);
         var params = new URLSearchParams();
-        ['month','year','range','start_day','end_day'].forEach(function (k) {
+        ['month','year','range','start_day','end_day','group_by'].forEach(function (k) {
             var v = src.get(k) || _bladeDefaults[k] || '';
             if (v) params.set(k, v);
         });

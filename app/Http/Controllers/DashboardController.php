@@ -15,6 +15,14 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
+    private function normalizeSegmentTableGroupBy(?string $groupBy): string
+    {
+        $groupBy = strtolower(trim((string) $groupBy));
+        $allowed = ['segmentasi', 'sektor_ekonomi'];
+
+        return in_array($groupBy, $allowed, true) ? $groupBy : 'segmentasi';
+    }
+
     private function normalizeDashboardRange(?string $range): string
     {
         $range = strtolower(trim((string)$range));
@@ -326,24 +334,60 @@ class DashboardController extends Controller
         [$dashboardStartDate, $dashboardEndDate] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
         $this->applyOptionalDateFilter($query, 'tgleff', $dashboardStartDate, $dashboardEndDate);
 
-        // Segmentasi Outstanding & Disburse (gabungan)
-        $segmentasiData = $this->getSegmentasiData($startDay, $endDay, $filterMonth, $filterYear, $dashboardStartDate, $dashboardEndDate);
+        // Segmentasi default (dipakai chart existing)
+        $segmentasiData = $this->getSegmentasiData(
+            $startDay,
+            $endDay,
+            $filterMonth,
+            $filterYear,
+            $dashboardStartDate,
+            $dashboardEndDate,
+            'segmentasi'
+        );
+
+        $segmentTableGroupBy = $this->normalizeSegmentTableGroupBy($request->input('group_by', 'segmentasi'));
+        $segmentTableData = $segmentTableGroupBy === 'segmentasi'
+            ? $segmentasiData
+            : $this->getSegmentasiData(
+                $startDay,
+                $endDay,
+                $filterMonth,
+                $filterYear,
+                $dashboardStartDate,
+                $dashboardEndDate,
+                $segmentTableGroupBy
+            );
+
+        // Semua agregasi utama lending diringkas ke 1 query untuk menekan waktu load awal.
+        $lendingSummary = (clone $query)
+            ->selectRaw('COALESCE(SUM(osmdlc), 0) as total_lending_modal')
+            ->selectRaw('COALESCE(SUM(osmgnc), 0) as total_lending_margin')
+            ->selectRaw('COALESCE(SUM(mdlawal), 0) as total_modal_awal')
+            ->selectRaw('COALESCE(SUM(mgnawal), 0) as total_margin_awal')
+            ->selectRaw('COUNT(*) as total_nasabah')
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru IN ('3', '4', '5') THEN osmdlc ELSE 0 END), 0) as total_npf")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru IN ('3', '4', '5') THEN tgkpok ELSE 0 END), 0) as total_tunggakan_pokok")
+            ->selectRaw("SUM(CASE WHEN colbaru = '1' THEN 1 ELSE 0 END) as col1_count")
+            ->selectRaw("SUM(CASE WHEN colbaru = '2' THEN 1 ELSE 0 END) as col2_count")
+            ->selectRaw("SUM(CASE WHEN colbaru = '3' THEN 1 ELSE 0 END) as col3_count")
+            ->selectRaw("SUM(CASE WHEN colbaru = '4' THEN 1 ELSE 0 END) as col4_count")
+            ->selectRaw("SUM(CASE WHEN colbaru = '5' THEN 1 ELSE 0 END) as col5_count")
+            ->first();
 
         // Total Outstanding Lending (Pokok Pembiayaan saja)
-        $totalLendingModal = (clone $query)->sum('osmdlc'); // Outstanding Modal/Pokok
-        $totalLendingMargin = (clone $query)->sum('osmgnc'); // Outstanding Margin
+        $totalLendingModal = (float) ($lendingSummary->total_lending_modal ?? 0); // Outstanding Modal/Pokok
+        $totalLendingMargin = (float) ($lendingSummary->total_lending_margin ?? 0); // Outstanding Margin
 
         // Total Modal Awal (Plafon awal pembiayaan)
-        $totalModalAwal = (clone $query)->sum('mdlawal');
-        $totalMarginAwal = (clone $query)->sum('mgnawal');
+        $totalModalAwal = (float) ($lendingSummary->total_modal_awal ?? 0);
+        $totalMarginAwal = (float) ($lendingSummary->total_margin_awal ?? 0);
 
         // Count total nasabah/kontrak
-        $totalNasabah = (clone $query)->count();
+        $totalNasabah = (int) ($lendingSummary->total_nasabah ?? 0);
 
         // Calculate NPF (kolektibilitas >= 3) - hanya pokok
-        $npfData = (clone $query)->whereIn('colbaru', ['3', '4', '5'])->get();
-        $totalNPF = $npfData->sum('osmdlc'); // NPF hanya dari pokok
-        $totalTunggakanPokok = $npfData->sum('tgkpok'); // Tunggakan pokok NPF
+        $totalNPF = (float) ($lendingSummary->total_npf ?? 0); // NPF hanya dari pokok
+        $totalTunggakanPokok = (float) ($lendingSummary->total_tunggakan_pokok ?? 0); // Tunggakan pokok NPF
         $npfRatio = $totalLendingModal > 0 ? ($totalNPF / $totalLendingModal) * 100 : 0;
 
         // Funding data (Real dari tabel tabungans dan depositos)
@@ -763,7 +807,9 @@ class DashboardController extends Controller
             'period_year',
             'period_month',
             DB::raw('SUM(mdlawal) as plafon'),
-            DB::raw('SUM(osmdlc) as outstanding')
+            DB::raw('SUM(osmdlc) as outstanding'),
+            DB::raw('COUNT(DISTINCT nokontrak) as funding_count'),
+            DB::raw('COUNT(DISTINCT CASE WHEN osmdlc > 0 THEN nokontrak END) as lending_count')
         )
             ->whereNotNull('period_year')
             ->whereNotNull('period_month')
@@ -874,19 +920,10 @@ class DashboardController extends Controller
                 return round($item->outstanding / 1000000000, 2); // Konversi ke miliar
             })->values()->toArray(),
             'funding_count' => $monthlyData->map(function ($item) {
-                $monthStr = str_pad((string)(int)$item->period_month, 2, '0', STR_PAD_LEFT);
-                return Pembiayaan::where('period_month', $monthStr)
-                    ->where('period_year', (int)$item->period_year)
-                    ->selectRaw('DISTINCT nokontrak')
-                    ->count();
+                return (int) ($item->funding_count ?? 0);
             })->values()->toArray(),
             'lending_count' => $monthlyData->map(function ($item) {
-                $monthStr = str_pad((string)(int)$item->period_month, 2, '0', STR_PAD_LEFT);
-                return Pembiayaan::where('period_month', $monthStr)
-                    ->where('period_year', (int)$item->period_year)
-                    ->where('osmdlc', '>', 0)
-                    ->selectRaw('DISTINCT nokontrak')
-                    ->count();
+                return (int) ($item->lending_count ?? 0);
             })->values()->toArray()
         ];
 
@@ -991,12 +1028,12 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Kolektibilitas Distribution (All)
-        $col1 = (clone $query)->where('colbaru', '1')->count();
-        $col2 = (clone $query)->where('colbaru', '2')->count();
-        $col3Count = (clone $query)->where('colbaru', '3')->count();
-        $col4Count = (clone $query)->where('colbaru', '4')->count();
-        $col5Count = (clone $query)->where('colbaru', '5')->count();
+        // Kolektibilitas Distribution (All) pakai hasil agregasi awal.
+        $col1 = (int) ($lendingSummary->col1_count ?? 0);
+        $col2 = (int) ($lendingSummary->col2_count ?? 0);
+        $col3Count = (int) ($lendingSummary->col3_count ?? 0);
+        $col4Count = (int) ($lendingSummary->col4_count ?? 0);
+        $col5Count = (int) ($lendingSummary->col5_count ?? 0);
 
         $collectibilityStats = [
             ['label' => 'Lancar (Kol 1)', 'count' => $col1, 'percentage' => $totalNasabah > 0 ? round(($col1 / $totalNasabah) * 100, 1) : 0, 'color' => 'success'],
@@ -1466,6 +1503,7 @@ class DashboardController extends Controller
             'topProducts',
             'topAreas',
             'segmentasiData',
+            'segmentTableData',
             'segmentasiDistribution',
             'kolektibilitasDistribution',
             'kolektibilitasComparison',
@@ -1489,7 +1527,8 @@ class DashboardController extends Controller
             'segmentCodes',
             'range',
             'trendRangeLabel',
-            'svrPredictions'
+            'svrPredictions',
+            'segmentTableGroupBy'
         ))->renderSections();
 
         return response()->json([
@@ -3037,31 +3076,10 @@ class DashboardController extends Controller
             $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
         }
 
-        // Handle LAIN-LAIN category
-        if ($category === 'LAIN-LAIN' && $type === 'Lainnya') {
-            // Get all mapped codes from segment structure
-            $segmentCodes = $this->getSegmentCodes();
-            $mappedCodes = [];
-            foreach ($segmentCodes as $segments) {
-                foreach ($segments as $codes) {
-                    $mappedCodes = array_merge($mappedCodes, $codes);
-                }
-            }
+        $segmentTableGroupBy = $this->normalizeSegmentTableGroupBy($request->input('group_by', 'segmentasi'));
 
-            // Query untuk LAIN-LAIN (yang tidak ada di mapping)
-            $query->whereNotIn('kdgroupdeb', $mappedCodes)
-                ->whereNotNull('kdgroupdeb')
-                ->where('kdgroupdeb', '!=', '');
-        } else {
-            // Handle normal categories
-            $segmentCodes = $this->getSegmentCodes();
-            $codes = $segmentCodes[$category][$type] ?? [];
-
-            if (empty($codes)) {
-                return response()->json(['error' => 'Segment not found'], 404);
-            }
-
-            $query->whereIn('kdgroupdeb', $codes);
+        if (!$this->applySegmentGroupingFilter($query, $category, $type, $segmentTableGroupBy)) {
+            return response()->json(['error' => 'Segment not found'], 404);
         }
 
         // Get detail data
@@ -3090,6 +3108,7 @@ class DashboardController extends Controller
         ];
 
         return response()->json([
+            'group_by' => $segmentTableGroupBy,
             'category' => $category,
             'type' => $type,
             'summary' => $summary,
@@ -3122,31 +3141,10 @@ class DashboardController extends Controller
             // Filter by kolektibilitas
             $query->where('colbaru', $kol);
 
-            // Handle LAIN-LAIN category
-            if ($category === 'LAIN-LAIN' && $type === 'Lainnya') {
-                // Get all mapped codes from segment structure
-                $segmentCodes = $this->getSegmentCodes();
-                $mappedCodes = [];
-                foreach ($segmentCodes as $segments) {
-                    foreach ($segments as $codes) {
-                        $mappedCodes = array_merge($mappedCodes, $codes);
-                    }
-                }
+            $segmentTableGroupBy = $this->normalizeSegmentTableGroupBy($request->input('group_by', 'segmentasi'));
 
-                // Query untuk LAIN-LAIN (yang tidak ada di mapping)
-                $query->whereNotIn('kdgroupdeb', $mappedCodes)
-                    ->whereNotNull('kdgroupdeb')
-                    ->where('kdgroupdeb', '!=', '');
-            } else {
-                // Handle normal categories
-                $segmentCodes = $this->getSegmentCodes();
-                $codes = $segmentCodes[$category][$type] ?? [];
-
-                if (empty($codes)) {
-                    return response()->json(['error' => 'Segment not found'], 404);
-                }
-
-                $query->whereIn('kdgroupdeb', $codes);
+            if (!$this->applySegmentGroupingFilter($query, $category, $type, $segmentTableGroupBy)) {
+                return response()->json(['error' => 'Segment not found'], 404);
             }
 
             // Get detail data. Only select `dpd` if the column exists in the table
@@ -3183,6 +3181,7 @@ class DashboardController extends Controller
             ];
 
             return response()->json([
+                'group_by' => $segmentTableGroupBy,
                 'category' => $category,
                 'type' => $type,
                 'kol' => $kol,
@@ -3433,6 +3432,59 @@ class DashboardController extends Controller
         return $labels[$col] ?? '-';
     }
 
+    private function applySegmentGroupingFilter($query, string $category, string $type, string $groupBy): bool
+    {
+        if ($groupBy === 'sektor_ekonomi') {
+            if ($category === 'TANPA SEKTOR') {
+                $query->where(function ($subQuery) {
+                    $subQuery->whereNull('kdsektor')
+                        ->orWhere('kdsektor', '');
+                });
+            } else {
+                $query->where('kdsektor', $category);
+            }
+
+            if ($type === 'LAINNYA') {
+                $query->where(function ($subQuery) {
+                    $subQuery->whereNull('kdsub')
+                        ->orWhere('kdsub', '');
+                });
+            } else {
+                $query->where('kdsub', $type);
+            }
+
+            return true;
+        }
+
+        // Default grouping: segmentasi (kdgroupdeb mapping)
+        if ($category === 'LAIN-LAIN' && $type === 'Lainnya') {
+            $segmentCodes = $this->getSegmentCodes();
+            $mappedCodes = [];
+            foreach ($segmentCodes as $segments) {
+                foreach ($segments as $codes) {
+                    $mappedCodes = array_merge($mappedCodes, $codes);
+                }
+            }
+
+            $query->whereNotIn('kdgroupdeb', $mappedCodes)
+                ->whereNotNull('kdgroupdeb')
+                ->where('kdgroupdeb', '!=', '');
+
+            return true;
+        }
+
+        $segmentCodes = $this->getSegmentCodes();
+        $codes = $segmentCodes[$category][$type] ?? [];
+
+        if (empty($codes)) {
+            return false;
+        }
+
+        $query->whereIn('kdgroupdeb', $codes);
+
+        return true;
+    }
+
     private function getSegmentCodes()
     {
         return [
@@ -3534,8 +3586,10 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getSegmentasiData($startDay = null, $endDay = null, $filterMonth = null, $filterYear = null, $absoluteStartDate = null, $absoluteEndDate = null)
+    private function getSegmentasiData($startDay = null, $endDay = null, $filterMonth = null, $filterYear = null, $absoluteStartDate = null, $absoluteEndDate = null, $groupBy = 'segmentasi')
     {
+        $groupBy = $this->normalizeSegmentTableGroupBy($groupBy);
+
         // Build base query with combined filters
         $baseQuery = function () use ($startDay, $endDay, $filterMonth, $filterYear, $absoluteStartDate, $absoluteEndDate) {
             $query = Pembiayaan::query();
@@ -3554,6 +3608,140 @@ class DashboardController extends Controller
 
             return $query;
         };
+
+        if ($groupBy === 'sektor_ekonomi') {
+            $rows = $baseQuery()
+                ->selectRaw("COALESCE(NULLIF(TRIM(kdsektor), ''), 'TANPA SEKTOR') as category")
+                ->selectRaw("COALESCE(NULLIF(TRIM(kdsub), ''), 'LAINNYA') as type")
+                ->selectRaw('SUM(osmdlc) as outstanding')
+                ->selectRaw('SUM(mdlawal) as disburse')
+                ->selectRaw('COUNT(*) as noa')
+                ->selectRaw('COUNT(DISTINCT nocif) as cif')
+                ->selectRaw("SUM(CASE WHEN colbaru = '1' THEN 1 ELSE 0 END) as col1")
+                ->selectRaw("SUM(CASE WHEN colbaru = '2' THEN 1 ELSE 0 END) as col2")
+                ->selectRaw("SUM(CASE WHEN colbaru = '3' THEN 1 ELSE 0 END) as col3")
+                ->selectRaw("SUM(CASE WHEN colbaru = '4' THEN 1 ELSE 0 END) as col4")
+                ->selectRaw("SUM(CASE WHEN colbaru = '5' THEN 1 ELSE 0 END) as col5")
+                ->selectRaw("SUM(CASE WHEN colbaru = '1' THEN osmdlc ELSE 0 END) as col1_sum")
+                ->selectRaw("SUM(CASE WHEN colbaru = '2' THEN osmdlc ELSE 0 END) as col2_sum")
+                ->selectRaw("SUM(CASE WHEN colbaru = '3' THEN osmdlc ELSE 0 END) as col3_sum")
+                ->selectRaw("SUM(CASE WHEN colbaru = '4' THEN osmdlc ELSE 0 END) as col4_sum")
+                ->selectRaw("SUM(CASE WHEN colbaru = '5' THEN osmdlc ELSE 0 END) as col5_sum")
+                ->groupBy('category', 'type')
+                ->orderBy('category')
+                ->orderBy('type')
+                ->get();
+
+            $grouped = $rows->groupBy('category');
+
+            $data = [];
+            $grandTotalOutstanding = 0;
+            $grandTotalDisburse = 0;
+            $grandNoa = 0;
+            $grandCif = 0;
+            $totalCol1Count = 0;
+            $totalCol2Count = 0;
+            $totalCol3Count = 0;
+            $totalCol4Count = 0;
+            $totalCol5Count = 0;
+            $totalCol1Sum = 0;
+            $totalCol2Sum = 0;
+            $totalCol3Sum = 0;
+            $totalCol4Sum = 0;
+            $totalCol5Sum = 0;
+
+            foreach ($grouped as $category => $items) {
+                $rowspan = $items->count();
+                foreach ($items->values() as $index => $item) {
+                    $outstanding = (float) ($item->outstanding ?? 0);
+                    $disburse = (float) ($item->disburse ?? 0);
+                    $noa = (int) ($item->noa ?? 0);
+                    $cif = (int) ($item->cif ?? 0);
+                    $col1 = (int) ($item->col1 ?? 0);
+                    $col2 = (int) ($item->col2 ?? 0);
+                    $col3 = (int) ($item->col3 ?? 0);
+                    $col4 = (int) ($item->col4 ?? 0);
+                    $col5 = (int) ($item->col5 ?? 0);
+                    $col1Sum = (float) ($item->col1_sum ?? 0);
+                    $col2Sum = (float) ($item->col2_sum ?? 0);
+                    $col3Sum = (float) ($item->col3_sum ?? 0);
+                    $col4Sum = (float) ($item->col4_sum ?? 0);
+                    $col5Sum = (float) ($item->col5_sum ?? 0);
+
+                    $grandTotalOutstanding += $outstanding;
+                    $grandTotalDisburse += $disburse;
+                    $grandNoa += $noa;
+                    $grandCif += $cif;
+
+                    $totalCol1Count += $col1;
+                    $totalCol2Count += $col2;
+                    $totalCol3Count += $col3;
+                    $totalCol4Count += $col4;
+                    $totalCol5Count += $col5;
+
+                    $totalCol1Sum += $col1Sum;
+                    $totalCol2Sum += $col2Sum;
+                    $totalCol3Sum += $col3Sum;
+                    $totalCol4Sum += $col4Sum;
+                    $totalCol5Sum += $col5Sum;
+
+                    $data[] = [
+                        'category' => (string) $category,
+                        'type' => (string) ($item->type ?? 'LAINNYA'),
+                        'outstanding' => $outstanding,
+                        'pct_outstanding' => 0,
+                        'noa' => $noa,
+                        'cif' => $cif,
+                        'disburse' => $disburse,
+                        'pct_disburse' => 0,
+                        'col1' => $col1,
+                        'col2' => $col2,
+                        'col3' => $col3,
+                        'col4' => $col4,
+                        'col5' => $col5,
+                        'col1_sum' => $col1Sum,
+                        'col2_sum' => $col2Sum,
+                        'col3_sum' => $col3Sum,
+                        'col4_sum' => $col4Sum,
+                        'col5_sum' => $col5Sum,
+                        'rowspan' => $index === 0 ? $rowspan : 0,
+                        'is_total' => false,
+                    ];
+                }
+            }
+
+            $data[] = [
+                'category' => 'TOTAL',
+                'type' => '',
+                'outstanding' => $grandTotalOutstanding,
+                'pct_outstanding' => 100,
+                'noa' => $grandNoa,
+                'cif' => $grandCif,
+                'disburse' => $grandTotalDisburse,
+                'pct_disburse' => 100,
+                'col1' => $totalCol1Count,
+                'col2' => $totalCol2Count,
+                'col3' => $totalCol3Count,
+                'col4' => $totalCol4Count,
+                'col5' => $totalCol5Count,
+                'col1_sum' => $totalCol1Sum,
+                'col2_sum' => $totalCol2Sum,
+                'col3_sum' => $totalCol3Sum,
+                'col4_sum' => $totalCol4Sum,
+                'col5_sum' => $totalCol5Sum,
+                'rowspan' => 1,
+                'is_total' => true,
+            ];
+
+            foreach ($data as &$item) {
+                if (!$item['is_total']) {
+                    $item['pct_outstanding'] = $grandTotalOutstanding > 0 ? ($item['outstanding'] / $grandTotalOutstanding) * 100 : 0;
+                    $item['pct_disburse'] = $grandTotalDisburse > 0 ? ($item['disburse'] / $grandTotalDisburse) * 100 : 0;
+                }
+            }
+
+            return $data;
+        }
 
         // Definisi struktur segmentasi yang akan ditampilkan
         $segmentStructure = [
@@ -3656,11 +3844,18 @@ class DashboardController extends Controller
 
         // Kumpulkan semua kode yang sudah dipetakan
         $mappedCodes = [];
-        foreach ($segmentStructure as $segments) {
+        $segmentCodeToLabel = [];
+        $segmentLabelToCategory = [];
+        foreach ($segmentStructure as $category => $segments) {
             foreach ($segments as $segment) {
+                $segmentLabelToCategory[$segment['label']] = $category;
+                foreach ($segment['codes'] as $segmentCode) {
+                    $segmentCodeToLabel[$segmentCode] = $segment['label'];
+                }
                 $mappedCodes = array_merge($mappedCodes, $segment['codes']);
             }
         }
+        $mappedCodes = array_values(array_unique($mappedCodes));
 
         $data = [];
         $grandTotalOutstanding = 0;
@@ -3668,34 +3863,126 @@ class DashboardController extends Controller
         $grandNoa = 0;
         $grandCif = 0;
 
+        // Ambil agregasi semua kode segmentasi dalam satu query saja.
+        $segmentAggregates = $baseQuery()
+            ->whereIn('kdgroupdeb', $mappedCodes)
+            ->select('kdgroupdeb')
+            ->selectRaw('COALESCE(SUM(osmdlc), 0) as outstanding')
+            ->selectRaw('COALESCE(SUM(mdlawal), 0) as disburse')
+            ->selectRaw('COUNT(*) as noa')
+            ->selectRaw('COUNT(DISTINCT nocif) as cif')
+            ->selectRaw("SUM(CASE WHEN colbaru = '1' THEN 1 ELSE 0 END) as col1")
+            ->selectRaw("SUM(CASE WHEN colbaru = '2' THEN 1 ELSE 0 END) as col2")
+            ->selectRaw("SUM(CASE WHEN colbaru = '3' THEN 1 ELSE 0 END) as col3")
+            ->selectRaw("SUM(CASE WHEN colbaru = '4' THEN 1 ELSE 0 END) as col4")
+            ->selectRaw("SUM(CASE WHEN colbaru = '5' THEN 1 ELSE 0 END) as col5")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '1' THEN osmdlc ELSE 0 END), 0) as col1_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '2' THEN osmdlc ELSE 0 END), 0) as col2_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '3' THEN osmdlc ELSE 0 END), 0) as col3_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '4' THEN osmdlc ELSE 0 END), 0) as col4_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '5' THEN osmdlc ELSE 0 END), 0) as col5_sum")
+            ->groupBy('kdgroupdeb')
+            ->get();
+
+        $segmentBucket = [];
+        foreach ($segmentAggregates as $segmentRow) {
+            $segmentCode = (string) ($segmentRow->kdgroupdeb ?? '');
+            $segmentLabel = $segmentCodeToLabel[$segmentCode] ?? null;
+            if (!$segmentLabel) {
+                continue;
+            }
+
+            if (!isset($segmentBucket[$segmentLabel])) {
+                $segmentBucket[$segmentLabel] = [
+                    'outstanding' => 0.0,
+                    'disburse' => 0.0,
+                    'noa' => 0,
+                    'cif_values' => [],
+                    'col1' => 0,
+                    'col2' => 0,
+                    'col3' => 0,
+                    'col4' => 0,
+                    'col5' => 0,
+                    'col1_sum' => 0.0,
+                    'col2_sum' => 0.0,
+                    'col3_sum' => 0.0,
+                    'col4_sum' => 0.0,
+                    'col5_sum' => 0.0,
+                ];
+            }
+
+            $segmentBucket[$segmentLabel]['outstanding'] += (float) ($segmentRow->outstanding ?? 0);
+            $segmentBucket[$segmentLabel]['disburse'] += (float) ($segmentRow->disburse ?? 0);
+            $segmentBucket[$segmentLabel]['noa'] += (int) ($segmentRow->noa ?? 0);
+            $segmentBucket[$segmentLabel]['col1'] += (int) ($segmentRow->col1 ?? 0);
+            $segmentBucket[$segmentLabel]['col2'] += (int) ($segmentRow->col2 ?? 0);
+            $segmentBucket[$segmentLabel]['col3'] += (int) ($segmentRow->col3 ?? 0);
+            $segmentBucket[$segmentLabel]['col4'] += (int) ($segmentRow->col4 ?? 0);
+            $segmentBucket[$segmentLabel]['col5'] += (int) ($segmentRow->col5 ?? 0);
+            $segmentBucket[$segmentLabel]['col1_sum'] += (float) ($segmentRow->col1_sum ?? 0);
+            $segmentBucket[$segmentLabel]['col2_sum'] += (float) ($segmentRow->col2_sum ?? 0);
+            $segmentBucket[$segmentLabel]['col3_sum'] += (float) ($segmentRow->col3_sum ?? 0);
+            $segmentBucket[$segmentLabel]['col4_sum'] += (float) ($segmentRow->col4_sum ?? 0);
+            $segmentBucket[$segmentLabel]['col5_sum'] += (float) ($segmentRow->col5_sum ?? 0);
+        }
+
+        // Hitung CIF unik per label dengan satu query tambahan (tetap jauh lebih kecil dari sebelumnya).
+        $segmentCifRows = $baseQuery()
+            ->whereIn('kdgroupdeb', $mappedCodes)
+            ->whereNotNull('nocif')
+            ->where('nocif', '!=', '')
+            ->select('kdgroupdeb', 'nocif')
+            ->distinct()
+            ->get();
+
+        foreach ($segmentCifRows as $segmentCifRow) {
+            $segmentCode = (string) ($segmentCifRow->kdgroupdeb ?? '');
+            $segmentLabel = $segmentCodeToLabel[$segmentCode] ?? null;
+            if (!$segmentLabel || !isset($segmentBucket[$segmentLabel])) {
+                continue;
+            }
+            $segmentBucket[$segmentLabel]['cif_values'][(string) $segmentCifRow->nocif] = true;
+        }
+
         // Process segmentasi berdasarkan struktur yang baru
         foreach ($segmentStructure as $category => $segments) {
             $rowCount = 0;
             $categoryData = [];
 
             foreach ($segments as $segment) {
-                // Aggregate data untuk semua kode dalam segment ini
-                $result = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])
-                    ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa, COUNT(DISTINCT nocif) as cif")
-                    ->first();
+                $bucket = $segmentBucket[$segment['label']] ?? null;
 
-                // Count and sum by collectibility
-                $col1Count = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '1')->count();
-                $col2Count = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '2')->count();
-                $col3Count = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '3')->count();
-                $col4Count = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '4')->count();
-                $col5Count = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '5')->count();
-
-                $col1Sum = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '1')->sum('osmdlc');
-                $col2Sum = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '2')->sum('osmdlc');
-                $col3Sum = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '3')->sum('osmdlc');
-                $col4Sum = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '4')->sum('osmdlc');
-                $col5Sum = $baseQuery()->whereIn('kdgroupdeb', $segment['codes'])->where('colbaru', '5')->sum('osmdlc');
-
-                $outstanding = $result->outstanding ?? 0;
-                $disburse = $result->disburse ?? 0;
-                $noa = $result->noa ?? 0;
-                $cif = $result->cif ?? 0;
+                if ($bucket) {
+                    $outstanding = (float) ($bucket['outstanding'] ?? 0);
+                    $disburse = (float) ($bucket['disburse'] ?? 0);
+                    $noa = (int) ($bucket['noa'] ?? 0);
+                    $cif = isset($bucket['cif_values']) ? count($bucket['cif_values']) : 0;
+                    $col1Count = (int) ($bucket['col1'] ?? 0);
+                    $col2Count = (int) ($bucket['col2'] ?? 0);
+                    $col3Count = (int) ($bucket['col3'] ?? 0);
+                    $col4Count = (int) ($bucket['col4'] ?? 0);
+                    $col5Count = (int) ($bucket['col5'] ?? 0);
+                    $col1Sum = (float) ($bucket['col1_sum'] ?? 0);
+                    $col2Sum = (float) ($bucket['col2_sum'] ?? 0);
+                    $col3Sum = (float) ($bucket['col3_sum'] ?? 0);
+                    $col4Sum = (float) ($bucket['col4_sum'] ?? 0);
+                    $col5Sum = (float) ($bucket['col5_sum'] ?? 0);
+                } else {
+                    $outstanding = 0;
+                    $disburse = 0;
+                    $noa = 0;
+                    $cif = 0;
+                    $col1Count = 0;
+                    $col2Count = 0;
+                    $col3Count = 0;
+                    $col4Count = 0;
+                    $col5Count = 0;
+                    $col1Sum = 0;
+                    $col2Sum = 0;
+                    $col3Sum = 0;
+                    $col4Sum = 0;
+                    $col5Sum = 0;
+                }
 
                 if ($outstanding > 0 || $disburse > 0 || $noa > 0) {
                     $grandTotalOutstanding += $outstanding;
@@ -3736,29 +4023,40 @@ class DashboardController extends Controller
             }
         }
 
-        // Process LAIN-LAIN (data yang tidak masuk kategori)
-        $lainResult = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)
+        // Process LAIN-LAIN (data yang tidak masuk kategori) juga dipadatkan menjadi satu query agregasi.
+        $lainSummary = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)
             ->whereNotNull('kdgroupdeb')
             ->where('kdgroupdeb', '!=', '')
-            ->selectRaw("SUM(osmdlc) as outstanding, SUM(mdlawal) as disburse, COUNT(*) as noa, COUNT(DISTINCT nocif) as cif")
+            ->selectRaw('COALESCE(SUM(osmdlc), 0) as outstanding')
+            ->selectRaw('COALESCE(SUM(mdlawal), 0) as disburse')
+            ->selectRaw('COUNT(*) as noa')
+            ->selectRaw('COUNT(DISTINCT nocif) as cif')
+            ->selectRaw("SUM(CASE WHEN colbaru = '1' THEN 1 ELSE 0 END) as col1")
+            ->selectRaw("SUM(CASE WHEN colbaru = '2' THEN 1 ELSE 0 END) as col2")
+            ->selectRaw("SUM(CASE WHEN colbaru = '3' THEN 1 ELSE 0 END) as col3")
+            ->selectRaw("SUM(CASE WHEN colbaru = '4' THEN 1 ELSE 0 END) as col4")
+            ->selectRaw("SUM(CASE WHEN colbaru = '5' THEN 1 ELSE 0 END) as col5")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '1' THEN osmdlc ELSE 0 END), 0) as col1_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '2' THEN osmdlc ELSE 0 END), 0) as col2_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '3' THEN osmdlc ELSE 0 END), 0) as col3_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '4' THEN osmdlc ELSE 0 END), 0) as col4_sum")
+            ->selectRaw("COALESCE(SUM(CASE WHEN colbaru = '5' THEN osmdlc ELSE 0 END), 0) as col5_sum")
             ->first();
 
-        $lainCol1Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '1')->count();
-        $lainCol2Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '2')->count();
-        $lainCol3Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '3')->count();
-        $lainCol4Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '4')->count();
-        $lainCol5Count = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '5')->count();
-
-        $lainCol1Sum = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '1')->sum('osmdlc');
-        $lainCol2Sum = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '2')->sum('osmdlc');
-        $lainCol3Sum = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '3')->sum('osmdlc');
-        $lainCol4Sum = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '4')->sum('osmdlc');
-        $lainCol5Sum = $baseQuery()->whereNotIn('kdgroupdeb', $mappedCodes)->where('colbaru', '5')->sum('osmdlc');
-
-        $lainOutstanding = $lainResult->outstanding ?? 0;
-        $lainDisburse = $lainResult->disburse ?? 0;
-        $lainNoa = $lainResult->noa ?? 0;
-        $lainCif = $lainResult->cif ?? 0;
+        $lainOutstanding = (float) ($lainSummary->outstanding ?? 0);
+        $lainDisburse = (float) ($lainSummary->disburse ?? 0);
+        $lainNoa = (int) ($lainSummary->noa ?? 0);
+        $lainCif = (int) ($lainSummary->cif ?? 0);
+        $lainCol1Count = (int) ($lainSummary->col1 ?? 0);
+        $lainCol2Count = (int) ($lainSummary->col2 ?? 0);
+        $lainCol3Count = (int) ($lainSummary->col3 ?? 0);
+        $lainCol4Count = (int) ($lainSummary->col4 ?? 0);
+        $lainCol5Count = (int) ($lainSummary->col5 ?? 0);
+        $lainCol1Sum = (float) ($lainSummary->col1_sum ?? 0);
+        $lainCol2Sum = (float) ($lainSummary->col2_sum ?? 0);
+        $lainCol3Sum = (float) ($lainSummary->col3_sum ?? 0);
+        $lainCol4Sum = (float) ($lainSummary->col4_sum ?? 0);
+        $lainCol5Sum = (float) ($lainSummary->col5_sum ?? 0);
 
         if ($lainOutstanding > 0 || $lainDisburse > 0 || $lainNoa > 0) {
             $grandTotalOutstanding += $lainOutstanding;
@@ -3790,18 +4088,33 @@ class DashboardController extends Controller
             ];
         }
 
-        // Calculate total collectibility
-        $totalCol1Count = $baseQuery()->where('colbaru', '1')->count();
-        $totalCol2Count = $baseQuery()->where('colbaru', '2')->count();
-        $totalCol3Count = $baseQuery()->where('colbaru', '3')->count();
-        $totalCol4Count = $baseQuery()->where('colbaru', '4')->count();
-        $totalCol5Count = $baseQuery()->where('colbaru', '5')->count();
+        // Calculate total collectibility dari data yang sudah disusun (tanpa query tambahan).
+        $totalCol1Count = 0;
+        $totalCol2Count = 0;
+        $totalCol3Count = 0;
+        $totalCol4Count = 0;
+        $totalCol5Count = 0;
+        $totalCol1Sum = 0.0;
+        $totalCol2Sum = 0.0;
+        $totalCol3Sum = 0.0;
+        $totalCol4Sum = 0.0;
+        $totalCol5Sum = 0.0;
 
-        $totalCol1Sum = $baseQuery()->where('colbaru', '1')->sum('osmdlc');
-        $totalCol2Sum = $baseQuery()->where('colbaru', '2')->sum('osmdlc');
-        $totalCol3Sum = $baseQuery()->where('colbaru', '3')->sum('osmdlc');
-        $totalCol4Sum = $baseQuery()->where('colbaru', '4')->sum('osmdlc');
-        $totalCol5Sum = $baseQuery()->where('colbaru', '5')->sum('osmdlc');
+        foreach ($data as $segmentItem) {
+            if ($segmentItem['is_total']) {
+                continue;
+            }
+            $totalCol1Count += (int) ($segmentItem['col1'] ?? 0);
+            $totalCol2Count += (int) ($segmentItem['col2'] ?? 0);
+            $totalCol3Count += (int) ($segmentItem['col3'] ?? 0);
+            $totalCol4Count += (int) ($segmentItem['col4'] ?? 0);
+            $totalCol5Count += (int) ($segmentItem['col5'] ?? 0);
+            $totalCol1Sum += (float) ($segmentItem['col1_sum'] ?? 0);
+            $totalCol2Sum += (float) ($segmentItem['col2_sum'] ?? 0);
+            $totalCol3Sum += (float) ($segmentItem['col3_sum'] ?? 0);
+            $totalCol4Sum += (float) ($segmentItem['col4_sum'] ?? 0);
+            $totalCol5Sum += (float) ($segmentItem['col5_sum'] ?? 0);
+        }
 
         // Add TOTAL row
         $data[] = [

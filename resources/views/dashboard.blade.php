@@ -788,6 +788,7 @@ function formatNominal($amount) {
             'month' => $filterMonth ?? null,
             'year' => $filterYear ?? null,
             'range' => $range ?? null,
+            'group_by' => $segmentTableGroupBy ?? 'segmentasi',
         ];
 
         function formatLastUpdated($updatedAt) {
@@ -1800,7 +1801,16 @@ function formatNominal($amount) {
         <div class="col-12 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">📊 Tabel Segmentasi Outstanding & Disburse</h5>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="card-title mb-0">📊 Tabel Outstanding & Disburse</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-muted">Kelompokkan berdasarkan</small>
+                            <select id="segmentTableGroupBy" class="form-select form-select-sm" style="min-width: 220px;" onchange="updateSegmentTableGrouping(this.value)">
+                                <option value="segmentasi" {{ ($segmentTableGroupBy ?? 'segmentasi') === 'segmentasi' ? 'selected' : '' }}>Segmentasi</option>
+                                <option value="sektor_ekonomi" {{ ($segmentTableGroupBy ?? 'segmentasi') === 'sektor_ekonomi' ? 'selected' : '' }}>Sektor Ekonomi</option>
+                            </select>
+                        </div>
+                    </div>
                     <small class="text-muted d-block">
                         <i class="ti ti-calendar me-1"></i>
                         Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
@@ -1815,7 +1825,7 @@ function formatNominal($amount) {
                         <table class="table table-bordered mb-0">
                             <thead>
                                 <tr class="table-light">
-                                    <th colspan="2" rowspan="2" class="text-center align-middle">SEGMENTASI</th>
+                                    <th colspan="2" rowspan="2" class="text-center align-middle">{{ ($segmentTableGroupBy ?? 'segmentasi') === 'sektor_ekonomi' ? 'SEKTOR EKONOMI' : 'SEGMENTASI' }}</th>
                                     <th colspan="2" class="text-center bg-success text-white">DISBURSE</th>
                                     <th colspan="2" class="text-center bg-primary text-white">OUTSTANDING</th>
                                     <th colspan="5" class="text-center bg-warning text-dark">KOLEKTIBILITAS</th>
@@ -1835,7 +1845,7 @@ function formatNominal($amount) {
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($segmentasiData as $segment)
+                                @foreach($segmentTableData as $segment)
                                 <tr class="{{ $segment['is_total'] ? 'table-active fw-bold' : 'segment-row' }}"
                                     @if(!$segment['is_total'])
                                         data-category="{{ $segment['category'] }}"
@@ -1851,7 +1861,7 @@ function formatNominal($amount) {
                                         <td class="text-end">{{ number_format($segment['outstanding'], 0, ',', '.') }}</td>
                                         <td class="text-center">{{ number_format($segment['pct_outstanding'], 2) }}%</td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '1')"
+                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '1', '{{ $segmentTableGroupBy ?? 'segmentasi' }}')"
                                             title="Klik untuk melihat detail nasabah KOL 1">
                                             <div style="font-size: 14px;">
                                                 @if(($segment['col1_sum'] ?? 0) >= 1000000000)
@@ -1863,7 +1873,7 @@ function formatNominal($amount) {
                                             <small class="text-muted" style="font-size: 9px;">{{ $segment['col1'] ?? 0 }} NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '2')"
+                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '2', '{{ $segmentTableGroupBy ?? 'segmentasi' }}')"
                                             title="Klik untuk melihat detail nasabah KOL 2">
                                             <div style="font-size: 14px;">
                                                 @if(($segment['col2_sum'] ?? 0) >= 1000000000)
@@ -1875,7 +1885,7 @@ function formatNominal($amount) {
                                             <small class="text-muted" style="font-size: 9px;">{{ $segment['col2'] ?? 0 }} NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '3')"
+                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '3', '{{ $segmentTableGroupBy ?? 'segmentasi' }}')"
                                             title="Klik untuk melihat detail nasabah KOL 3">
                                             <div style="font-size: 14px;">
                                                 @if(($segment['col3_sum'] ?? 0) >= 1000000000)
@@ -1887,7 +1897,7 @@ function formatNominal($amount) {
                                             <small class="text-muted" style="font-size: 9px;">{{ $segment['col3'] ?? 0 }} NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '4')"
+                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '4', '{{ $segmentTableGroupBy ?? 'segmentasi' }}')"
                                             title="Klik untuk melihat detail nasabah KOL 4">
                                             <div style="font-size: 14px;">
                                                 @if(($segment['col4_sum'] ?? 0) >= 1000000000)
@@ -1899,7 +1909,7 @@ function formatNominal($amount) {
                                             <small class="text-muted" style="font-size: 9px;">{{ $segment['col4'] ?? 0 }} NOA</small>
                                         </td>
                                         <td class="text-center kol-cell" style="line-height: 1.2; cursor: pointer;"
-                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '5')"
+                                            onclick="showSegmentKolDetail(event, '{{ $segment['category'] }}', '{{ $segment['type'] }}', '5', '{{ $segmentTableGroupBy ?? 'segmentasi' }}')"
                                             title="Klik untuk melihat detail nasabah KOL 5">
                                             <div style="font-size: 14px;">
                                                 @if(($segment['col5_sum'] ?? 0) >= 1000000000)
@@ -2755,7 +2765,7 @@ window.getDashboardQueryParams = function() {
     const url = new URL(window.location.href);
     const params = new URLSearchParams();
     const defaults = window.__dashboardDefaults || {};
-    ['start_day', 'end_day', 'month', 'year', 'range'].forEach((key) => {
+    ['start_day', 'end_day', 'month', 'year', 'range', 'group_by'].forEach((key) => {
         let value = url.searchParams.get(key);
         if (value === null || value === '') {
             value = defaults[key] ?? null;
@@ -2780,6 +2790,12 @@ window.setDashboardRange = function(range) {
     url.searchParams.set('range', range);
     url.searchParams.delete('start_day');
     url.searchParams.delete('end_day');
+    window.location.href = url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '');
+};
+
+window.updateSegmentTableGrouping = function(groupBy) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('group_by', groupBy || 'segmentasi');
     window.location.href = url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '');
 };
 
@@ -3662,7 +3678,8 @@ function formatNominal(amount) {
             const category = this.getAttribute('data-category');
             const type = this.getAttribute('data-type');
             if (category && type) {
-                showSegmentDetail(category, type);
+                const groupBy = document.getElementById('segmentTableGroupBy')?.value || 'segmentasi';
+                showSegmentDetail(category, type, groupBy);
             }
         });
     });
@@ -3693,7 +3710,7 @@ function formatNominal(amount) {
 });
 
 // Function untuk menampilkan detail segmentasi
-function showSegmentDetail(category, type) {
+function showSegmentDetail(category, type, groupBy = 'segmentasi') {
     const modalElement = document.getElementById('segmentDetailModal');
     if (!modalElement) return;
 
@@ -3717,6 +3734,7 @@ function showSegmentDetail(category, type) {
     if (endDay) params.push('end_day=' + endDay);
     if (month) params.push('month=' + month);
     if (year) params.push('year=' + year);
+    params.push('group_by=' + encodeURIComponent(groupBy));
     if (params.length > 0) {
         url += '?' + params.join('&');
     }
@@ -3773,7 +3791,7 @@ function showSegmentDetail(category, type) {
 }
 
 // Function untuk menampilkan detail nasabah per kolektibilitas dan segmentasi
-function showSegmentKolDetail(event, category, type, kolValue) {
+function showSegmentKolDetail(event, category, type, kolValue, groupBy = 'segmentasi') {
     // Stop event propagation to prevent row click event
     if (event) {
         event.stopPropagation();
@@ -3820,6 +3838,7 @@ function showSegmentKolDetail(event, category, type, kolValue) {
     if (endDay) params.push('end_day=' + endDay);
     if (month) params.push('month=' + month);
     if (year) params.push('year=' + year);
+    params.push('group_by=' + encodeURIComponent(groupBy));
     if (params.length > 0) {
         url += '?' + params.join('&');
     }
