@@ -71,6 +71,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Export Routes
     Route::get('/export/dashboard', [ExportController::class, 'exportDashboard'])->name('export.dashboard');
+    Route::get('/export/data', [ExportController::class, 'showDataExportForm'])->name('export.data.form');
+    Route::post('/export/data', [ExportController::class, 'exportSelectedData'])->name('export.data.download');
     Route::get('/api/financial-highlights/calculate', [FinancialHighlightController::class, 'calculateDerivedValues'])->name('financial-highlights.calculate');
 
     // TEMPORARY: Simple test route

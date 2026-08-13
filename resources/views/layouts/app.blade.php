@@ -124,6 +124,13 @@
 
                     @endif
 
+                    <li class="menu-item {{ request()->is('export/data*') ? 'active' : '' }}">
+                        <a href="{{ route('export.data.form') }}" class="menu-link">
+                            <i class="menu-icon tf-icons ti ti-file-export"></i>
+                            <div data-i18n="Export Data">Export Data</div>
+                        </a>
+                    </li>
+
 
                     <!-- User Settings (hanya untuk admin) -->
                     @if(auth()->user()->role === 'admin')

@@ -7,8 +7,11 @@ use App\Models\Tabungan;
 use App\Models\Deposito;
 use App\Models\FinancialMetricPrediction;
 use App\Models\Linkage;
+use App\Services\FinancialCacheService;
+use Closure;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -39,7 +42,6 @@ class DashboardController extends Controller
         $startDay = $startDay !== null && $startDay !== '' ? (string)$startDay : null;
         $endDay = $endDay !== null && $endDay !== '' ? (string)$endDay : null;
 
-        // Explicit day-range takes precedence over range.
         if ($startDay || $endDay) {
             if (!ctype_digit((string)$filterYear) || !ctype_digit((string)$filterMonth)) {
                 return [null, null];
@@ -115,6 +117,44 @@ class DashboardController extends Controller
         }
 
         return $query;
+    }
+
+    private function buildDashboardRenderCacheKey(array $parts): string
+    {
+        ksort($parts);
+
+        return 'dashboard:render:' . md5(json_encode($parts));
+    }
+
+    private function getLatestPembiayaanPeriod()
+    {
+        return Cache::remember('dashboard:latest-period', now()->addMinutes(30), function () {
+            return Pembiayaan::query()
+                ->select('period_year', 'period_month')
+                ->whereNotNull('period_year')
+                ->whereNotNull('period_month')
+                ->orderByRaw('(period_year * 100 + period_month) DESC')
+                ->first();
+        });
+    }
+
+    private function rememberDashboardJson(string $scope, array $parts, Closure $resolver, int $ttlMinutes = 15)
+    {
+        $parts['scope'] = $scope;
+        $parts['version'] = app(FinancialCacheService::class)->getDashboardRenderVersion();
+
+        $cacheKey = $this->buildDashboardRenderCacheKey($parts);
+        $cachedPayload = Cache::get($cacheKey);
+        if (is_array($cachedPayload)) {
+            return response()->json($cachedPayload);
+        }
+
+        $payload = $resolver();
+        if (is_array($payload)) {
+            Cache::put($cacheKey, $payload, now()->addMinutes($ttlMinutes));
+        }
+
+        return response()->json($payload);
     }
 
     private function getAoMapping(): array
@@ -208,12 +248,14 @@ class DashboardController extends Controller
         $endDay      = $request->input('end_day',   '');
 
         if (! $filterMonth || ! $filterYear) {
-            $latest = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
+            $latest = Cache::remember('dashboard:latest-period', now()->addMinutes(30), function () {
+                return Pembiayaan::query()
+                    ->select('period_year', 'period_month')
+                    ->whereNotNull('period_year')
+                    ->whereNotNull('period_month')
+                    ->orderByRaw('(period_year * 100 + period_month) DESC')
+                    ->first();
+            });
 
             $filterMonth = $filterMonth ?: str_pad((string)(int)($latest?->period_month ?: date('m')), 2, '0', STR_PAD_LEFT);
             $filterYear  = $filterYear  ?: (string)($latest?->period_year ?: date('Y'));
@@ -317,6 +359,24 @@ class DashboardController extends Controller
                 return response()->json(['redirect' => $redirectUrl]);
             }
             return redirect()->to($redirectUrl);
+        }
+
+        $dashboardRenderVersion = app(FinancialCacheService::class)->getDashboardRenderVersion();
+
+        $dashboardCacheKey = $this->buildDashboardRenderCacheKey([
+            'user_id' => Auth::id(),
+            'month' => $filterMonth,
+            'year' => $filterYear,
+            'range' => $range,
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'group_by' => $request->input('group_by', 'segmentasi'),
+            'version' => $dashboardRenderVersion,
+        ]);
+
+        $cachedPayload = Cache::get($dashboardCacheKey);
+        if (is_array($cachedPayload)) {
+            return response()->json($cachedPayload);
         }
 
         // Build base query with combined filters
@@ -1531,11 +1591,15 @@ class DashboardController extends Controller
             'segmentTableGroupBy'
         ))->renderSections();
 
-        return response()->json([
+        $payload = [
             'html'    => $sections['content'] ?? '',
             'styles'  => $sections['styles']  ?? '',
             'scripts' => $sections['scripts'] ?? '',
-        ]);
+        ];
+
+        Cache::put($dashboardCacheKey, $payload, now()->addMinutes(15));
+
+        return response()->json($payload);
     }
 
     private function getNasabahStatusData($startDay, $endDay, $filterMonth, $filterYear)
@@ -1891,157 +1955,165 @@ class DashboardController extends Controller
         $kategori = $request->input('kategori');
         $type = $request->input('type', 'nominal'); // nominal or jumlah
 
-        $data = collect();
-        $total = 0;
+        return $this->rememberDashboardJson('trend-funding-detail', [
+            'month' => $month,
+            'year' => $year,
+            'kategori' => $kategori,
+            'type' => $type,
+        ], function () use ($month, $year, $kategori, $type) {
 
-        if ($kategori === 'tabungan') {
-            if ($type === 'nominal') {
-                $data = Tabungan::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
-                    ->orderBy('sahirrp', 'desc')
-                    ->limit(100) // Limit to prevent encoding issues
-                    ->get();
-                $total = $data->sum('nominal');
-            } else {
-                $data = Tabungan::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
-                    ->limit(100)
-                    ->get();
-                $total = $data->count();
-            }
-        } elseif ($kategori === 'deposito') {
-            if ($type === 'nominal') {
-                $data = Deposito::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
-                    ->orderBy('nomrp', 'desc')
-                    ->limit(100)
-                    ->get();
-                $total = $data->sum('nominal');
-            } else {
-                $data = Deposito::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
-                    ->limit(100)
-                    ->get();
-                $total = $data->count();
-            }
-        } elseif ($kategori === 'total_funding') {
-            // Combine tabungan and deposito
-            $tabunganData = Tabungan::where('period_month', $month)
-                ->where('period_year', $year)
-                ->selectRaw("'Tabungan' as jenis, notab as no_rek, fnama as nama, sahirrp as nominal, tgltrnakh as tanggal")
-                ->limit(50)
-                ->get();
+            $data = collect();
+            $total = 0;
 
-            $depositoData = Deposito::where('period_month', $month)
-                ->where('period_year', $year)
-                ->selectRaw("'Deposito' as jenis, nobilyet as no_rek, nama, nomrp as nominal, tglbuka as tanggal")
-                ->limit(50)
-                ->get();
-
-            $data = $tabunganData->concat($depositoData);
-
-            if ($type === 'nominal') {
-                $data = $data->sortByDesc('nominal');
-                $total = $data->sum('nominal');
-            } else {
-                $total = $data->count();
-            }
-        } elseif ($kategori === 'pencairan_deposito') {
-            // Pencairan deposito - deposito yang ada di bulan sebelumnya tapi tidak ada di bulan ini
-            $prevMonth = $month == '01' ? '12' : str_pad($month - 1, 2, '0', STR_PAD_LEFT);
-            $prevYear = $month == '01' ? $year - 1 : $year;
-
-            $data = DB::table('depositos as prev')
-                ->leftJoin('depositos as curr', function ($join) use ($month, $year) {
-                    $join->on('prev.nobilyet', '=', 'curr.nobilyet')
-                        ->where('curr.period_month', $month)
-                        ->where('curr.period_year', $year);
-                })
-                ->where('prev.period_month', $prevMonth)
-                ->where('prev.period_year', $prevYear)
-                ->whereNull('curr.nobilyet')
-                ->select('prev.nobilyet', 'prev.nama', 'prev.nomrp', 'prev.tgleff as tglcair')
-                ->orderBy('prev.nomrp', 'desc')
-                ->get();
-
-            if ($type === 'nominal') {
-                $total = $data->sum('nomrp');
-            } else {
-                $total = $data->count();
-            }
-        } elseif (str_starts_with($kategori, 'linkage_')) {
-            // Handle linkage categories
-            $sumberDana = null;
-            if ($kategori === 'linkage_dana1') $sumberDana = 'Dana Pihak 1';
-            elseif ($kategori === 'linkage_dana2') $sumberDana = 'Dana Pihak 2';
-            elseif ($kategori === 'linkage_dana3') $sumberDana = 'Dana Pihak 3';
-
-            if ($sumberDana) {
-                // Specific dana pihak
-                $data = Linkage::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
-                    ->orderBy('plafon', 'desc')
-                    ->limit(100)
-                    ->get();
-            } elseif ($kategori === 'linkage_total') {
-                // All linkage data
-                $data = Linkage::where('period_month', $month)
-                    ->where('period_year', $year)
-                    ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
-                    ->orderBy('plafon', 'desc')
-                    ->limit(100)
-                    ->get();
-            } else {
-                // Specific linkage type (tabungan, deposito, pembiayaan)
-                $linkageType = str_replace('linkage_', '', $kategori);
-                if ($linkageType === 'tabungan') {
+            if ($kategori === 'tabungan') {
+                if ($type === 'nominal') {
                     $data = Tabungan::where('period_month', $month)
                         ->where('period_year', $year)
-                        ->where('linkage', '>', 0)
-                        ->select('notab as norek', 'fnama as nama', 'linkage as nominal', 'tgltrnakh as tgleff', 'kodeprd')
-                        ->orderBy('linkage', 'desc')
+                        ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
+                        ->orderBy('sahirrp', 'desc')
+                        ->limit(100) // Limit to prevent encoding issues
+                        ->get();
+                    $total = $data->sum('nominal');
+                } else {
+                    $data = Tabungan::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->select('notab as account', 'fnama as nama', 'sahirrp as nominal', 'tgltrnakh as tgleff', 'kodeprd')
                         ->limit(100)
                         ->get();
-                } elseif ($linkageType === 'deposito') {
+                    $total = $data->count();
+                }
+            } elseif ($kategori === 'deposito') {
+                if ($type === 'nominal') {
                     $data = Deposito::where('period_month', $month)
                         ->where('period_year', $year)
-                        ->where('linkage', '>', 0)
-                        ->select('nobilyet as norek', 'nama', 'linkage as nominal', 'tgleff', 'kdprd')
-                        ->orderBy('linkage', 'desc')
+                        ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
+                        ->orderBy('nomrp', 'desc')
                         ->limit(100)
                         ->get();
-                } elseif ($linkageType === 'pembiayaan') {
-                    $data = Pembiayaan::where('period_month', $month)
+                    $total = $data->sum('nominal');
+                } else {
+                    $data = Deposito::where('period_month', $month)
                         ->where('period_year', $year)
-                        ->where('linkage', '>', 0)
-                        ->select('nokontrak as norek', 'nama', 'linkage as nominal', 'tgleff', 'kelompok', 'jnsakad')
-                        ->orderBy('linkage', 'desc')
+                        ->select('nobilyet as account', 'nama', 'nomrp as nominal', 'jkwaktu as jw', 'tglbuka as tgleff', 'kdprd')
                         ->limit(100)
                         ->get();
+                    $total = $data->count();
+                }
+            } elseif ($kategori === 'total_funding') {
+                // Combine tabungan and deposito
+                $tabunganData = Tabungan::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->selectRaw("'Tabungan' as jenis, notab as no_rek, fnama as nama, sahirrp as nominal, tgltrnakh as tanggal")
+                    ->limit(50)
+                    ->get();
+
+                $depositoData = Deposito::where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->selectRaw("'Deposito' as jenis, nobilyet as no_rek, nama, nomrp as nominal, tglbuka as tanggal")
+                    ->limit(50)
+                    ->get();
+
+                $data = $tabunganData->concat($depositoData);
+
+                if ($type === 'nominal') {
+                    $data = $data->sortByDesc('nominal');
+                    $total = $data->sum('nominal');
+                } else {
+                    $total = $data->count();
+                }
+            } elseif ($kategori === 'pencairan_deposito') {
+                // Pencairan deposito - deposito yang ada di bulan sebelumnya tapi tidak ada di bulan ini
+                $prevMonth = $month == '01' ? '12' : str_pad($month - 1, 2, '0', STR_PAD_LEFT);
+                $prevYear = $month == '01' ? $year - 1 : $year;
+
+                $data = DB::table('depositos as prev')
+                    ->leftJoin('depositos as curr', function ($join) use ($month, $year) {
+                        $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                            ->where('curr.period_month', $month)
+                            ->where('curr.period_year', $year);
+                    })
+                    ->where('prev.period_month', $prevMonth)
+                    ->where('prev.period_year', $prevYear)
+                    ->whereNull('curr.nobilyet')
+                    ->select('prev.nobilyet', 'prev.nama', 'prev.nomrp', 'prev.tgleff as tglcair')
+                    ->orderBy('prev.nomrp', 'desc')
+                    ->get();
+
+                if ($type === 'nominal') {
+                    $total = $data->sum('nomrp');
+                } else {
+                    $total = $data->count();
+                }
+            } elseif (str_starts_with($kategori, 'linkage_')) {
+                // Handle linkage categories
+                $sumberDana = null;
+                if ($kategori === 'linkage_dana1') $sumberDana = 'Dana Pihak 1';
+                elseif ($kategori === 'linkage_dana2') $sumberDana = 'Dana Pihak 2';
+                elseif ($kategori === 'linkage_dana3') $sumberDana = 'Dana Pihak 3';
+
+                if ($sumberDana) {
+                    // Specific dana pihak
+                    $data = Linkage::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
+                        ->orderBy('plafon', 'desc')
+                        ->limit(100)
+                        ->get();
+                } elseif ($kategori === 'linkage_total') {
+                    // All linkage data
+                    $data = Linkage::where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->select('nokontrak as norek', 'nama', 'plafon', 'tgleff', 'kelompok', 'jnsakad')
+                        ->orderBy('plafon', 'desc')
+                        ->limit(100)
+                        ->get();
+                } else {
+                    // Specific linkage type (tabungan, deposito, pembiayaan)
+                    $linkageType = str_replace('linkage_', '', $kategori);
+                    if ($linkageType === 'tabungan') {
+                        $data = Tabungan::where('period_month', $month)
+                            ->where('period_year', $year)
+                            ->where('linkage', '>', 0)
+                            ->select('notab as norek', 'fnama as nama', 'linkage as nominal', 'tgltrnakh as tgleff', 'kodeprd')
+                            ->orderBy('linkage', 'desc')
+                            ->limit(100)
+                            ->get();
+                    } elseif ($linkageType === 'deposito') {
+                        $data = Deposito::where('period_month', $month)
+                            ->where('period_year', $year)
+                            ->where('linkage', '>', 0)
+                            ->select('nobilyet as norek', 'nama', 'linkage as nominal', 'tgleff', 'kdprd')
+                            ->orderBy('linkage', 'desc')
+                            ->limit(100)
+                            ->get();
+                    } elseif ($linkageType === 'pembiayaan') {
+                        $data = Pembiayaan::where('period_month', $month)
+                            ->where('period_year', $year)
+                            ->where('linkage', '>', 0)
+                            ->select('nokontrak as norek', 'nama', 'linkage as nominal', 'tgleff', 'kelompok', 'jnsakad')
+                            ->orderBy('linkage', 'desc')
+                            ->limit(100)
+                            ->get();
+                    }
+                }
+
+                if ($type === 'nominal') {
+                    $total = $data->sum('nominal') ?? $data->sum('plafon') ?? 0;
+                } else {
+                    $total = $data->count();
                 }
             }
 
-            if ($type === 'nominal') {
-                $total = $data->sum('nominal') ?? $data->sum('plafon') ?? 0;
-            } else {
-                $total = $data->count();
-            }
-        }
-
-        return response()->json([
-            'summary' => [
-                'total_nasabah' => $type === 'nominal' ? $data->count() : $data->count(),
-                'total_nominal' => $total
-            ],
-            'nasabah' => $data->toArray(),
-            'total' => $total,
-            'type' => $type
-        ]);
+            return [
+                'summary' => [
+                    'total_nasabah' => $type === 'nominal' ? $data->count() : $data->count(),
+                    'total_nominal' => $total
+                ],
+                'nasabah' => $data->toArray(),
+                'total' => $total,
+                'type' => $type
+            ];
+        }, 20);
     }
 
     public function getTrendProductDetail(Request $request)
@@ -2073,251 +2145,255 @@ class DashboardController extends Controller
         $endYear = (is_string($filterYear) && ctype_digit($filterYear)) ? (int)$filterYear : null;
         $endMonth = (is_string($filterMonth) && ctype_digit($filterMonth)) ? (int)$filterMonth : null;
 
-        // If month/year aren't provided, fall back to the latest available pembiayaan snapshot.
-        if ($endYear === null || $endMonth === null) {
-            $latestPeriod = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
-
-            $endYear = (int)($latestPeriod?->period_year ?: now()->year);
-            $endMonth = (int)($latestPeriod?->period_month ?: now()->month);
-        }
-
-        $periodStartKey = null;
-        $periodEndKey = null;
-
-        $rangeMonths = $rangeMonthsMap[$range];
-        if ($range === 'ytd' || $rangeMonths !== null) {
-            $endDate = Carbon::createFromDate($endYear, $endMonth, 1)->startOfMonth();
-            if ($range === 'ytd') {
-                $startDate = Carbon::createFromDate($endYear, 1, 1)->startOfMonth();
-            } else {
-                $startDate = (clone $endDate)->subMonthsNoOverflow(max(0, (int)$rangeMonths - 1));
-            }
-
-            $periodStartKey = ((int)$startDate->format('Y')) * 100 + (int)$startDate->format('m');
-            $periodEndKey = ((int)$endDate->format('Y')) * 100 + (int)$endDate->format('m');
-        }
-
-        $data = [];
-
-        if ($jenis === 'tabungan') {
-            // Get tabungan data grouped by kodeprd and period
-            $query = Tabungan::select(
-                'kodeprd',
-                'period_year',
-                'period_month',
-                DB::raw('SUM(sahirrp) as total_nominal'),
-                DB::raw('COUNT(*) as total_rekening')
-            )
-                ->whereNotNull('kodeprd')
-                ->where('kodeprd', '!=', '')
-                ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
-                })
-                ->groupBy('kodeprd', 'period_year', 'period_month')
-                ->orderBy('period_year', 'desc')
-                ->orderBy('period_month', 'desc');
-
-            $results = $query->get();
-
-            // Group by kodeprd
-            $groupedData = [];
-            foreach ($results as $result) {
-                $kodeprd = $result->kodeprd;
-                if (!isset($groupedData[$kodeprd])) {
-                    $groupedData[$kodeprd] = [
-                        'kodeprd' => $kodeprd,
-                        'data' => []
-                    ];
-                }
-
-                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
-                $groupedData[$kodeprd]['data'][$monthKey] = [
-                    'nominal' => (float) $result->total_nominal,
-                    'jumlah' => (int) $result->total_rekening
-                ];
-            }
-
-            $data = array_values($groupedData);
-        } elseif ($jenis === 'deposito') {
-            // Get deposito data grouped by kdprd and period
-            $query = Deposito::select(
-                'kdprd',
-                'period_year',
-                'period_month',
-                DB::raw('SUM(nomrp) as total_nominal'),
-                DB::raw('COUNT(*) as total_rekening')
-            )
-                ->whereNotNull('kdprd')
-                ->where('kdprd', '!=', '')
-                ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
-                })
-                ->groupBy('kdprd', 'period_year', 'period_month')
-                ->orderBy('period_year', 'desc')
-                ->orderBy('period_month', 'desc');
-
-            $results = $query->get();
-
-            // Group by kdprd
-            $groupedData = [];
-            foreach ($results as $result) {
-                $kdprd = $result->kdprd;
-                if (!isset($groupedData[$kdprd])) {
-                    $groupedData[$kdprd] = [
-                        'kdprd' => $kdprd,
-                        'data' => []
-                    ];
-                }
-
-                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
-                $groupedData[$kdprd]['data'][$monthKey] = [
-                    'nominal' => (float) $result->total_nominal,
-                    'jumlah' => (int) $result->total_rekening
-                ];
-            }
-
-            $data = array_values($groupedData);
-        } elseif ($jenis === 'pembiayaan') {
-            // Get pembiayaan data grouped by kelompok and period
-            $query = Pembiayaan::select(
-                'kelompok',
-                'period_year',
-                'period_month',
-                DB::raw('SUM(plafon) as total_nominal'),
-                DB::raw('COUNT(*) as total_rekening')
-            )
-                ->whereNotNull('kelompok')
-                ->where('kelompok', '!=', '')
-                ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
-                })
-                ->groupBy('kelompok', 'period_year', 'period_month')
-                ->orderBy('period_year', 'desc')
-                ->orderBy('period_month', 'desc');
-
-            $results = $query->get();
-
-            // Group by kelompok
-            $groupedData = [];
-            foreach ($results as $result) {
-                $kelompok = $result->kelompok;
-                if (!isset($groupedData[$kelompok])) {
-                    $groupedData[$kelompok] = [
-                        'kelompok' => $kelompok,
-                        'data' => []
-                    ];
-                }
-
-                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
-                $groupedData[$kelompok]['data'][$monthKey] = [
-                    'nominal' => (float) $result->total_nominal,
-                    'jumlah' => (int) $result->total_rekening
-                ];
-            }
-
-            $data = array_values($groupedData);
-        } elseif ($jenis === 'linkage') {
-            // Get linkage data grouped by kelompok and period
-            $query = Linkage::select(
-                'kelompok',
-                'period_year',
-                'period_month',
-                DB::raw('SUM(plafon) as total_nominal'),
-                DB::raw('COUNT(*) as total_rekening')
-            )
-                ->whereNotNull('kelompok')
-                ->where('kelompok', '!=', '')
-                ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
-                })
-                ->groupBy('kelompok', 'period_year', 'period_month')
-                ->orderBy('period_year', 'desc')
-                ->orderBy('period_month', 'desc');
-
-            $results = $query->get();
-
-            // Group by kelompok
-            $groupedData = [];
-            foreach ($results as $result) {
-                $kelompok = $result->kelompok;
-                if (!isset($groupedData[$kelompok])) {
-                    $groupedData[$kelompok] = [
-                        'kelompok' => $kelompok,
-                        'data' => []
-                    ];
-                }
-
-                $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
-                $groupedData[$kelompok]['data'][$monthKey] = [
-                    'nominal' => (float) $result->total_nominal,
-                    'jumlah' => (int) $result->total_rekening
-                ];
-            }
-
-            $data = array_values($groupedData);
-        } elseif ($jenis === 'pencairan_deposito') {
-            // Get pencairan deposito data - deposits that existed in previous period but not in current period
-            // This matches the logic used in the main funding trend chart
-            $query = DB::table('depositos')
-                ->select('period_year', 'period_month')
-                ->distinct()
-                ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
-                    return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
-                })
-                ->orderBy('period_year', 'desc')
-                ->orderBy('period_month', 'desc')
-                ->get();
-
-            $groupedData = [];
-            foreach ($query as $period) {
-                $currentYear = $period->period_year;
-                $currentMonth = $period->period_month;
-
-                // Calculate previous period
-                $prevMonth = $currentMonth == '01' ? '12' : str_pad($currentMonth - 1, 2, '0', STR_PAD_LEFT);
-                $prevYear = $currentMonth == '01' ? $currentYear - 1 : $currentYear;
-
-                // Query pencairan deposito for this period (deposits from previous period that don't exist in current period)
-                $pencairan = DB::table('depositos as prev')
-                    ->leftJoin('depositos as curr', function ($join) use ($currentMonth, $currentYear) {
-                        $join->on('prev.nobilyet', '=', 'curr.nobilyet')
-                            ->where('curr.period_month', $currentMonth)
-                            ->where('curr.period_year', $currentYear);
-                    })
-                    ->where('prev.period_month', $prevMonth)
-                    ->where('prev.period_year', $prevYear)
-                    ->whereNull('curr.nobilyet')
-                    ->select(
-                        DB::raw('COUNT(*) as jumlah'),
-                        DB::raw('SUM(prev.nomrp) as total')
-                    )
-                    ->first();
-
-                $monthKey = $currentYear . '-' . str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                $groupedData[$monthKey] = [
-                    'kdprd' => 'PENCAIRAN', // Use a fixed product code for pencairan
-                    'data' => [
-                        $monthKey => [
-                            'nominal' => (float) ($pencairan->total ?? 0),
-                            'jumlah' => (int) ($pencairan->jumlah ?? 0)
-                        ]
-                    ]
-                ];
-            }
-
-            $data = array_values($groupedData);
-        }
-
-        return response()->json([
-            'data' => $data,
+        return $this->rememberDashboardJson('trend-product-detail', [
             'jenis' => $jenis,
-            'type' => $type
-        ]);
+            'type' => $type,
+            'range' => $range,
+            'month' => $filterMonth,
+            'year' => $filterYear,
+        ], function () use ($jenis, $type, $range, $rangeMonthsMap, $filterMonth, $filterYear, $endYear, $endMonth) {
+
+            // If month/year aren't provided, fall back to the latest available pembiayaan snapshot.
+            if ($endYear === null || $endMonth === null) {
+                $latestPeriod = $this->getLatestPembiayaanPeriod();
+
+                $endYear = (int)($latestPeriod?->period_year ?: now()->year);
+                $endMonth = (int)($latestPeriod?->period_month ?: now()->month);
+            }
+
+            $periodStartKey = null;
+            $periodEndKey = null;
+
+            $rangeMonths = $rangeMonthsMap[$range];
+            if ($range === 'ytd' || $rangeMonths !== null) {
+                $endDate = Carbon::createFromDate($endYear, $endMonth, 1)->startOfMonth();
+                if ($range === 'ytd') {
+                    $startDate = Carbon::createFromDate($endYear, 1, 1)->startOfMonth();
+                } else {
+                    $startDate = (clone $endDate)->subMonthsNoOverflow(max(0, (int)$rangeMonths - 1));
+                }
+
+                $periodStartKey = ((int)$startDate->format('Y')) * 100 + (int)$startDate->format('m');
+                $periodEndKey = ((int)$endDate->format('Y')) * 100 + (int)$endDate->format('m');
+            }
+
+            $data = [];
+
+            if ($jenis === 'tabungan') {
+                // Get tabungan data grouped by kodeprd and period
+                $query = Tabungan::select(
+                    'kodeprd',
+                    'period_year',
+                    'period_month',
+                    DB::raw('SUM(sahirrp) as total_nominal'),
+                    DB::raw('COUNT(*) as total_rekening')
+                )
+                    ->whereNotNull('kodeprd')
+                    ->where('kodeprd', '!=', '')
+                    ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
+                        return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    })
+                    ->groupBy('kodeprd', 'period_year', 'period_month')
+                    ->orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc');
+
+                $results = $query->get();
+
+                // Group by kodeprd
+                $groupedData = [];
+                foreach ($results as $result) {
+                    $kodeprd = $result->kodeprd;
+                    if (!isset($groupedData[$kodeprd])) {
+                        $groupedData[$kodeprd] = [
+                            'kodeprd' => $kodeprd,
+                            'data' => []
+                        ];
+                    }
+
+                    $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                    $groupedData[$kodeprd]['data'][$monthKey] = [
+                        'nominal' => (float) $result->total_nominal,
+                        'jumlah' => (int) $result->total_rekening
+                    ];
+                }
+
+                $data = array_values($groupedData);
+            } elseif ($jenis === 'deposito') {
+                // Get deposito data grouped by kdprd and period
+                $query = Deposito::select(
+                    'kdprd',
+                    'period_year',
+                    'period_month',
+                    DB::raw('SUM(nomrp) as total_nominal'),
+                    DB::raw('COUNT(*) as total_rekening')
+                )
+                    ->whereNotNull('kdprd')
+                    ->where('kdprd', '!=', '')
+                    ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
+                        return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    })
+                    ->groupBy('kdprd', 'period_year', 'period_month')
+                    ->orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc');
+
+                $results = $query->get();
+
+                // Group by kdprd
+                $groupedData = [];
+                foreach ($results as $result) {
+                    $kdprd = $result->kdprd;
+                    if (!isset($groupedData[$kdprd])) {
+                        $groupedData[$kdprd] = [
+                            'kdprd' => $kdprd,
+                            'data' => []
+                        ];
+                    }
+
+                    $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                    $groupedData[$kdprd]['data'][$monthKey] = [
+                        'nominal' => (float) $result->total_nominal,
+                        'jumlah' => (int) $result->total_rekening
+                    ];
+                }
+
+                $data = array_values($groupedData);
+            } elseif ($jenis === 'pembiayaan') {
+                // Get pembiayaan data grouped by kelompok and period
+                $query = Pembiayaan::select(
+                    'kelompok',
+                    'period_year',
+                    'period_month',
+                    DB::raw('SUM(plafon) as total_nominal'),
+                    DB::raw('COUNT(*) as total_rekening')
+                )
+                    ->whereNotNull('kelompok')
+                    ->where('kelompok', '!=', '')
+                    ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
+                        return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    })
+                    ->groupBy('kelompok', 'period_year', 'period_month')
+                    ->orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc');
+
+                $results = $query->get();
+
+                // Group by kelompok
+                $groupedData = [];
+                foreach ($results as $result) {
+                    $kelompok = $result->kelompok;
+                    if (!isset($groupedData[$kelompok])) {
+                        $groupedData[$kelompok] = [
+                            'kelompok' => $kelompok,
+                            'data' => []
+                        ];
+                    }
+
+                    $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                    $groupedData[$kelompok]['data'][$monthKey] = [
+                        'nominal' => (float) $result->total_nominal,
+                        'jumlah' => (int) $result->total_rekening
+                    ];
+                }
+
+                $data = array_values($groupedData);
+            } elseif ($jenis === 'linkage') {
+                // Get linkage data grouped by kelompok and period
+                $query = Linkage::select(
+                    'kelompok',
+                    'period_year',
+                    'period_month',
+                    DB::raw('SUM(plafon) as total_nominal'),
+                    DB::raw('COUNT(*) as total_rekening')
+                )
+                    ->whereNotNull('kelompok')
+                    ->where('kelompok', '!=', '')
+                    ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
+                        return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    })
+                    ->groupBy('kelompok', 'period_year', 'period_month')
+                    ->orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc');
+
+                $results = $query->get();
+
+                // Group by kelompok
+                $groupedData = [];
+                foreach ($results as $result) {
+                    $kelompok = $result->kelompok;
+                    if (!isset($groupedData[$kelompok])) {
+                        $groupedData[$kelompok] = [
+                            'kelompok' => $kelompok,
+                            'data' => []
+                        ];
+                    }
+
+                    $monthKey = $result->period_year . '-' . str_pad($result->period_month, 2, '0', STR_PAD_LEFT);
+                    $groupedData[$kelompok]['data'][$monthKey] = [
+                        'nominal' => (float) $result->total_nominal,
+                        'jumlah' => (int) $result->total_rekening
+                    ];
+                }
+
+                $data = array_values($groupedData);
+            } elseif ($jenis === 'pencairan_deposito') {
+                // Get pencairan deposito data - deposits that existed in previous period but not in current period
+                // This matches the logic used in the main funding trend chart
+                $query = DB::table('depositos')
+                    ->select('period_year', 'period_month')
+                    ->distinct()
+                    ->when($periodStartKey !== null && $periodEndKey !== null, function ($q) use ($periodStartKey, $periodEndKey) {
+                        return $q->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey]);
+                    })
+                    ->orderBy('period_year', 'desc')
+                    ->orderBy('period_month', 'desc')
+                    ->get();
+
+                $groupedData = [];
+                foreach ($query as $period) {
+                    $currentYear = $period->period_year;
+                    $currentMonth = $period->period_month;
+
+                    // Calculate previous period
+                    $prevMonth = $currentMonth == '01' ? '12' : str_pad($currentMonth - 1, 2, '0', STR_PAD_LEFT);
+                    $prevYear = $currentMonth == '01' ? $currentYear - 1 : $currentYear;
+
+                    // Query pencairan deposito for this period (deposits from previous period that don't exist in current period)
+                    $pencairan = DB::table('depositos as prev')
+                        ->leftJoin('depositos as curr', function ($join) use ($currentMonth, $currentYear) {
+                            $join->on('prev.nobilyet', '=', 'curr.nobilyet')
+                                ->where('curr.period_month', $currentMonth)
+                                ->where('curr.period_year', $currentYear);
+                        })
+                        ->where('prev.period_month', $prevMonth)
+                        ->where('prev.period_year', $prevYear)
+                        ->whereNull('curr.nobilyet')
+                        ->select(
+                            DB::raw('COUNT(*) as jumlah'),
+                            DB::raw('SUM(prev.nomrp) as total')
+                        )
+                        ->first();
+
+                    $monthKey = $currentYear . '-' . str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                    $groupedData[$monthKey] = [
+                        'kdprd' => 'PENCAIRAN', // Use a fixed product code for pencairan
+                        'data' => [
+                            $monthKey => [
+                                'nominal' => (float) ($pencairan->total ?? 0),
+                                'jumlah' => (int) ($pencairan->jumlah ?? 0)
+                            ]
+                        ]
+                    ];
+                }
+
+                $data = array_values($groupedData);
+            }
+
+            return [
+                'data' => $data,
+                'jenis' => $jenis,
+                'type' => $type
+            ];
+        }, 20);
     }
 
     public function displayBoard(Request $request)
@@ -3209,44 +3285,54 @@ class DashboardController extends Controller
         $filterYear = request('year', now()->year);
         $range = $this->normalizeDashboardRange(request('range', 'all'));
 
-        $query = Pembiayaan::query()
-            ->where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
-
-        [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
-        $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
-
-        // Filter by kecamatan
-        $query->where('kecamatan', $kecamatan);
-
-        $details = $query
-            ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'kdaoh', 'nmao', 'kecamatan')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'nokontrak' => $item->nokontrak,
-                    'nama' => $item->nama,
-                    'osmdlc' => $item->osmdlc,
-                    'mdlawal' => $item->mdlawal,
-                    'colbaru' => $item->colbaru,
-                    'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
-                    'kdgroupdeb' => $item->kdgroupdeb,
-                    'nmao' => $item->nmao ?? '-',
-                    'kecamatan' => $item->kecamatan
-                ];
-            });
-
-        $summary = [
-            'total_outstanding' => $details->sum('osmdlc'),
-            'total_disburse' => $details->sum('mdlawal'),
-            'total_kontrak' => $details->count()
-        ];
-
-        return response()->json([
+        return $this->rememberDashboardJson('kecamatan-detail', [
             'kecamatan' => $kecamatan,
-            'summary' => $summary,
-            'details' => $details
-        ]);
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'month' => $filterMonth,
+            'year' => $filterYear,
+            'range' => $range,
+        ], function () use ($kecamatan, $startDay, $endDay, $filterMonth, $filterYear, $range) {
+
+            $query = Pembiayaan::query()
+                ->where('period_month', $filterMonth)
+                ->where('period_year', $filterYear);
+
+            [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
+            $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
+
+            // Filter by kecamatan
+            $query->where('kecamatan', $kecamatan);
+
+            $details = $query
+                ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'kdaoh', 'nmao', 'kecamatan')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'nokontrak' => $item->nokontrak,
+                        'nama' => $item->nama,
+                        'osmdlc' => $item->osmdlc,
+                        'mdlawal' => $item->mdlawal,
+                        'colbaru' => $item->colbaru,
+                        'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
+                        'kdgroupdeb' => $item->kdgroupdeb,
+                        'nmao' => $item->nmao ?? '-',
+                        'kecamatan' => $item->kecamatan
+                    ];
+                });
+
+            $summary = [
+                'total_outstanding' => $details->sum('osmdlc'),
+                'total_disburse' => $details->sum('mdlawal'),
+                'total_kontrak' => $details->count()
+            ];
+
+            return [
+                'kecamatan' => $kecamatan,
+                'summary' => $summary,
+                'details' => $details
+            ];
+        }, 20);
     }
 
     public function getAODetail($nmao)
@@ -3257,71 +3343,76 @@ class DashboardController extends Controller
         $filterYear = request('year', now()->year);
         $range = $this->normalizeDashboardRange(request('range', 'all'));
 
-        // Normalize 'all' period selection to latest available pembiayaan snapshot
-        if ($filterYear === 'all' || $filterMonth === 'all') {
-            $latestPeriod = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
+        return $this->rememberDashboardJson('ao-detail', [
+            'nmao' => $nmao,
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'month' => $filterMonth,
+            'year' => $filterYear,
+            'range' => $range,
+        ], function () use ($nmao, $startDay, $endDay, $filterMonth, $filterYear, $range) {
 
-            $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
-            $resolvedMonth = $latestPeriod?->period_month ?: now()->format('m');
-            $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
+            // Normalize 'all' period selection to latest available pembiayaan snapshot
+            if ($filterYear === 'all' || $filterMonth === 'all') {
+                $latestPeriod = $this->getLatestPembiayaanPeriod();
 
-            $startDay = null;
-            $endDay = null;
-        } else {
-            $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
-            $filterYear = (string)$filterYear;
-        }
+                $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
+                $resolvedMonth = $latestPeriod?->period_month ?: now()->format('m');
+                $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
 
-        $query = Pembiayaan::query()
-            ->where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+                $startDay = null;
+                $endDay = null;
+            } else {
+                $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
+                $filterYear = (string)$filterYear;
+            }
 
-        [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
-        $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
+            $query = Pembiayaan::query()
+                ->where('period_month', $filterMonth)
+                ->where('period_year', $filterYear);
 
-        // Filter by AO key (kdaoh) or name (nmao)
-        $query->where(function ($subQuery) use ($nmao) {
-            $subQuery->where('kdaoh', $nmao)
-                ->orWhere('nmao', $nmao);
-        });
+            [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
+            $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
 
-        $details = $query
-            ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao', 'kecamatan')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'nokontrak' => $item->nokontrak,
-                    'nama' => $item->nama,
-                    'osmdlc' => $item->osmdlc,
-                    'mdlawal' => $item->mdlawal,
-                    'colbaru' => $item->colbaru,
-                    'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
-                    'kdgroupdeb' => $item->kdgroupdeb,
-                    'nmao' => $this->getAoDisplayName($item->kdaoh ?? ($item->nmao ?? null)),
-                    'kecamatan' => $item->kecamatan
-                ];
+            // Filter by AO key (kdaoh) or name (nmao)
+            $query->where(function ($subQuery) use ($nmao) {
+                $subQuery->where('kdaoh', $nmao)
+                    ->orWhere('nmao', $nmao);
             });
 
-        $summary = [
-            'total_outstanding' => $details->sum('osmdlc'),
-            'total_disburse' => $details->sum('mdlawal'),
-            'total_kontrak' => $details->count(),
-            'total_npf' => $details->where('colbaru', '>=', 3)->sum('osmdlc'),
-            'jumlah_npf' => $details->where('colbaru', '>=', 3)->count()
-        ];
+            $details = $query
+                ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'nmao', 'kecamatan')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'nokontrak' => $item->nokontrak,
+                        'nama' => $item->nama,
+                        'osmdlc' => $item->osmdlc,
+                        'mdlawal' => $item->mdlawal,
+                        'colbaru' => $item->colbaru,
+                        'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
+                        'kdgroupdeb' => $item->kdgroupdeb,
+                        'nmao' => $this->getAoDisplayName($item->kdaoh ?? ($item->nmao ?? null)),
+                        'kecamatan' => $item->kecamatan
+                    ];
+                });
 
-        return response()->json([
-            'nmao' => $nmao,
-            'ao_key' => $nmao,
-            'ao_name' => $this->getAoDisplayName($nmao),
-            'summary' => $summary,
-            'details' => $details
-        ]);
+            $summary = [
+                'total_outstanding' => $details->sum('osmdlc'),
+                'total_disburse' => $details->sum('mdlawal'),
+                'total_kontrak' => $details->count(),
+                'total_npf' => $details->where('colbaru', '>=', 3)->sum('osmdlc'),
+                'jumlah_npf' => $details->where('colbaru', '>=', 3)->count()
+            ];
+
+            return [
+                'nmao' => $nmao,
+                'ao_key' => $nmao,
+                'ao_name' => $this->getAoDisplayName($nmao),
+                'summary' => $summary,
+                'details' => $details
+            ];
+        }, 20);
     }
 
     public function getAONpfDetail($nmao)
@@ -3332,92 +3423,97 @@ class DashboardController extends Controller
         $filterYear = request('year', now()->year);
         $range = $this->normalizeDashboardRange(request('range', 'all'));
 
-        // Normalize 'all' period selection to latest available pembiayaan snapshot
-        if ($filterYear === 'all' || $filterMonth === 'all') {
-            $latestPeriod = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
+        return $this->rememberDashboardJson('ao-npf-detail', [
+            'nmao' => $nmao,
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'month' => $filterMonth,
+            'year' => $filterYear,
+            'range' => $range,
+        ], function () use ($nmao, $startDay, $endDay, $filterMonth, $filterYear, $range) {
 
-            $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
-            $resolvedMonth = $latestPeriod?->period_month ?: now()->format('m');
-            $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
+            // Normalize 'all' period selection to latest available pembiayaan snapshot
+            if ($filterYear === 'all' || $filterMonth === 'all') {
+                $latestPeriod = $this->getLatestPembiayaanPeriod();
 
-            $startDay = null;
-            $endDay = null;
-        } else {
-            $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
-            $filterYear = (string)$filterYear;
-        }
+                $filterYear = (string)($latestPeriod?->period_year ?: now()->year);
+                $resolvedMonth = $latestPeriod?->period_month ?: now()->format('m');
+                $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
 
-        $query = Pembiayaan::query()
-            ->where('period_month', $filterMonth)
-            ->where('period_year', $filterYear);
+                $startDay = null;
+                $endDay = null;
+            } else {
+                $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
+                $filterYear = (string)$filterYear;
+            }
 
-        [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
-        $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
+            $query = Pembiayaan::query()
+                ->where('period_month', $filterMonth)
+                ->where('period_year', $filterYear);
 
-        // Filter by AO key (kdaoh) or name (nmao) and NPF (colbaru >= 3)
-        $query->where(function ($subQuery) use ($nmao) {
-            $subQuery->where('kdaoh', $nmao)
-                ->orWhere('nmao', $nmao);
-        })
-            ->where('colbaru', '>=', 3);
+            [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
+            $this->applyOptionalDateFilter($query, 'tgleff', $absStart, $absEnd);
 
-        $selectCols = ['nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'kdaoh', 'nmao', 'kecamatan'];
-        if (Schema::hasColumn('pembiayaans', 'dpd')) {
-            $selectCols[] = 'dpd';
-        }
-
-        $details = $query
-            ->select($selectCols)
-            ->orderBy('osmdlc', 'desc')
-            ->limit(100)
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'nokontrak' => $item->nokontrak,
-                    'nama' => $item->nama,
-                    'osmdlc' => $item->osmdlc,
-                    'mdlawal' => $item->mdlawal,
-                    'colbaru' => $item->colbaru,
-                    'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
-                    'kdgroupdeb' => $item->kdgroupdeb,
-                    'nmao' => $this->getAoDisplayName($item->kdaoh ?? ($item->nmao ?? null)),
-                    'kecamatan' => $item->kecamatan,
-                    'dpd' => $item->dpd ?? 0
-                ];
-            });
-
-        // Get total outstanding for this AO (for NPF ratio calculation)
-        $totalOutstandingAOQuery = Pembiayaan::query()
-            ->where('period_month', $filterMonth)
-            ->where('period_year', $filterYear)
-            ->where(function ($subQuery) use ($nmao) {
+            // Filter by AO key (kdaoh) or name (nmao) and NPF (colbaru >= 3)
+            $query->where(function ($subQuery) use ($nmao) {
                 $subQuery->where('kdaoh', $nmao)
                     ->orWhere('nmao', $nmao);
-            });
+            })
+                ->where('colbaru', '>=', 3);
 
-        $this->applyOptionalDateFilter($totalOutstandingAOQuery, 'tgleff', $absStart, $absEnd);
-        $totalOutstandingAO = $totalOutstandingAOQuery->sum('osmdlc');
+            $selectCols = ['nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'kdaoh', 'nmao', 'kecamatan'];
+            if (Schema::hasColumn('pembiayaans', 'dpd')) {
+                $selectCols[] = 'dpd';
+            }
 
-        $summary = [
-            'total_nasabah' => $details->count(),
-            'total_outstanding' => $details->sum('osmdlc'),
-            'avg_outstanding' => $details->count() > 0 ? $details->avg('osmdlc') : 0,
-            'total_disburse' => $details->sum('mdlawal'),
-            'npf_ratio' => $totalOutstandingAO > 0 ? ($details->sum('osmdlc') / $totalOutstandingAO) * 100 : 0
-        ];
+            $details = $query
+                ->select($selectCols)
+                ->orderBy('osmdlc', 'desc')
+                ->limit(100)
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'nokontrak' => $item->nokontrak,
+                        'nama' => $item->nama,
+                        'osmdlc' => $item->osmdlc,
+                        'mdlawal' => $item->mdlawal,
+                        'colbaru' => $item->colbaru,
+                        'colbaru_label' => $this->getCollectibilityLabel($item->colbaru),
+                        'kdgroupdeb' => $item->kdgroupdeb,
+                        'nmao' => $this->getAoDisplayName($item->kdaoh ?? ($item->nmao ?? null)),
+                        'kecamatan' => $item->kecamatan,
+                        'dpd' => $item->dpd ?? 0
+                    ];
+                });
 
-        return response()->json([
-            'nmao' => $nmao,
-            'ao_key' => $nmao,
-            'ao_name' => $this->getAoDisplayName($nmao),
-            'summary' => $summary,
-            'details' => $details
-        ]);
+            // Get total outstanding for this AO (for NPF ratio calculation)
+            $totalOutstandingAOQuery = Pembiayaan::query()
+                ->where('period_month', $filterMonth)
+                ->where('period_year', $filterYear)
+                ->where(function ($subQuery) use ($nmao) {
+                    $subQuery->where('kdaoh', $nmao)
+                        ->orWhere('nmao', $nmao);
+                });
+
+            $this->applyOptionalDateFilter($totalOutstandingAOQuery, 'tgleff', $absStart, $absEnd);
+            $totalOutstandingAO = $totalOutstandingAOQuery->sum('osmdlc');
+
+            $summary = [
+                'total_nasabah' => $details->count(),
+                'total_outstanding' => $details->sum('osmdlc'),
+                'avg_outstanding' => $details->count() > 0 ? $details->avg('osmdlc') : 0,
+                'total_disburse' => $details->sum('mdlawal'),
+                'npf_ratio' => $totalOutstandingAO > 0 ? ($details->sum('osmdlc') / $totalOutstandingAO) * 100 : 0
+            ];
+
+            return [
+                'nmao' => $nmao,
+                'ao_key' => $nmao,
+                'ao_name' => $this->getAoDisplayName($nmao),
+                'summary' => $summary,
+                'details' => $details
+            ];
+        }, 20);
     }
 
     private function getCollectibilityLabel($col)
@@ -4151,6 +4247,11 @@ class DashboardController extends Controller
         return $data;
     }
 
+    public function getOutstandingDisburseTableData($startDay = null, $endDay = null, $filterMonth = null, $filterYear = null, $absoluteStartDate = null, $absoluteEndDate = null, $groupBy = 'segmentasi')
+    {
+        return $this->getSegmentasiData($startDay, $endDay, $filterMonth, $filterYear, $absoluteStartDate, $absoluteEndDate, $groupBy);
+    }
+
     public function getNasabahStatusDetail(Request $request, $status)
     {
         // Get filter parameters
@@ -4193,52 +4294,36 @@ class DashboardController extends Controller
                 break;
 
             case 'pelunasan_cepat':
-                // Kontrak yang ada di bulan lalu tapi hilang di bulan ini, dan masih banyak tenor
-                $kontrakBulanLalu = Pembiayaan::where('period_month', $prevMonthStr)
-                    ->where('period_year', $prevYear)
-                    ->pluck('nokontrak')
-                    ->toArray();
-
-                $kontrakBulanIni = Pembiayaan::where('period_month', $filterMonthStr)
-                    ->where('period_year', $filterYear)
-                    ->pluck('nokontrak')
-                    ->toArray();
-
-                $kontrakHilang = array_diff($kontrakBulanLalu, $kontrakBulanIni);
-
-                // Ambil data dari bulan lalu
                 $query = Pembiayaan::query()
                     ->where('period_month', $prevMonthStr)
                     ->where('period_year', $prevYear)
-                    ->whereIn('nokontrak', $kontrakHilang)
                     ->whereRaw('angs_ke < jw')
-                    ->where('jw', '>', 0);
+                    ->where('jw', '>', 0)
+                    ->whereNotExists(function ($subQuery) use ($filterMonthStr, $filterYear) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('pembiayaans as curr')
+                            ->whereColumn('curr.nokontrak', 'pembiayaans.nokontrak')
+                            ->where('curr.period_month', $filterMonthStr)
+                            ->where('curr.period_year', $filterYear);
+                    });
 
                 $title = 'Pelunasan Cepat (Lunas Sebelum Tenor Selesai)';
                 break;
 
             case 'nasabah_lunas':
-                // Kontrak yang ada di bulan lalu tapi hilang di bulan ini, dan tenor sudah habis
-                $kontrakBulanLalu = Pembiayaan::where('period_month', $prevMonthStr)
-                    ->where('period_year', $prevYear)
-                    ->pluck('nokontrak')
-                    ->toArray();
-
-                $kontrakBulanIni = Pembiayaan::where('period_month', $filterMonthStr)
-                    ->where('period_year', $filterYear)
-                    ->pluck('nokontrak')
-                    ->toArray();
-
-                $kontrakHilang = array_diff($kontrakBulanLalu, $kontrakBulanIni);
-
-                // Ambil data dari bulan lalu
                 $query = Pembiayaan::query()
                     ->where('period_month', $prevMonthStr)
                     ->where('period_year', $prevYear)
-                    ->whereIn('nokontrak', $kontrakHilang)
                     ->whereRaw('angs_ke >= jw')
                     ->where('jw', '>', 0)
                     ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
+                    ->whereNotExists(function ($subQuery) use ($filterMonthStr, $filterYear) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('pembiayaans as curr')
+                            ->whereColumn('curr.nokontrak', 'pembiayaans.nokontrak')
+                            ->where('curr.period_month', $filterMonthStr)
+                            ->where('curr.period_year', $filterYear);
+                    })
                     ->where(function ($q) use ($filterYear, $filterMonth) {
                         $q->whereYear('tgleff', '!=', $filterYear)
                             ->orWhereMonth('tgleff', '!=', (int) $filterMonth);
@@ -4312,141 +4397,148 @@ class DashboardController extends Controller
         $endDay = $request->input('end_day');
         $range = $this->normalizeDashboardRange($request->input('range', 'all'));
 
-        // Normalize 'all' / missing to latest available pembiayaan snapshot
-        if ($filterMonth === 'all' || $filterYear === 'all' || $filterMonth === null || $filterYear === null || $filterMonth === '' || $filterYear === '') {
-            $latestPeriod = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
-
-            $resolvedYear = (string)($latestPeriod?->period_year ?: date('Y'));
-
-            if ($filterYear === 'all' || $filterYear === null || $filterYear === '' || !ctype_digit((string)$filterYear)) {
-                $filterYear = $resolvedYear;
-            }
-
-            if ($filterMonth === 'all' || $filterMonth === null || $filterMonth === '' || !ctype_digit((string)$filterMonth)) {
-                $resolvedMonth = (string)($latestPeriod?->period_month ?: date('m'));
-                $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
-            } else {
-                $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
-            }
-        } else {
-            $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
-            $filterYear = (string)$filterYear;
-        }
-
-        [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
-
-        $customers = [];
-
-        if ($jenis === 'tabungan') {
-            // Get top customers by tabungan amount
-            $customers = DB::table('tabungans')
-                ->select(
-                    'fnama',
-                    'notab',
-                    'sahirrp',
-                    'period_year',
-                    'period_month'
-                )
-                ->where('period_month', $filterMonth)
-                ->where('period_year', $filterYear)
-                ->when($absStart, function ($q) use ($absStart) {
-                    return $q->whereDate('tgltrnakh', '>=', $absStart);
-                })
-                ->when($absEnd, function ($q) use ($absEnd) {
-                    return $q->whereDate('tgltrnakh', '<=', $absEnd);
-                })
-                ->orderBy('sahirrp', 'desc')
-                ->limit($limit)
-                ->get()
-                ->map(function ($customer) {
-                    return [
-                        'nama' => $customer->fnama,
-                        'account' => $customer->notab,
-                        'amount' => (float) $customer->sahirrp,
-                        'type' => 'Tabungan',
-                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
-                    ];
-                });
-        } elseif ($jenis === 'deposito') {
-            // Get top customers by deposito amount
-            $customers = DB::table('depositos')
-                ->select(
-                    'nama',
-                    'nobilyet',
-                    'nomrp',
-                    'period_year',
-                    'period_month'
-                )
-                ->where('period_month', $filterMonth)
-                ->where('period_year', $filterYear)
-                ->when($absStart, function ($q) use ($absStart) {
-                    return $q->whereDate('tglbuka', '>=', $absStart);
-                })
-                ->when($absEnd, function ($q) use ($absEnd) {
-                    return $q->whereDate('tglbuka', '<=', $absEnd);
-                })
-                ->orderBy('nomrp', 'desc')
-                ->limit($limit)
-                ->get()
-                ->map(function ($customer) {
-                    return [
-                        'nama' => $customer->nama,
-                        'account' => $customer->nobilyet,
-                        'amount' => (float) $customer->nomrp,
-                        'type' => 'Deposito',
-                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
-                    ];
-                });
-        } elseif ($jenis === 'pencairan_deposito') {
-            // Deposito pencairan for the selected snapshot: deposits from previous period
-            // that no longer exist in the current period.
-            $currMonth = $filterMonth;
-            $currYear = (int)$filterYear;
-            $prevMonth = $currMonth === '01' ? '12' : str_pad(((int)$currMonth) - 1, 2, '0', STR_PAD_LEFT);
-            $prevYear = $currMonth === '01' ? $currYear - 1 : $currYear;
-
-            $customers = DB::table('depositos as prev')
-                ->leftJoin('depositos as curr', function ($join) use ($currMonth, $currYear) {
-                    // Join on nodep which is a stable deposit identifier across imports
-                    $join->on('prev.nodep', '=', 'curr.nodep')
-                        ->where('curr.period_month', $currMonth)
-                        ->where('curr.period_year', (string)$currYear);
-                })
-                ->where('prev.period_month', $prevMonth)
-                ->where('prev.period_year', (string)$prevYear)
-                ->whereNull('curr.nodep')
-                ->select(
-                    'prev.nama',
-                    'prev.nodep as nobilyet',
-                    'prev.nomrp',
-                    'prev.period_year',
-                    'prev.period_month'
-                )
-                ->orderBy('prev.nomrp', 'desc')
-                ->limit($limit)
-                ->get()
-                ->map(function ($customer) {
-                    return [
-                        'nama' => $customer->nama,
-                        'account' => $customer->nobilyet,
-                        'amount' => (float) $customer->nomrp,
-                        'type' => 'Pencairan Deposito',
-                        'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
-                    ];
-                });
-        }
-
-        return response()->json([
+        return $this->rememberDashboardJson('customer-details', [
             'jenis' => $jenis,
             'type' => $type,
-            'total' => count($customers),
-            'customers' => $customers
-        ]);
+            'limit' => $limit,
+            'month' => $filterMonth,
+            'year' => $filterYear,
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'range' => $range,
+        ], function () use ($jenis, $type, $limit, $filterMonth, $filterYear, $startDay, $endDay, $range) {
+
+            // Normalize 'all' / missing to latest available pembiayaan snapshot
+            if ($filterMonth === 'all' || $filterYear === 'all' || $filterMonth === null || $filterYear === null || $filterMonth === '' || $filterYear === '') {
+                $latestPeriod = $this->getLatestPembiayaanPeriod();
+
+                $resolvedYear = (string)($latestPeriod?->period_year ?: date('Y'));
+
+                if ($filterYear === 'all' || $filterYear === null || $filterYear === '' || !ctype_digit((string)$filterYear)) {
+                    $filterYear = $resolvedYear;
+                }
+
+                if ($filterMonth === 'all' || $filterMonth === null || $filterMonth === '' || !ctype_digit((string)$filterMonth)) {
+                    $resolvedMonth = (string)($latestPeriod?->period_month ?: date('m'));
+                    $filterMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
+                } else {
+                    $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
+                }
+            } else {
+                $filterMonth = str_pad((string)(int)$filterMonth, 2, '0', STR_PAD_LEFT);
+                $filterYear = (string)$filterYear;
+            }
+
+            [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$filterMonth, (string)$filterYear);
+
+            $customers = [];
+
+            if ($jenis === 'tabungan') {
+                // Get top customers by tabungan amount
+                $customers = DB::table('tabungans')
+                    ->select(
+                        'fnama',
+                        'notab',
+                        'sahirrp',
+                        'period_year',
+                        'period_month'
+                    )
+                    ->where('period_month', $filterMonth)
+                    ->where('period_year', $filterYear)
+                    ->when($absStart, function ($q) use ($absStart) {
+                        return $q->whereDate('tgltrnakh', '>=', $absStart);
+                    })
+                    ->when($absEnd, function ($q) use ($absEnd) {
+                        return $q->whereDate('tgltrnakh', '<=', $absEnd);
+                    })
+                    ->orderBy('sahirrp', 'desc')
+                    ->limit($limit)
+                    ->get()
+                    ->map(function ($customer) {
+                        return [
+                            'nama' => $customer->fnama,
+                            'account' => $customer->notab,
+                            'amount' => (float) $customer->sahirrp,
+                            'type' => 'Tabungan',
+                            'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                        ];
+                    });
+            } elseif ($jenis === 'deposito') {
+                // Get top customers by deposito amount
+                $customers = DB::table('depositos')
+                    ->select(
+                        'nama',
+                        'nobilyet',
+                        'nomrp',
+                        'period_year',
+                        'period_month'
+                    )
+                    ->where('period_month', $filterMonth)
+                    ->where('period_year', $filterYear)
+                    ->when($absStart, function ($q) use ($absStart) {
+                        return $q->whereDate('tglbuka', '>=', $absStart);
+                    })
+                    ->when($absEnd, function ($q) use ($absEnd) {
+                        return $q->whereDate('tglbuka', '<=', $absEnd);
+                    })
+                    ->orderBy('nomrp', 'desc')
+                    ->limit($limit)
+                    ->get()
+                    ->map(function ($customer) {
+                        return [
+                            'nama' => $customer->nama,
+                            'account' => $customer->nobilyet,
+                            'amount' => (float) $customer->nomrp,
+                            'type' => 'Deposito',
+                            'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                        ];
+                    });
+            } elseif ($jenis === 'pencairan_deposito') {
+                // Deposito pencairan for the selected snapshot: deposits from previous period
+                // that no longer exist in the current period.
+                $currMonth = $filterMonth;
+                $currYear = (int)$filterYear;
+                $prevMonth = $currMonth === '01' ? '12' : str_pad(((int)$currMonth) - 1, 2, '0', STR_PAD_LEFT);
+                $prevYear = $currMonth === '01' ? $currYear - 1 : $currYear;
+
+                $customers = DB::table('depositos as prev')
+                    ->leftJoin('depositos as curr', function ($join) use ($currMonth, $currYear) {
+                        // Join on nodep which is a stable deposit identifier across imports
+                        $join->on('prev.nodep', '=', 'curr.nodep')
+                            ->where('curr.period_month', $currMonth)
+                            ->where('curr.period_year', (string)$currYear);
+                    })
+                    ->where('prev.period_month', $prevMonth)
+                    ->where('prev.period_year', (string)$prevYear)
+                    ->whereNull('curr.nodep')
+                    ->select(
+                        'prev.nama',
+                        'prev.nodep as nobilyet',
+                        'prev.nomrp',
+                        'prev.period_year',
+                        'prev.period_month'
+                    )
+                    ->orderBy('prev.nomrp', 'desc')
+                    ->limit($limit)
+                    ->get()
+                    ->map(function ($customer) {
+                        return [
+                            'nama' => $customer->nama,
+                            'account' => $customer->nobilyet,
+                            'amount' => (float) $customer->nomrp,
+                            'type' => 'Pencairan Deposito',
+                            'period' => $customer->period_year . '-' . str_pad($customer->period_month, 2, '0', STR_PAD_LEFT)
+                        ];
+                    });
+            }
+
+            return [
+                'jenis' => $jenis,
+                'type' => $type,
+                'total' => count($customers),
+                'customers' => $customers->toArray()
+            ];
+        }, 20);
     }
 
     /**
@@ -4459,160 +4551,166 @@ class DashboardController extends Controller
             $currentYear = date('Y');
         }
 
-        // AO mapping
-        $aoMapping = [
-            '017' => 'AGUS SETIAWAN',
-            '018' => 'ADITYA FATAHILLAH MUHARAM',
-            '020' => 'TAUFAN NUGRAHA',
-            '021' => 'SURYA SEPTIANNANDA',
-            '022' => 'FACHRI EKA PUTRA',
-            '023' => 'RIZKI NIRMALA',
-            '024' => 'GUNANTO',
-            '025' => 'SANDI M ILHAM',
-            '026' => 'FEISHAL JUAENI',
-            '027' => 'ZAINAL ARIFIN',
-            '028' => 'RIVI NUGRAHA',
-            '029' => 'YOHAN EKA PUTRA',
-            '030' => 'YUSRON WIJAYA',
-            '031' => 'SABIQ KHUSNAIDI',
-            '032' => 'YUNITA HERDIANA',
-            '033' => 'YUSI IRMAYANTI',
-            '034' => 'LARIZA AFRIANTI',
-            '035' => 'DEVI NURLIANTO',
-            '036' => 'FAUZIA NURUL AFINAH',
-            '037' => 'ENDANG SITI MULYANI',
-            '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
-            '039' => 'BALQIS CITRA SULISTYANA',
-            '11' => 'DERRY NUR MUHAMMAD',
-            '12' => 'FATTAH YASIN',
-            'GR01' => 'AO GRAMINDO 01',
-            'GR02' => 'AO GRAMINDO 02',
-            'GR03' => 'AO GRAMINDO 03',
-            'GR04' => 'AO GRAMINDO 04',
-            'GR05' => 'AO GRAMINDO 05',
-            'GR06' => 'AO BTB-GRAMIN 06',
-            'GR07' => 'AO BTB-GRAMIN 07',
-            'GR08' => 'AO BTB-GRAMIN 08',
-            'GR09' => 'AO BTB-GRAMIN 09',
-            'GR10' => 'AO BTB-GRAMIN 10',
-            'GR11' => 'AO BTB-GRAMIN 11',
-            'GR12' => 'AO BTB-GRAMIN 12',
-            'GR13' => 'AO BTB-GRAMIN 13',
-            'GR14' => 'AO BTB-GRAMIN 14',
-            'GR15' => 'AO BTB-GRAMIN 15',
-            'GR16' => 'AO BTB-GRAMIN 16',
-            'GR17' => 'AO BTB-GRAMIN 17',
-            'SDI' => 'SDI'
-        ];
+        return $this->rememberDashboardJson('ao-funding-detail', [
+            'kodeaoh' => $kodeaoh,
+            'year' => $currentYear,
+        ], function () use ($kodeaoh, $currentYear) {
 
-        $aoName = $aoMapping[$kodeaoh] ?? $kodeaoh;
+            // AO mapping
+            $aoMapping = [
+                '017' => 'AGUS SETIAWAN',
+                '018' => 'ADITYA FATAHILLAH MUHARAM',
+                '020' => 'TAUFAN NUGRAHA',
+                '021' => 'SURYA SEPTIANNANDA',
+                '022' => 'FACHRI EKA PUTRA',
+                '023' => 'RIZKI NIRMALA',
+                '024' => 'GUNANTO',
+                '025' => 'SANDI M ILHAM',
+                '026' => 'FEISHAL JUAENI',
+                '027' => 'ZAINAL ARIFIN',
+                '028' => 'RIVI NUGRAHA',
+                '029' => 'YOHAN EKA PUTRA',
+                '030' => 'YUSRON WIJAYA',
+                '031' => 'SABIQ KHUSNAIDI',
+                '032' => 'YUNITA HERDIANA',
+                '033' => 'YUSI IRMAYANTI',
+                '034' => 'LARIZA AFRIANTI',
+                '035' => 'DEVI NURLIANTO',
+                '036' => 'FAUZIA NURUL AFINAH',
+                '037' => 'ENDANG SITI MULYANI',
+                '038' => 'RADEN MUHAMMAD ROBIANTARA PUTR',
+                '039' => 'BALQIS CITRA SULISTYANA',
+                '11' => 'DERRY NUR MUHAMMAD',
+                '12' => 'FATTAH YASIN',
+                'GR01' => 'AO GRAMINDO 01',
+                'GR02' => 'AO GRAMINDO 02',
+                'GR03' => 'AO GRAMINDO 03',
+                'GR04' => 'AO GRAMINDO 04',
+                'GR05' => 'AO GRAMINDO 05',
+                'GR06' => 'AO BTB-GRAMIN 06',
+                'GR07' => 'AO BTB-GRAMIN 07',
+                'GR08' => 'AO BTB-GRAMIN 08',
+                'GR09' => 'AO BTB-GRAMIN 09',
+                'GR10' => 'AO BTB-GRAMIN 10',
+                'GR11' => 'AO BTB-GRAMIN 11',
+                'GR12' => 'AO BTB-GRAMIN 12',
+                'GR13' => 'AO BTB-GRAMIN 13',
+                'GR14' => 'AO BTB-GRAMIN 14',
+                'GR15' => 'AO BTB-GRAMIN 15',
+                'GR16' => 'AO BTB-GRAMIN 16',
+                'GR17' => 'AO BTB-GRAMIN 17',
+                'SDI' => 'SDI'
+            ];
 
-        // Get monthly data for current year
-        $monthlyData = [];
-        for ($month = 1; $month <= 12; $month++) {
-            $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
-            $startOfMonth = sprintf('%04d-%02d-01', (int) $currentYear, (int) $month);
-            $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+            $aoName = $aoMapping[$kodeaoh] ?? $kodeaoh;
 
-            // Get deposito data for this month - depositos that exist in this period AND were opened in this month
-            $depositos = DB::table('depositos')
+            // Get monthly data for current year
+            $monthlyData = [];
+            for ($month = 1; $month <= 12; $month++) {
+                $monthStr = str_pad($month, 2, '0', STR_PAD_LEFT);
+                $startOfMonth = sprintf('%04d-%02d-01', (int) $currentYear, (int) $month);
+                $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+
+                // Get deposito data for this month - depositos that exist in this period AND were opened in this month
+                $depositos = DB::table('depositos')
+                    ->where('kodeaoh', $kodeaoh)
+                    ->where('period_month', $monthStr)
+                    ->where('period_year', $currentYear)
+                    ->whereBetween('tglbuka', [$startOfMonth, $endOfMonth])
+                    ->where('stsrec', 'A')
+                    ->get();
+
+                // Categorize depositos
+                $depositoRegular = $depositos->where('kdprd', '31');
+                $depositoAbp = $depositos->where('kdprd', '41');
+
+                // Calculate pencairan (depositos that existed in this month but not in next month)
+                // But only if next month has data - otherwise pencairan = 0
+                $nextMonth = $month == 12 ? 1 : $month + 1;
+                $nextYear = $month == 12 ? $currentYear + 1 : $currentYear;
+                $nextMonthStr = str_pad($nextMonth, 2, '0', STR_PAD_LEFT);
+
+                $nextMonthHasData = DB::table('depositos')
+                    ->where('kodeaoh', $kodeaoh)
+                    ->where('period_month', $nextMonthStr)
+                    ->where('period_year', $nextYear)
+                    ->where('stsrec', 'A')
+                    ->exists();
+
+                if ($nextMonthHasData) {
+                    $depositoCairkan = DB::table('depositos as curr')
+                        ->leftJoin('depositos as next', function ($join) use ($nextMonthStr, $nextYear) {
+                            $join->on('curr.nobilyet', '=', 'next.nobilyet')
+                                ->where('next.period_month', $nextMonthStr)
+                                ->where('next.period_year', $nextYear)
+                                ->where('next.stsrec', 'A');
+                        })
+                        ->where('curr.kodeaoh', $kodeaoh)
+                        ->where('curr.period_month', $monthStr)
+                        ->where('curr.period_year', $currentYear)
+                        ->where('curr.stsrec', 'A')
+                        ->whereNull('next.nobilyet') // Tidak ada di bulan berikutnya
+                        ->select('curr.nomrp')
+                        ->get();
+                } else {
+                    // No data for next month, so no pencairan can be calculated
+                    $depositoCairkan = collect();
+                }
+
+                $monthlyData[] = [
+                    'month' => $month,
+                    'month_name' => date('F', mktime(0, 0, 0, $month, 1)),
+                    'deposito' => [
+                        'count' => $depositoRegular->count(),
+                        'nominal' => $depositoRegular->sum('nomrp')
+                    ],
+                    'abp' => [
+                        'count' => $depositoAbp->count(),
+                        'nominal' => $depositoAbp->sum('nomrp')
+                    ],
+                    'pencairan' => [
+                        'count' => $depositoCairkan->count(),
+                        'nominal' => $depositoCairkan->sum('nomrp')
+                    ],
+                    'total' => [
+                        'count' => $depositos->count(),
+                        'nominal' => $depositos->sum('nomrp')
+                    ]
+                ];
+            }
+
+            // Calculate totals - sum of all depositos opened throughout the year
+            $allOpenedDepositos = DB::table('depositos')
                 ->where('kodeaoh', $kodeaoh)
-                ->where('period_month', $monthStr)
-                ->where('period_year', $currentYear)
-                ->whereBetween('tglbuka', [$startOfMonth, $endOfMonth])
+                ->whereBetween('tglbuka', [
+                    sprintf('%04d-01-01', (int) $currentYear),
+                    sprintf('%04d-12-31', (int) $currentYear),
+                ])
                 ->where('stsrec', 'A')
                 ->get();
 
-            // Categorize depositos
-            $depositoRegular = $depositos->where('kdprd', '31');
-            $depositoAbp = $depositos->where('kdprd', '41');
+            $depositoRegularTotal = $allOpenedDepositos->where('kdprd', '31');
+            $depositoAbpTotal = $allOpenedDepositos->where('kdprd', '41');
 
-            // Calculate pencairan (depositos that existed in this month but not in next month)
-            // But only if next month has data - otherwise pencairan = 0
-            $nextMonth = $month == 12 ? 1 : $month + 1;
-            $nextYear = $month == 12 ? $currentYear + 1 : $currentYear;
-            $nextMonthStr = str_pad($nextMonth, 2, '0', STR_PAD_LEFT);
-
-            $nextMonthHasData = DB::table('depositos')
-                ->where('kodeaoh', $kodeaoh)
-                ->where('period_month', $nextMonthStr)
-                ->where('period_year', $nextYear)
-                ->where('stsrec', 'A')
-                ->exists();
-
-            if ($nextMonthHasData) {
-                $depositoCairkan = DB::table('depositos as curr')
-                    ->leftJoin('depositos as next', function ($join) use ($nextMonthStr, $nextYear) {
-                        $join->on('curr.nobilyet', '=', 'next.nobilyet')
-                            ->where('next.period_month', $nextMonthStr)
-                            ->where('next.period_year', $nextYear)
-                            ->where('next.stsrec', 'A');
-                    })
-                    ->where('curr.kodeaoh', $kodeaoh)
-                    ->where('curr.period_month', $monthStr)
-                    ->where('curr.period_year', $currentYear)
-                    ->where('curr.stsrec', 'A')
-                    ->whereNull('next.nobilyet') // Tidak ada di bulan berikutnya
-                    ->select('curr.nomrp')
-                    ->get();
-            } else {
-                // No data for next month, so no pencairan can be calculated
-                $depositoCairkan = collect();
-            }
-
-            $monthlyData[] = [
-                'month' => $month,
-                'month_name' => date('F', mktime(0, 0, 0, $month, 1)),
-                'deposito' => [
-                    'count' => $depositoRegular->count(),
-                    'nominal' => $depositoRegular->sum('nomrp')
-                ],
-                'abp' => [
-                    'count' => $depositoAbp->count(),
-                    'nominal' => $depositoAbp->sum('nomrp')
-                ],
-                'pencairan' => [
-                    'count' => $depositoCairkan->count(),
-                    'nominal' => $depositoCairkan->sum('nomrp')
-                ],
-                'total' => [
-                    'count' => $depositos->count(),
-                    'nominal' => $depositos->sum('nomrp')
-                ]
+            $totals = [
+                'deposito_count' => $depositoRegularTotal->count(),
+                'deposito_nominal' => $depositoRegularTotal->sum('nomrp'),
+                'abp_count' => $depositoAbpTotal->count(),
+                'abp_nominal' => $depositoAbpTotal->sum('nomrp'),
+                'pencairan_count' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'count')),
+                'pencairan_nominal' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'nominal')),
+                'total_count' => $allOpenedDepositos->count(),
+                'total_nominal' => $allOpenedDepositos->sum('nomrp')
             ];
-        }
 
-        // Calculate totals - sum of all depositos opened throughout the year
-        $allOpenedDepositos = DB::table('depositos')
-            ->where('kodeaoh', $kodeaoh)
-            ->whereBetween('tglbuka', [
-                sprintf('%04d-01-01', (int) $currentYear),
-                sprintf('%04d-12-31', (int) $currentYear),
-            ])
-            ->where('stsrec', 'A')
-            ->get();
-
-        $depositoRegularTotal = $allOpenedDepositos->where('kdprd', '31');
-        $depositoAbpTotal = $allOpenedDepositos->where('kdprd', '41');
-
-        $totals = [
-            'deposito_count' => $depositoRegularTotal->count(),
-            'deposito_nominal' => $depositoRegularTotal->sum('nomrp'),
-            'abp_count' => $depositoAbpTotal->count(),
-            'abp_nominal' => $depositoAbpTotal->sum('nomrp'),
-            'pencairan_count' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'count')),
-            'pencairan_nominal' => array_sum(array_column(array_column($monthlyData, 'pencairan'), 'nominal')),
-            'total_count' => $allOpenedDepositos->count(),
-            'total_nominal' => $allOpenedDepositos->sum('nomrp')
-        ];
-
-        return response()->json([
-            'ao_code' => $kodeaoh,
-            'ao_name' => $aoName,
-            'year' => $currentYear,
-            'monthly_data' => $monthlyData,
-            'totals' => $totals
-        ]);
+            return [
+                'ao_code' => $kodeaoh,
+                'ao_name' => $aoName,
+                'year' => $currentYear,
+                'monthly_data' => $monthlyData,
+                'totals' => $totals
+            ];
+        }, 20);
     }
 
     public function getAOCustomerDetails(Request $request, $ao, $month, $category)
@@ -4820,95 +4918,101 @@ class DashboardController extends Controller
         $endDay = $request->input('end_day');
         $range = $this->normalizeDashboardRange($request->input('range', 'all'));
 
-        // Validate kategori
-        if (!in_array($kategori, ['1', '2', '3', '4', '5'])) {
-            return response()->json(['error' => 'Invalid kategori'], 400);
-        }
-
-        // Product mapping for pembiayaan (financing) products
-        $productMapping = [
-            '55' => 'Musyarakah',
-            '50' => 'Murabahah',
-            '56' => 'MMQ',
-            '88' => 'Isthisna',
-            '86' => 'Multijasa Piutang',
-        ];
-
-        // Respect dashboard period filters
-        $currentMonth = (string)$request->input('month', date('m'));
-        $currentYear = (string)$request->input('year', date('Y'));
-
-        // Normalize 'all' to latest available pembiayaan snapshot
-        if ($currentMonth === 'all' || $currentYear === 'all' || !ctype_digit($currentMonth) || !ctype_digit($currentYear)) {
-            $latestPeriod = Pembiayaan::query()
-                ->select('period_year', 'period_month')
-                ->whereNotNull('period_year')
-                ->whereNotNull('period_month')
-                ->orderByRaw('(period_year * 100 + period_month) DESC')
-                ->first();
-
-            $currentYear = (string)($latestPeriod?->period_year ?: date('Y'));
-            $resolvedMonth = (string)($latestPeriod?->period_month ?: date('m'));
-            $currentMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
-            $startDay = null;
-            $endDay = null;
-        } else {
-            $currentMonth = str_pad((string)(int)$currentMonth, 2, '0', STR_PAD_LEFT);
-        }
-
-        [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$currentMonth, (string)$currentYear);
-
-        // Query pembiayaan data for selected period with kolektibilitas filter
-        $query = Pembiayaan::where('period_month', $currentMonth)
-            ->where('period_year', $currentYear)
-            ->where('colbaru', $kategori)
-            ->when($absStart, function ($q) use ($absStart) {
-                return $q->whereDate('tgleff', '>=', $absStart);
-            })
-            ->when($absEnd, function ($q) use ($absEnd) {
-                return $q->whereDate('tgleff', '<=', $absEnd);
-            })
-            ->orderBy('osmdlc', 'desc') // Order by outstanding descending
-            ->limit($limit);
-
-        $customers = $query->select([
-            'nama',
-            'nokontrak',
-            'osmdlc',
-            'kdprd',
-            'kdaoh',
-            'nmao',
-            'tgleff'
-        ])->get();
-
-        // Get total count for this kategori
-        $totalCountQuery = Pembiayaan::where('period_month', $currentMonth)
-            ->where('period_year', $currentYear)
-            ->where('colbaru', $kategori);
-        $this->applyOptionalDateFilter($totalCountQuery, 'tgleff', $absStart, $absEnd);
-        $totalCount = $totalCountQuery->count();
-
-        // Format data
-        $formattedCustomers = $customers->map(function ($customer) use ($productMapping) {
-            return [
-                'nama' => $customer->nama,
-                'nokontrak' => $customer->nokontrak,
-                'osmdlc' => (float) $customer->osmdlc,
-                'nama_produk' => $productMapping[$customer->kdprd] ?? 'Produk ' . ($customer->kdprd ?: 'Unknown'),
-                'kodeaoh' => $customer->kdaoh,
-                'nama_ao' => $customer->nmao,
-                'tgl_akad' => $customer->tgleff ? $customer->tgleff->format('d/m/Y') : null,
-                'jenis_akad' => $customer->kdprd // Using product code as contract type
-            ];
-        });
-
-        return response()->json([
+        return $this->rememberDashboardJson('kolektibilitas-details', [
             'kategori' => $kategori,
-            'customers' => $formattedCustomers,
-            'total' => $totalCount,
             'limit' => $limit,
-            'month' => $currentMonth,
-            'year' => $currentYear
-        ]);
+            'start_day' => $startDay,
+            'end_day' => $endDay,
+            'month' => $request->input('month', date('m')),
+            'year' => $request->input('year', date('Y')),
+            'range' => $range,
+        ], function () use ($kategori, $limit, $startDay, $endDay, $range, $request) {
+
+            // Validate kategori
+            if (!in_array($kategori, ['1', '2', '3', '4', '5'])) {
+                return response()->json(['error' => 'Invalid kategori'], 400);
+            }
+
+            // Product mapping for pembiayaan (financing) products
+            $productMapping = [
+                '55' => 'Musyarakah',
+                '50' => 'Murabahah',
+                '56' => 'MMQ',
+                '88' => 'Isthisna',
+                '86' => 'Multijasa Piutang',
+            ];
+
+            // Respect dashboard period filters
+            $currentMonth = (string)$request->input('month', date('m'));
+            $currentYear = (string)$request->input('year', date('Y'));
+
+            // Normalize 'all' to latest available pembiayaan snapshot
+            if ($currentMonth === 'all' || $currentYear === 'all' || !ctype_digit($currentMonth) || !ctype_digit($currentYear)) {
+                $latestPeriod = $this->getLatestPembiayaanPeriod();
+
+                $currentYear = (string)($latestPeriod?->period_year ?: date('Y'));
+                $resolvedMonth = (string)($latestPeriod?->period_month ?: date('m'));
+                $currentMonth = str_pad((string)(int)$resolvedMonth, 2, '0', STR_PAD_LEFT);
+                $startDay = null;
+                $endDay = null;
+            } else {
+                $currentMonth = str_pad((string)(int)$currentMonth, 2, '0', STR_PAD_LEFT);
+            }
+
+            [$absStart, $absEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, (string)$currentMonth, (string)$currentYear);
+
+            // Query pembiayaan data for selected period with kolektibilitas filter
+            $query = Pembiayaan::where('period_month', $currentMonth)
+                ->where('period_year', $currentYear)
+                ->where('colbaru', $kategori)
+                ->when($absStart, function ($q) use ($absStart) {
+                    return $q->whereDate('tgleff', '>=', $absStart);
+                })
+                ->when($absEnd, function ($q) use ($absEnd) {
+                    return $q->whereDate('tgleff', '<=', $absEnd);
+                })
+                ->orderBy('osmdlc', 'desc') // Order by outstanding descending
+                ->limit($limit);
+
+            $customers = $query->select([
+                'nama',
+                'nokontrak',
+                'osmdlc',
+                'kdprd',
+                'kdaoh',
+                'nmao',
+                'tgleff'
+            ])->get();
+
+            // Get total count for this kategori
+            $totalCountQuery = Pembiayaan::where('period_month', $currentMonth)
+                ->where('period_year', $currentYear)
+                ->where('colbaru', $kategori);
+            $this->applyOptionalDateFilter($totalCountQuery, 'tgleff', $absStart, $absEnd);
+            $totalCount = $totalCountQuery->count();
+
+            // Format data
+            $formattedCustomers = $customers->map(function ($customer) use ($productMapping) {
+                return [
+                    'nama' => $customer->nama,
+                    'nokontrak' => $customer->nokontrak,
+                    'osmdlc' => (float) $customer->osmdlc,
+                    'nama_produk' => $productMapping[$customer->kdprd] ?? 'Produk ' . ($customer->kdprd ?: 'Unknown'),
+                    'kodeaoh' => $customer->kdaoh,
+                    'nama_ao' => $customer->nmao,
+                    'tgl_akad' => $customer->tgleff ? $customer->tgleff->format('d/m/Y') : null,
+                    'jenis_akad' => $customer->kdprd // Using product code as contract type
+                ];
+            });
+
+            return [
+                'kategori' => $kategori,
+                'customers' => $formattedCustomers,
+                'total' => $totalCount,
+                'limit' => $limit,
+                'month' => $currentMonth,
+                'year' => $currentYear
+            ];
+        }, 20);
     }
 }

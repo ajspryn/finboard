@@ -98,6 +98,107 @@ function formatNominal($amount) {
         transform: scale(1.02);
     }
 
+    .segment-table-card .card-header {
+        padding: 1rem 1.25rem 0.875rem;
+        background: linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
+        border-bottom: 1px solid #eef1f6;
+    }
+
+    .segment-table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .segment-table-title {
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: 0.1px;
+    }
+
+    .segment-table-subtitle {
+        margin-top: 0.3rem;
+        margin-bottom: 0;
+        color: #6b7280;
+        font-size: 0.86rem;
+    }
+
+    .segment-table-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
+
+    .segment-table-label {
+        color: #6b7280;
+        font-size: 0.8rem;
+        margin: 0;
+    }
+
+    .segment-table-select {
+        min-width: 220px;
+    }
+
+    .segment-table-copy-btn {
+        min-width: 132px;
+        font-weight: 600;
+    }
+
+    .segment-table-meta {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 0.7rem;
+        color: #6b7280;
+        font-size: 0.83rem;
+    }
+
+    .segment-table-meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: #f6f8fc;
+        border: 1px solid #e9edf5;
+        border-radius: 999px;
+        padding: 0.24rem 0.62rem;
+    }
+
+    #outstandingDisburseTable th,
+    #outstandingDisburseTable td {
+        vertical-align: middle;
+    }
+
+    @media (max-width: 991.98px) {
+        .segment-table-controls {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .segment-table-select {
+            min-width: 190px;
+            flex: 1;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .segment-table-card .card-header {
+            padding: 0.875rem 0.875rem 0.75rem;
+        }
+
+        .segment-table-select,
+        .segment-table-copy-btn {
+            width: 100%;
+        }
+
+        .segment-table-controls {
+            gap: 0.5rem;
+        }
+    }
+
     /* Slide-in animation for cards */
     @keyframes slideInUp {
         from {
@@ -1799,30 +1900,38 @@ function formatNominal($amount) {
     <!-- Row 8: Segmentasi Table -->
     <div class="row">
         <div class="col-12 mb-4">
-            <div class="card">
+            <div class="card segment-table-card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h5 class="card-title mb-0">📊 Tabel Outstanding & Disburse</h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <small class="text-muted">Kelompokkan berdasarkan</small>
-                            <select id="segmentTableGroupBy" class="form-select form-select-sm" style="min-width: 220px;" onchange="updateSegmentTableGrouping(this.value)">
+                    <div class="segment-table-toolbar">
+                        <div>
+                            <h5 class="card-title segment-table-title">📊 Tabel Outstanding & Disburse</h5>
+                            <p class="segment-table-subtitle">Ringkasan disburse, outstanding, kolektibilitas, CIF, dan NOA per segmentasi.</p>
+                        </div>
+                        <div class="segment-table-controls">
+                            <p class="segment-table-label">Kelompokkan berdasarkan</p>
+                            <select id="segmentTableGroupBy" class="form-select form-select-sm segment-table-select" onchange="updateSegmentTableGrouping(this.value)">
                                 <option value="segmentasi" {{ ($segmentTableGroupBy ?? 'segmentasi') === 'segmentasi' ? 'selected' : '' }}>Segmentasi</option>
                                 <option value="sektor_ekonomi" {{ ($segmentTableGroupBy ?? 'segmentasi') === 'sektor_ekonomi' ? 'selected' : '' }}>Sektor Ekonomi</option>
                             </select>
+                            <button type="button" class="btn btn-sm btn-outline-primary segment-table-copy-btn" onclick="copyOutstandingDisburseTable()" aria-label="Copy Tabel Outstanding Disburse">
+                                <i class="ti ti-copy me-1"></i>Copy Tabel
+                            </button>
                         </div>
                     </div>
-                    <small class="text-muted d-block">
-                        <i class="ti ti-calendar me-1"></i>
-                        Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
-                    </small>
-                    <small class="text-muted d-block">
-                        <i class="ti ti-clock me-1"></i>
-                        Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
-                    </small>
+                    <div class="segment-table-meta">
+                        <span class="segment-table-meta-item">
+                            <i class="ti ti-calendar"></i>
+                            Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
+                        </span>
+                        <span class="segment-table-meta-item">
+                            <i class="ti ti-clock"></i>
+                            Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-bordered mb-0">
+                        <table id="outstandingDisburseTable" class="table table-bordered mb-0">
                             <thead>
                                 <tr class="table-light">
                                     <th colspan="2" rowspan="2" class="text-center align-middle">{{ ($segmentTableGroupBy ?? 'segmentasi') === 'sektor_ekonomi' ? 'SEKTOR EKONOMI' : 'SEGMENTASI' }}</th>
@@ -1847,6 +1956,24 @@ function formatNominal($amount) {
                             <tbody>
                                 @foreach($segmentTableData as $segment)
                                 <tr class="{{ $segment['is_total'] ? 'table-active fw-bold' : 'segment-row' }}"
+                                    data-copy-category="{{ $segment['category'] ?? '' }}"
+                                    data-copy-type="{{ $segment['type'] ?? '' }}"
+                                    data-copy-disburse="{{ $segment['disburse'] ?? 0 }}"
+                                    data-copy-pct-disburse="{{ $segment['pct_disburse'] ?? 0 }}"
+                                    data-copy-outstanding="{{ $segment['outstanding'] ?? 0 }}"
+                                    data-copy-pct-outstanding="{{ $segment['pct_outstanding'] ?? 0 }}"
+                                    data-copy-kol1-sum="{{ $segment['col1_sum'] ?? 0 }}"
+                                    data-copy-kol1-noa="{{ $segment['col1'] ?? 0 }}"
+                                    data-copy-kol2-sum="{{ $segment['col2_sum'] ?? 0 }}"
+                                    data-copy-kol2-noa="{{ $segment['col2'] ?? 0 }}"
+                                    data-copy-kol3-sum="{{ $segment['col3_sum'] ?? 0 }}"
+                                    data-copy-kol3-noa="{{ $segment['col3'] ?? 0 }}"
+                                    data-copy-kol4-sum="{{ $segment['col4_sum'] ?? 0 }}"
+                                    data-copy-kol4-noa="{{ $segment['col4'] ?? 0 }}"
+                                    data-copy-kol5-sum="{{ $segment['col5_sum'] ?? 0 }}"
+                                    data-copy-kol5-noa="{{ $segment['col5'] ?? 0 }}"
+                                    data-copy-cif="{{ $segment['cif'] ?? 0 }}"
+                                    data-copy-noa="{{ $segment['noa'] ?? 0 }}"
                                     @if(!$segment['is_total'])
                                         data-category="{{ $segment['category'] }}"
                                         data-type="{{ $segment['type'] }}"
@@ -8274,6 +8401,99 @@ function showKolektibilitasDetails(kategori, namaKategori) {
         container.style.zIndex = '9999';
         document.body.appendChild(container);
         return container;
+    }
+
+    async function copyOutstandingDisburseTable() {
+        const tableRows = document.querySelectorAll('#outstandingDisburseTable tbody tr');
+
+        if (!tableRows.length) {
+            showToast('Data tabel tidak ditemukan', 'warning');
+            return;
+        }
+
+        const headers = [
+            'GROUP',
+            'TYPE',
+            'DISBURSE',
+            'DISBURSE_PCT',
+            'OUTSTANDING',
+            'OUTSTANDING_PCT',
+            'KOL1_OUTSTANDING',
+            'KOL1_NOA',
+            'KOL2_OUTSTANDING',
+            'KOL2_NOA',
+            'KOL3_OUTSTANDING',
+            'KOL3_NOA',
+            'KOL4_OUTSTANDING',
+            'KOL4_NOA',
+            'KOL5_OUTSTANDING',
+            'KOL5_NOA',
+            'CIF',
+            'NOA'
+        ];
+
+        const lines = [headers.join('\t')];
+
+        const toIntString = (value) => {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return '0';
+            return String(Math.round(n));
+        };
+
+        const toPercentString = (value) => {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return '0';
+            return `${n.toFixed(2)}%`;
+        };
+
+        tableRows.forEach((row) => {
+            const d = row.dataset;
+            const line = [
+                d.copyCategory || '',
+                d.copyType || '',
+                toIntString(d.copyDisburse),
+                toPercentString(d.copyPctDisburse),
+                toIntString(d.copyOutstanding),
+                toPercentString(d.copyPctOutstanding),
+                toIntString(d.copyKol1Sum),
+                toIntString(d.copyKol1Noa),
+                toIntString(d.copyKol2Sum),
+                toIntString(d.copyKol2Noa),
+                toIntString(d.copyKol3Sum),
+                toIntString(d.copyKol3Noa),
+                toIntString(d.copyKol4Sum),
+                toIntString(d.copyKol4Noa),
+                toIntString(d.copyKol5Sum),
+                toIntString(d.copyKol5Noa),
+                toIntString(d.copyCif),
+                toIntString(d.copyNoa)
+            ];
+
+            lines.push(line.join('\t'));
+        });
+
+        const tsv = lines.join('\n');
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(tsv);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = tsv;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+
+            showToast('Tabel berhasil di-copy (angka utuh, format Excel)', 'success');
+        } catch (error) {
+            console.error('Copy table failed:', error);
+            showToast('Gagal copy tabel', 'error');
+        }
     }
 
     // Initialize search when DOM is ready

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Searchable;
+use App\Services\FinancialCacheService;
 use Illuminate\Database\Eloquent\Model;
 
 class Deposito extends Model
@@ -83,5 +84,18 @@ class Deposito extends Model
             'noid',
             'hp',
         ];
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function () {
+            app(FinancialCacheService::class)->invalidateDashboardRenderCache();
+        });
+
+        static::deleted(function () {
+            app(FinancialCacheService::class)->invalidateDashboardRenderCache();
+        });
     }
 }

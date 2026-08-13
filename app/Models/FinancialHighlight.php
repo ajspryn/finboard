@@ -61,6 +61,7 @@ class FinancialHighlight extends Model
         static::saved(function ($model) {
             // Dispatch real-time update event
             $cacheService = app(\App\Services\FinancialCacheService::class);
+            $cacheService->invalidateDashboardRenderCache();
             $cacheService->updateDataWithBroadcast('highlights', [
                 'period_year' => $model->period_year,
                 'period_month' => $model->period_month,
@@ -74,6 +75,7 @@ class FinancialHighlight extends Model
         static::deleted(function ($model) {
             // Dispatch real-time update event
             $cacheService = app(\App\Services\FinancialCacheService::class);
+            $cacheService->invalidateDashboardRenderCache();
             $cacheService->updateDataWithBroadcast('highlights', [
                 'period_year' => $model->period_year,
                 'period_month' => $model->period_month,

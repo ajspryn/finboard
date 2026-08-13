@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Deposito;
+use App\Models\Linkage;
+use App\Models\Pembiayaan;
+use App\Models\Tabungan;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use PDF;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
@@ -140,6 +146,285 @@ class ExportController extends Controller
         $filename = 'dashboard-finboard-' . date('Y-m-d-H-i-s') . '.pdf';
 
         return $pdf->download($filename);
+    }
+
+    public function showDataExportForm()
+    {
+        $now = now();
+
+        return view('exports.data-export', [
+            'defaultStartPeriod' => $now->copy()->subMonthNoOverflow()->format('Y-m'),
+            'defaultEndPeriod' => $now->format('Y-m'),
+            'currentPeriod' => $now->format('Y-m'),
+            'lastPeriod' => $now->copy()->subMonthNoOverflow()->format('Y-m'),
+        ]);
+    }
+
+    public function exportSelectedData(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'data_type' => 'required|in:tabungan,funding,lending,all',
+            'period_type' => 'required|in:this_month,last_month,custom_range',
+            'start_period' => 'nullable|required_if:period_type,custom_range|date_format:Y-m',
+            'end_period' => 'nullable|required_if:period_type,custom_range|date_format:Y-m|after_or_equal:start_period',
+            'filter_field' => 'nullable|in:cif,nik,nama,rekening,hp,produk,ao,kecamatan,keyword',
+            'filter_value' => 'nullable|string|max:100',
+        ]);
+
+        [$startKey, $endKey, $periodLabel] = $this->resolvePeriodRange(
+            $validated['period_type'],
+            $validated['start_period'] ?? null,
+            $validated['end_period'] ?? null,
+        );
+
+        $dataType = $validated['data_type'];
+        $filterField = $validated['filter_field'] ?? null;
+        $filterValue = $validated['filter_value'] ?? null;
+
+        $selectedDatasets = match ($dataType) {
+            'tabungan' => ['tabungan'],
+            'funding' => ['deposito', 'linkage'],
+            'lending' => ['pembiayaan'],
+            default => ['tabungan', 'deposito', 'linkage', 'pembiayaan'],
+        };
+
+        $headers = [
+            'Sumber Data',
+            'Periode Tahun',
+            'Periode Bulan',
+            'CIF',
+            'NIK/No ID',
+            'Nama Nasabah',
+            'Nomor Referensi',
+            'Produk',
+            'HP',
+            'AO',
+            'Kecamatan',
+            'Nominal',
+            'Tanggal Referensi',
+        ];
+
+        $filename = sprintf(
+            'export-data-%s-%s-%s.csv',
+            $dataType,
+            str_replace(' ', '-', strtolower($periodLabel)),
+            now()->format('Ymd-His')
+        );
+
+        return response()->streamDownload(function () use ($headers, $selectedDatasets, $startKey, $endKey, $filterField, $filterValue) {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, $headers);
+            $seenCifs = [];
+
+            foreach ($selectedDatasets as $dataset) {
+                $query = $this->buildDatasetQuery($dataset, $startKey, $endKey);
+                $this->applyDatasetFilters($query, $dataset, $filterField, $filterValue);
+
+                $query
+                    ->orderByDesc('period_year')
+                    ->orderByDesc('period_month')
+                    ->orderByDesc('id')
+                    ->chunk(1000, function ($rows) use ($output, &$seenCifs) {
+                        foreach ($rows as $row) {
+                            $cif = trim((string) ($row->nocif ?? ''));
+                            if ($cif === '' || isset($seenCifs[$cif])) {
+                                continue;
+                            }
+
+                            $seenCifs[$cif] = true;
+
+                            fputcsv($output, [
+                                $row->sumber_data,
+                                $row->period_year,
+                                str_pad((string) $row->period_month, 2, '0', STR_PAD_LEFT),
+                                $cif,
+                                $row->nik,
+                                $row->nama_nasabah,
+                                $row->nomor_referensi,
+                                $row->produk,
+                                $row->hp,
+                                $row->ao,
+                                $row->kecamatan,
+                                $row->nominal,
+                                $row->tanggal_referensi,
+                            ]);
+                        }
+                    });
+            }
+
+            fclose($output);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function resolvePeriodRange(string $periodType, ?string $startPeriod, ?string $endPeriod): array
+    {
+        if ($periodType === 'this_month') {
+            $current = now()->format('Y-m');
+            return [$this->monthKey($current), $this->monthKey($current), 'bulan-ini'];
+        }
+
+        if ($periodType === 'last_month') {
+            $last = now()->subMonthNoOverflow()->format('Y-m');
+            return [$this->monthKey($last), $this->monthKey($last), 'bulan-lalu'];
+        }
+
+        $start = Carbon::createFromFormat('Y-m', (string) $startPeriod)->startOfMonth()->format('Y-m');
+        $end = Carbon::createFromFormat('Y-m', (string) $endPeriod)->startOfMonth()->format('Y-m');
+
+        return [$this->monthKey($start), $this->monthKey($end), $start . '-sd-' . $end];
+    }
+
+    private function monthKey(string $period): int
+    {
+        [$year, $month] = explode('-', $period);
+        return ((int) $year * 100) + (int) $month;
+    }
+
+    private function applyPeriodFilter($query, int $startKey, int $endKey)
+    {
+        return $query->whereRaw(
+            '((period_year * 100) + period_month) BETWEEN ? AND ?',
+            [$startKey, $endKey]
+        );
+    }
+
+    private function buildDatasetQuery(string $dataset, int $startKey, int $endKey)
+    {
+        if ($dataset === 'tabungan') {
+            $query = Tabungan::query()->selectRaw("id, 'TABUNGAN' as sumber_data, period_year, period_month, nocif, noid as nik, fnama as nama_nasabah, notab as nomor_referensi, kodeprd as produk, hp, NULL as ao, NULL as kecamatan, sahirrp as nominal, tgltrnakh as tanggal_referensi");
+            return $this->applyPeriodFilter($query, $startKey, $endKey);
+        }
+
+        if ($dataset === 'deposito') {
+            $query = Deposito::query()->selectRaw("id, 'FUNDING-DEPOSITO' as sumber_data, period_year, period_month, nocif, noid as nik, nama as nama_nasabah, nodep as nomor_referensi, kdprd as produk, hp, kodeaoh as ao, kecamatan, nomrp as nominal, tgleff as tanggal_referensi");
+            return $this->applyPeriodFilter($query, $startKey, $endKey);
+        }
+
+        if ($dataset === 'linkage') {
+            $query = Linkage::query()->selectRaw("id, 'FUNDING-LINKAGE' as sumber_data, period_year, period_month, nocif, NULL as nik, nama as nama_nasabah, nokontrak as nomor_referensi, jnsakad as produk, NULL as hp, NULL as ao, NULL as kecamatan, os as nominal, tgleff as tanggal_referensi");
+            return $this->applyPeriodFilter($query, $startKey, $endKey);
+        }
+
+        $query = Pembiayaan::query()->selectRaw("id, 'LENDING' as sumber_data, period_year, period_month, nocif, NULL as nik, nama as nama_nasabah, nokontrak as nomor_referensi, kdprd as produk, hp, nmao as ao, kecamatan, osmdlc as nominal, tgleff as tanggal_referensi");
+        return $this->applyPeriodFilter($query, $startKey, $endKey);
+    }
+
+    private function applyDatasetFilters($query, string $dataset, ?string $filterField, ?string $filterValue): void
+    {
+        $value = trim((string) $filterValue);
+        if (!$filterField || $value === '') {
+            return;
+        }
+
+        if ($filterField === 'keyword') {
+            $query->where(function ($sub) use ($dataset, $value) {
+                $sub->where('nocif', 'like', "%{$value}%");
+
+                if ($dataset === 'tabungan') {
+                    $sub->orWhere('noid', 'like', "%{$value}%")
+                        ->orWhere('fnama', 'like', "%{$value}%")
+                        ->orWhere('notab', 'like', "%{$value}%")
+                        ->orWhere('kodeprd', 'like', "%{$value}%");
+                    return;
+                }
+
+                if ($dataset === 'deposito') {
+                    $sub->orWhere('noid', 'like', "%{$value}%")
+                        ->orWhere('nama', 'like', "%{$value}%")
+                        ->orWhere('nodep', 'like', "%{$value}%")
+                        ->orWhere('kdprd', 'like', "%{$value}%")
+                        ->orWhere('kodeaoh', 'like', "%{$value}%")
+                        ->orWhere('kecamatan', 'like', "%{$value}%");
+                    return;
+                }
+
+                if ($dataset === 'linkage') {
+                    $sub->orWhere('nama', 'like', "%{$value}%")
+                        ->orWhere('nokontrak', 'like', "%{$value}%")
+                        ->orWhere('jnsakad', 'like', "%{$value}%");
+                    return;
+                }
+
+                $sub->orWhere('nama', 'like', "%{$value}%")
+                    ->orWhere('nokontrak', 'like', "%{$value}%")
+                    ->orWhere('kdprd', 'like', "%{$value}%")
+                    ->orWhere('nmao', 'like', "%{$value}%")
+                    ->orWhere('kecamatan', 'like', "%{$value}%");
+            });
+
+            return;
+        }
+
+        if ($filterField === 'cif') {
+            $query->where('nocif', 'like', "%{$value}%");
+            return;
+        }
+
+        if ($filterField === 'nik') {
+            if ($dataset === 'tabungan' || $dataset === 'deposito') {
+                $query->where('noid', 'like', "%{$value}%");
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        if ($filterField === 'nama') {
+            $query->where($dataset === 'tabungan' ? 'fnama' : 'nama', 'like', "%{$value}%");
+            return;
+        }
+
+        if ($filterField === 'rekening') {
+            if ($dataset === 'tabungan') {
+                $query->where('notab', 'like', "%{$value}%");
+            } elseif ($dataset === 'deposito') {
+                $query->where('nodep', 'like', "%{$value}%");
+            } else {
+                $query->where('nokontrak', 'like', "%{$value}%");
+            }
+            return;
+        }
+
+        if ($filterField === 'hp') {
+            if ($dataset === 'tabungan' || $dataset === 'deposito' || $dataset === 'pembiayaan') {
+                $query->where('hp', 'like', "%{$value}%");
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        if ($filterField === 'produk') {
+            if ($dataset === 'tabungan') {
+                $query->where('kodeprd', 'like', "%{$value}%");
+            } elseif ($dataset === 'deposito' || $dataset === 'pembiayaan') {
+                $query->where('kdprd', 'like', "%{$value}%");
+            } else {
+                $query->where('jnsakad', 'like', "%{$value}%");
+            }
+            return;
+        }
+
+        if ($filterField === 'ao') {
+            if ($dataset === 'deposito') {
+                $query->where('kodeaoh', 'like', "%{$value}%");
+            } elseif ($dataset === 'pembiayaan') {
+                $query->where('nmao', 'like', "%{$value}%");
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        if ($filterField === 'kecamatan') {
+            if ($dataset === 'deposito' || $dataset === 'pembiayaan') {
+                $query->where('kecamatan', 'like', "%{$value}%");
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
     }
 
     // Helper methods to get dashboard data - same as DashboardController

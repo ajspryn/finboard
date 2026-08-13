@@ -18,6 +18,7 @@ class FinancialCacheService
      * Cache keys
      */
     const CACHE_PREFIX = 'financial:';
+    const DASHBOARD_RENDER_VERSION_KEY = 'dashboard:render:version';
 
     /**
      * Get cached financial highlights data
@@ -221,6 +222,26 @@ class FinancialCacheService
     }
 
     /**
+     * Get the current dashboard render cache version.
+     */
+    public function getDashboardRenderVersion(): int
+    {
+        return (int) Cache::get(self::DASHBOARD_RENDER_VERSION_KEY, 1);
+    }
+
+    /**
+     * Invalidate cached dashboard renders without flushing the whole cache store.
+     */
+    public function invalidateDashboardRenderCache(): int
+    {
+        $version = $this->getDashboardRenderVersion() + 1;
+        Cache::forever(self::DASHBOARD_RENDER_VERSION_KEY, $version);
+        Cache::forget('dashboard:latest-period');
+
+        return $version;
+    }
+
+    /**
      * Clear cache for specific period
      */
     public function clearPeriodCache(int $year, int $month): void
@@ -413,6 +434,10 @@ class FinancialCacheService
 
         foreach ($patterns as $pattern) {
             Cache::forget($pattern);
+        }
+
+        if ($type === 'all') {
+            $this->invalidateDashboardRenderCache();
         }
 
         Log::info('Cache invalidated', ['type' => $type, 'params' => $params]);

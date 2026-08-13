@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Searchable;
+use App\Services\FinancialCacheService;
 use Illuminate\Database\Eloquent\Model;
 
 class Pembiayaan extends Model
@@ -88,5 +89,18 @@ class Pembiayaan extends Model
             'fnama',
             'nocif',
         ];
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function () {
+            app(FinancialCacheService::class)->invalidateDashboardRenderCache();
+        });
+
+        static::deleted(function () {
+            app(FinancialCacheService::class)->invalidateDashboardRenderCache();
+        });
     }
 }
