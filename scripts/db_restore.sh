@@ -27,6 +27,8 @@ DB_PORT="${DB_PORT:-}"
 DB_DATABASE="${DB_DATABASE:-}"
 DB_USERNAME="${DB_USERNAME:-}"
 DB_PASSWORD="${DB_PASSWORD:-}"
+MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-}"
+MYSQL_SSL_CA="${MYSQL_SSL_CA:-}"
 
 if [[ -f "$ENV_FILE" ]]; then
   [[ -z "$DB_HOST" ]] && DB_HOST="$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
@@ -34,6 +36,8 @@ if [[ -f "$ENV_FILE" ]]; then
   [[ -z "$DB_DATABASE" ]] && DB_DATABASE="$(grep -E '^DB_DATABASE=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
   [[ -z "$DB_USERNAME" ]] && DB_USERNAME="$(grep -E '^DB_USERNAME=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
   [[ -z "$DB_PASSWORD" ]] && DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$MYSQL_SSL_MODE" ]] && MYSQL_SSL_MODE="$(grep -E '^MYSQL_SSL_MODE=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$MYSQL_SSL_CA" ]] && MYSQL_SSL_CA="$(grep -E '^MYSQL_SSL_CA=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
 fi
 
 DB_HOST="${DB_HOST:-127.0.0.1}"
@@ -41,6 +45,8 @@ DB_PORT="${DB_PORT:-3306}"
 DB_DATABASE="${DB_DATABASE:-finboard}"
 DB_USERNAME="${DB_USERNAME:-root}"
 DB_PASSWORD="${DB_PASSWORD:-}"
+MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-REQUIRED}"
+MYSQL_SSL_CA="${MYSQL_SSL_CA:-}"
 
 if [[ ! -f "$BACKUP_FILE" ]]; then
   echo "Backup file not found: $BACKUP_FILE" >&2
@@ -55,9 +61,6 @@ if [[ $SKIP_CONFIRM -ne 1 ]]; then
   fi
 fi
 
-# Drop and recreate database (requires privileges)
-mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" -e "DROP DATABASE IF EXISTS \`$DB_DATABASE\`; CREATE DATABASE \`$DB_DATABASE\`;"
-
 # Find mysql binary from PATH or common Homebrew locations
 MYSQL_BIN="$(command -v mysql 2>/dev/null || true)"
 for p in "/opt/homebrew/bin/mysql" "/opt/homebrew/opt/mysql-client/bin/mysql" "/usr/local/opt/mysql-client/bin/mysql" "/usr/local/bin/mysql" "/usr/bin/mysql"; do
@@ -71,11 +74,24 @@ if [[ -z "$MYSQL_BIN" || ! -x "$MYSQL_BIN" ]]; then
   exit 2
 fi
 
+# TLS options for environments with self-signed certificates.
+# Default mode REQUIRED keeps TLS enabled but does not enforce CA validation.
+MYSQL_SSL_ARGS=()
+if "$MYSQL_BIN" --help 2>/dev/null | grep -q -- '--ssl-mode'; then
+  MYSQL_SSL_ARGS+=("--ssl-mode=$MYSQL_SSL_MODE")
+fi
+if [[ -n "$MYSQL_SSL_CA" ]]; then
+  MYSQL_SSL_ARGS+=("--ssl-ca=$MYSQL_SSL_CA")
+fi
+
+# Drop and recreate database (requires privileges)
+"$MYSQL_BIN" "${MYSQL_SSL_ARGS[@]}" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" -e "DROP DATABASE IF EXISTS \`$DB_DATABASE\`; CREATE DATABASE \`$DB_DATABASE\`;"
+
 # Restore
 if [[ "$BACKUP_FILE" == *.gz ]]; then
-  gunzip -c "$BACKUP_FILE" | "$MYSQL_BIN" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" "$DB_DATABASE"
+  gunzip -c "$BACKUP_FILE" | "$MYSQL_BIN" "${MYSQL_SSL_ARGS[@]}" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" "$DB_DATABASE"
 else
-  "$MYSQL_BIN" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" "$DB_DATABASE" < "$BACKUP_FILE"
+  "$MYSQL_BIN" "${MYSQL_SSL_ARGS[@]}" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --password="$DB_PASSWORD" "$DB_DATABASE" < "$BACKUP_FILE"
 fi
 
 if [[ $? -ne 0 ]]; then

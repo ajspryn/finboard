@@ -63,6 +63,15 @@ Troubleshooting
 
 - If `mysqldump` prompts for a password, ensure `.env` contains `DB_PASSWORD` or run via an account with proper privileges.
 - For very large DBs consider streaming uploads to S3 to avoid local disk pressure.
+- If backup/restore fails with `TLS/SSL error: self-signed certificate in certificate chain`, set:
+
+```env
+MYSQL_SSL_MODE=REQUIRED
+MYSQL_SSL_CA=
+```
+
+`MYSQL_SSL_MODE=REQUIRED` keeps TLS enabled but does not require CA chain verification.
+If your DB provider gives a CA file, set `MYSQL_SSL_CA` to that file path and optionally use `MYSQL_SSL_MODE=VERIFY_CA`.
 
 Installation notes (if `mysqldump` is not found)
 
