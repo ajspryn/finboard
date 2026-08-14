@@ -287,12 +287,7 @@ class DashboardController extends Controller
         $endDay   = $request->input('end_day');
 
         // Resolve latest available period first — used as fallback when no params are given
-        $latestPeriod = Pembiayaan::query()
-            ->select('period_year', 'period_month')
-            ->whereNotNull('period_year')
-            ->whereNotNull('period_month')
-            ->orderByRaw('(period_year * 100 + period_month) DESC')
-            ->first();
+        $latestPeriod = $this->getLatestPembiayaanPeriod();
 
         $latestYear  = $latestPeriod?->period_year;
         $latestMonth = $latestPeriod?->period_month;

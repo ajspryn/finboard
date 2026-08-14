@@ -193,7 +193,9 @@ class ProcessCsvUpload implements ShouldQueue
                 DB::statement('SET UNIQUE_CHECKS=1;');
             }
             // DB::statement('SET AUTOCOMMIT=1;'); // Removed - not needed
-            DB::enableQueryLog();
+            // Keep query log disabled in long-running queue workers to avoid
+            // memory growth and overhead across subsequent jobs.
+            DB::disableQueryLog();
 
             // Re-enable Elasticsearch indexing
             Pembiayaan::$disableElasticsearchIndexing = false;
