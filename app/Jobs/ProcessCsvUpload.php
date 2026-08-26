@@ -32,6 +32,7 @@ class ProcessCsvUpload implements ShouldQueue
     protected $year;
     protected $userId;
     protected $statusIds;
+    protected ?string $filePath = null;
 
     /**
      * Create a new job instance.
@@ -511,13 +512,10 @@ class ProcessCsvUpload implements ShouldQueue
      */
     private function createRecordFromCsvRow($data, $header, $jenis, $lineNumber, $month, $year)
     {
+        $data = $this->normalizeCsvRowLength($header, $data, $jenis, $lineNumber);
+
         if ($jenis === 'PEMBIAYAAN') {
             // Use the existing validateAndConvertData method for pembiayaan
-            if (count($header) !== count($data)) {
-                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
-                Log::warning("{$message} (baris {$lineNumber})");
-                return ['__invalid' => true, 'message' => $message];
-            }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
                 $record = $this->validateAndConvertData($csvRow, $lineNumber);
@@ -528,11 +526,6 @@ class ProcessCsvUpload implements ShouldQueue
             }
         } elseif ($jenis === 'TABUNGAN') {
             // Use array_combine and validation like PEMBIAYAAN
-            if (count($header) !== count($data)) {
-                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
-                Log::warning("{$message} (baris {$lineNumber})");
-                return ['__invalid' => true, 'message' => $message];
-            }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
                 $record = $this->validateTabunganData($csvRow, $lineNumber);
@@ -543,11 +536,6 @@ class ProcessCsvUpload implements ShouldQueue
             }
         } elseif ($jenis === 'DEPOSITO') {
             // Use array_combine and validation like PEMBIAYAAN
-            if (count($header) !== count($data)) {
-                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
-                Log::warning("{$message} (baris {$lineNumber})");
-                return ['__invalid' => true, 'message' => $message];
-            }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
                 $record = $this->validateDepositoData($csvRow, $lineNumber);
@@ -558,11 +546,6 @@ class ProcessCsvUpload implements ShouldQueue
             }
         } elseif ($jenis === 'LINKAGE') {
             // Use array_combine and validation like PEMBIAYAAN
-            if (count($header) !== count($data)) {
-                $message = "Mismatch kolom header vs data: header " . count($header) . ", data " . count($data);
-                Log::warning("{$message} (baris {$lineNumber})");
-                return ['__invalid' => true, 'message' => $message];
-            }
             $csvRow = array_combine(array_map('strtolower', array_map('trim', $header)), $data);
             try {
                 $record = $this->validateLinkageData($csvRow, $lineNumber);
@@ -574,6 +557,28 @@ class ProcessCsvUpload implements ShouldQueue
         }
 
         return null;
+    }
+
+    /**
+     * Normalize a CSV data row so minor delimiter/header mismatches do not drop valid records.
+     * Extra values are truncated; missing values are padded with empty strings.
+     */
+    private function normalizeCsvRowLength(array $header, array $data, string $jenis, int $lineNumber): array
+    {
+        $headerCount = count($header);
+        $dataCount = count($data);
+
+        if ($headerCount === $dataCount) {
+            return $data;
+        }
+
+        if ($dataCount > $headerCount) {
+            Log::warning("CSV {$jenis} row {$lineNumber} has extra columns ({$dataCount} > {$headerCount}); truncating extras.");
+            return array_slice($data, 0, $headerCount);
+        }
+
+        Log::warning("CSV {$jenis} row {$lineNumber} has missing columns ({$dataCount} < {$headerCount}); padding blanks.");
+        return array_pad($data, $headerCount, '');
     }
 
     /**
@@ -912,6 +917,20 @@ class ProcessCsvUpload implements ShouldQueue
         }
 
         return 0;
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $value = (float) $bytes;
+        $unitIndex = 0;
+
+        while ($value >= 1024 && $unitIndex < count($units) - 1) {
+            $value /= 1024;
+            $unitIndex++;
+        }
+
+        return number_format($value, 2) . ' ' . $units[$unitIndex];
     }
 
     private function readCsvFile(): array

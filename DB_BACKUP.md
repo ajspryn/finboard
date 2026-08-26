@@ -68,10 +68,11 @@ Troubleshooting
 ```env
 MYSQL_SSL_MODE=REQUIRED
 MYSQL_SSL_CA=
+MYSQL_ATTR_SSL_CA=
 ```
 
 `MYSQL_SSL_MODE=REQUIRED` keeps TLS enabled but does not require CA chain verification.
-If your DB provider gives a CA file, set `MYSQL_SSL_CA` to that file path and optionally use `MYSQL_SSL_MODE=VERIFY_CA`.
+If your DB provider gives a CA file, set `MYSQL_SSL_CA` or `MYSQL_ATTR_SSL_CA` to that file path and optionally use `MYSQL_SSL_MODE=VERIFY_CA`.
 
 Installation notes (if `mysqldump` is not found)
 

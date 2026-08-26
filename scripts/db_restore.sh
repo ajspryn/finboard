@@ -29,6 +29,7 @@ DB_USERNAME="${DB_USERNAME:-}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-}"
 MYSQL_SSL_CA="${MYSQL_SSL_CA:-}"
+MYSQL_ATTR_SSL_CA="${MYSQL_ATTR_SSL_CA:-}"
 
 if [[ -f "$ENV_FILE" ]]; then
   [[ -z "$DB_HOST" ]] && DB_HOST="$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
@@ -38,6 +39,7 @@ if [[ -f "$ENV_FILE" ]]; then
   [[ -z "$DB_PASSWORD" ]] && DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
   [[ -z "$MYSQL_SSL_MODE" ]] && MYSQL_SSL_MODE="$(grep -E '^MYSQL_SSL_MODE=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
   [[ -z "$MYSQL_SSL_CA" ]] && MYSQL_SSL_CA="$(grep -E '^MYSQL_SSL_CA=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
+  [[ -z "$MYSQL_ATTR_SSL_CA" ]] && MYSQL_ATTR_SSL_CA="$(grep -E '^MYSQL_ATTR_SSL_CA=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' || true)"
 fi
 
 DB_HOST="${DB_HOST:-127.0.0.1}"
@@ -46,7 +48,7 @@ DB_DATABASE="${DB_DATABASE:-finboard}"
 DB_USERNAME="${DB_USERNAME:-root}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-REQUIRED}"
-MYSQL_SSL_CA="${MYSQL_SSL_CA:-}"
+MYSQL_SSL_CA="${MYSQL_SSL_CA:-${MYSQL_ATTR_SSL_CA:-}}"
 
 if [[ ! -f "$BACKUP_FILE" ]]; then
   echo "Backup file not found: $BACKUP_FILE" >&2
@@ -79,6 +81,8 @@ fi
 MYSQL_SSL_ARGS=()
 if "$MYSQL_BIN" --help 2>/dev/null | grep -q -- '--ssl-mode'; then
   MYSQL_SSL_ARGS+=("--ssl-mode=$MYSQL_SSL_MODE")
+elif [[ "$MYSQL_SSL_MODE" != "DISABLED" ]]; then
+  MYSQL_SSL_ARGS+=("--ssl")
 fi
 if [[ -n "$MYSQL_SSL_CA" ]]; then
   MYSQL_SSL_ARGS+=("--ssl-ca=$MYSQL_SSL_CA")

@@ -66,7 +66,7 @@ class BackupController extends Controller
                     $msg .= '\nSuggestion: install MySQL client (Homebrew: `brew install mysql-client`) and ensure the binary is readable by the webserver user.';
                }
                if (stripos($msg, 'self-signed certificate in certificate chain') !== false || stripos($msg, 'TLS/SSL error') !== false) {
-                    $msg .= '\nSuggestion: set MYSQL_SSL_MODE=REQUIRED in Dokploy env (and MYSQL_SSL_CA if provided by DB vendor), then redeploy/restart app container.';
+                    $msg .= '\nSuggestion: set MYSQL_SSL_MODE=REQUIRED in Dokploy env (and MYSQL_SSL_CA or MYSQL_ATTR_SSL_CA if provided by DB vendor), then redeploy/restart app container.';
                }
                return redirect()->route('admin.backups.index')->with('error', 'Backup failed: ' . Str::limit($msg, 750));
           }
