@@ -227,6 +227,23 @@ class DashboardController extends Controller
     }
 
     /**
+     * Build anti-join query for contracts that exist in previous period
+     * but no longer exist in current period.
+     */
+    private function buildMissingContractsQuery(string $prevMonth, int $prevYear, string $currentMonth, int $currentYear)
+    {
+        return DB::table('pembiayaans as prev')
+            ->leftJoin('pembiayaans as curr', function ($join) use ($currentMonth, $currentYear) {
+                $join->on('prev.nokontrak', '=', 'curr.nokontrak')
+                    ->where('curr.period_month', $currentMonth)
+                    ->where('curr.period_year', $currentYear);
+            })
+            ->where('prev.period_month', $prevMonth)
+            ->where('prev.period_year', $prevYear)
+            ->whereNull('curr.nokontrak');
+    }
+
+    /**
      * Show the dashboard with banking data
      */
     /**
@@ -997,38 +1014,14 @@ class DashboardController extends Controller
             }
             $tPrevMonthStr = str_pad($tPrevMonth, 2, '0', STR_PAD_LEFT);
 
-            $tKontrakLalu = Pembiayaan::where('period_month', $tPrevMonthStr)
-                ->where('period_year', $tPrevYear)
-                ->selectRaw('DISTINCT nokontrak')
-                ->pluck('nokontrak')
-                ->toArray();
-            $tKontrakIni = Pembiayaan::where('period_month', $tMonthStr)
-                ->where('period_year', $tYear)
-                ->selectRaw('DISTINCT nokontrak')
-                ->pluck('nokontrak')
-                ->toArray();
-            $tHilang = array_diff($tKontrakLalu, $tKontrakIni);
+            $pelunasanCepatAgg = $this->buildMissingContractsQuery($tPrevMonthStr, $tPrevYear, $tMonthStr, $tYear)
+                ->whereRaw('prev.angs_ke < prev.jw')
+                ->where('prev.jw', '>', 0)
+                ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(prev.mdlawal), 0) as nominal')
+                ->first();
 
-            if (!empty($tHilang)) {
-                $pelunasanCepatBaseQuery = Pembiayaan::where('period_month', $tPrevMonthStr)
-                    ->where('period_year', $tPrevYear)
-                    ->whereIn('nokontrak', $tHilang)
-                    ->whereRaw('angs_ke < jw')
-                    ->where('jw', '>', 0)
-                    ->select('nokontrak', 'mdlawal');
-
-                $pelunasanCepatContracts = $pelunasanCepatBaseQuery
-                    ->get()
-                    ->unique('nokontrak')
-                    ->values();
-
-                $tNominal = $pelunasanCepatContracts->sum('mdlawal');
-                $pelunasanCepatByMonth[] = round(($tNominal ?? 0) / 1000000000, 2);
-                $pelunasanCepatCountByMonth[] = $pelunasanCepatContracts->count();
-            } else {
-                $pelunasanCepatByMonth[] = 0;
-                $pelunasanCepatCountByMonth[] = 0;
-            }
+            $pelunasanCepatByMonth[] = round(((float)($pelunasanCepatAgg->nominal ?? 0)) / 1000000000, 2);
+            $pelunasanCepatCountByMonth[] = (int)($pelunasanCepatAgg->jumlah ?? 0);
         }
         $monthlyTrends['pelunasan_cepat'] = $pelunasanCepatByMonth;
         $monthlyTrends['pelunasan_cepat_count'] = $pelunasanCepatCountByMonth;
@@ -1347,11 +1340,13 @@ class DashboardController extends Controller
 
         $topAOCollection = $topAOQuery->get();
 
-        // Log SQL and counts for debugging when card is empty
-        try {
-            \Log::debug('Top AO query', ['sql' => $topAORawSql, 'bindings' => $topAOBindings, 'count' => $topAOCollection->count(), 'sample' => $topAOCollection->first()]);
-        } catch (\Exception $e) {
-            // ignore logging errors
+        // Log SQL only in local/dev to avoid production log overhead on every dashboard render.
+        if (app()->isLocal()) {
+            try {
+                \Log::debug('Top AO query', ['sql' => $topAORawSql, 'bindings' => $topAOBindings, 'count' => $topAOCollection->count(), 'sample' => $topAOCollection->first()]);
+            } catch (\Exception $e) {
+                // ignore logging errors
+            }
         }
 
         $topAOData = $topAOCollection->map(function ($item) {
@@ -1628,60 +1623,30 @@ class DashboardController extends Controller
         $startOfMonth = $filterYear . '-' . $filterMonthStr . '-01';
         $endOfMonth = $filterYear . '-' . $filterMonthStr . '-' . date('t', strtotime($startOfMonth));
 
-        // Ambil DISTINCT nokontrak dengan tgleff di bulan ini DARI period bulan ini
-        $uniqueKontrakBaru = Pembiayaan::where('period_month', $filterMonthStr)
+        // Agregasi langsung di DB agar tidak memindahkan daftar kontrak besar ke PHP.
+        $kontrakBaruAgg = Pembiayaan::where('period_month', $filterMonthStr)
             ->where('period_year', $filterYear)
             ->whereDate('tgleff', '>=', $startOfMonth)
             ->whereDate('tgleff', '<=', $endOfMonth)
-            ->selectRaw('DISTINCT nokontrak')
-            ->pluck('nokontrak')
-            ->toArray();
+            ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(mdlawal), 0) as nominal')
+            ->first();
 
-        $jumlahNasabahBaru = count($uniqueKontrakBaru);
-        $nominalNasabahBaru = 0;
-        if ($jumlahNasabahBaru > 0) {
-            $nominalNasabahBaru = Pembiayaan::where('period_month', $filterMonthStr)
-                ->where('period_year', $filterYear)
-                ->whereIn('nokontrak', $uniqueKontrakBaru)
-                ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
-                ->groupBy('nokontrak')
-                ->get()
-                ->sum('mdlawal');
-        }
-
-        // Get kontrak yang hilang untuk pelunasan cepat dan lunas
-        $kontrakBulanLalu = Pembiayaan::where('period_month', $prevMonthStr)
-            ->where('period_year', $prevYear)
-            ->selectRaw('DISTINCT nokontrak')
-            ->pluck('nokontrak')
-            ->toArray();
-
-        $kontrakBulanIni = Pembiayaan::where('period_month', $filterMonthStr)
-            ->where('period_year', $filterYear)
-            ->selectRaw('DISTINCT nokontrak')
-            ->pluck('nokontrak')
-            ->toArray();
-        $kontrakHilang = array_diff($kontrakBulanLalu, $kontrakBulanIni);
+        $jumlahNasabahBaru = (int)($kontrakBaruAgg->jumlah ?? 0);
+        $nominalNasabahBaru = (float)($kontrakBaruAgg->nominal ?? 0);
 
         // 2. PELUNASAN CEPAT - kontrak ada di bulan lalu, hilang di bulan ini, dan masih banyak tenor
-        // Dari kontrak yang hilang, ambil data terakhir di bulan lalu
-        $pelunasanCepatContracts = Pembiayaan::where('period_month', $prevMonthStr)
-            ->where('period_year', $prevYear)
-            ->whereIn('nokontrak', $kontrakHilang)
-            ->whereRaw('angs_ke < jw') // Masih banyak tenor (lunas sebelum jatuh tempo)
-            ->where('jw', '>', 0)
-            ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
-            ->groupBy('nokontrak')
-            ->get();
+        $pelunasanCepatAgg = $this->buildMissingContractsQuery($prevMonthStr, (int)$prevYear, $filterMonthStr, (int)$filterYear)
+            ->whereRaw('prev.angs_ke < prev.jw') // Masih banyak tenor (lunas sebelum jatuh tempo)
+            ->where('prev.jw', '>', 0)
+            ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(prev.mdlawal), 0) as nominal')
+            ->first();
 
         // 3. NASABAH LUNAS - kontrak ada di bulan lalu, hilang di bulan ini, dan tenor sudah habis/hampir habis
-        $nasabahLunas = Pembiayaan::where('period_month', $prevMonthStr)
-            ->where('period_year', $prevYear)
-            ->whereIn('nokontrak', $kontrakHilang)
-            ->whereRaw('angs_ke >= jw') // Tenor sudah selesai (lunas tepat waktu)
-            ->where('jw', '>', 0)
-            ->where('osmdlc', '<=', 2000000) // Outstanding max 2 juta
-            ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as total_nominal')
+        $nasabahLunas = $this->buildMissingContractsQuery($prevMonthStr, (int)$prevYear, $filterMonthStr, (int)$filterYear)
+            ->whereRaw('prev.angs_ke >= prev.jw') // Tenor sudah selesai (lunas tepat waktu)
+            ->where('prev.jw', '>', 0)
+            ->where('prev.osmdlc', '<=', 2000000) // Outstanding max 2 juta
+            ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(prev.mdlawal), 0) as total_nominal')
             ->first();
 
         return [
@@ -1696,9 +1661,9 @@ class DashboardController extends Controller
                 'nominal_miliar' => round(($nasabahLunas->total_nominal ?? 0) / 1000000000, 2)
             ],
             'pelunasan_cepat' => [
-                'jumlah' => $pelunasanCepatContracts->count(),
-                'nominal' => $pelunasanCepatContracts->sum('mdlawal'),
-                'nominal_miliar' => round($pelunasanCepatContracts->sum('mdlawal') / 1000000000, 2)
+                'jumlah' => (int)($pelunasanCepatAgg->jumlah ?? 0),
+                'nominal' => (float)($pelunasanCepatAgg->nominal ?? 0),
+                'nominal_miliar' => round(((float)($pelunasanCepatAgg->nominal ?? 0)) / 1000000000, 2)
             ]
         ];
     }
@@ -1729,26 +1694,16 @@ class DashboardController extends Controller
             $startOfMonth = $year . '-' . $monthStr . '-01';
             $endOfMonth = $year . '-' . $monthStr . '-' . date('t', strtotime($startOfMonth));
 
-            // Ambil DISTINCT nokontrak dengan tgleff di bulan ini DARI period bulan ini
-            $uniqueKontrak = Pembiayaan::where('period_month', $monthStr)
+            // Agregasi langsung di DB agar tidak memindahkan daftar kontrak besar ke PHP.
+            $kontrakBaruAgg = Pembiayaan::where('period_month', $monthStr)
                 ->where('period_year', $year)
                 ->whereDate('tgleff', '>=', $startOfMonth)
                 ->whereDate('tgleff', '<=', $endOfMonth)
-                ->selectRaw('DISTINCT nokontrak')
-                ->pluck('nokontrak')
-                ->toArray();
+                ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(mdlawal), 0) as nominal')
+                ->first();
 
-            $jumlahNasabahBaru = count($uniqueKontrak);
-            $nominalNasabahBaru = 0;
-            if ($jumlahNasabahBaru > 0) {
-                $nominalNasabahBaru = Pembiayaan::where('period_month', $monthStr)
-                    ->where('period_year', $year)
-                    ->whereIn('nokontrak', $uniqueKontrak)
-                    ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
-                    ->groupBy('nokontrak')
-                    ->get()
-                    ->sum('mdlawal');
-            }
+            $jumlahNasabahBaru = (int)($kontrakBaruAgg->jumlah ?? 0);
+            $nominalNasabahBaru = (float)($kontrakBaruAgg->nominal ?? 0);
 
             $nasabahBaruData[] = $jumlahNasabahBaru;
             $nasabahBaruNominal[] = round($nominalNasabahBaru / 1000000000, 2);
@@ -1762,45 +1717,26 @@ class DashboardController extends Controller
             }
             $prevMonthStr = str_pad($prevMonth, 2, '0', STR_PAD_LEFT);
 
-            $kontrakBulanLalu = Pembiayaan::where('period_month', $prevMonthStr)
-                ->where('period_year', $prevYear)
-                ->selectRaw('DISTINCT nokontrak')
-                ->pluck('nokontrak')
-                ->toArray();
-
-            $kontrakBulanIni = Pembiayaan::where('period_month', $monthStr)
-                ->where('period_year', $year)
-                ->selectRaw('DISTINCT nokontrak')
-                ->pluck('nokontrak')
-                ->toArray();
-
-            $kontrakHilang = array_diff($kontrakBulanLalu, $kontrakBulanIni);
-
             // Pelunasan Cepat
-            $pelunasanCepatContracts = Pembiayaan::where('period_month', $prevMonthStr)
-                ->where('period_year', $prevYear)
-                ->whereIn('nokontrak', $kontrakHilang)
-                ->whereRaw('angs_ke < jw')
-                ->where('jw', '>', 0)
-                ->selectRaw('nokontrak, MAX(mdlawal) as mdlawal')
-                ->groupBy('nokontrak')
-                ->get();
+            $pelunasanCepatAgg = $this->buildMissingContractsQuery($prevMonthStr, (int)$prevYear, $monthStr, (int)$year)
+                ->whereRaw('prev.angs_ke < prev.jw')
+                ->where('prev.jw', '>', 0)
+                ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(prev.mdlawal), 0) as nominal')
+                ->first();
 
-            $pelunasanCepatData[] = $pelunasanCepatContracts->count();
-            $pelunasanCepatNominal[] = round($pelunasanCepatContracts->sum('mdlawal') / 1000000000, 2);
+            $pelunasanCepatData[] = (int)($pelunasanCepatAgg->jumlah ?? 0);
+            $pelunasanCepatNominal[] = round(((float)($pelunasanCepatAgg->nominal ?? 0)) / 1000000000, 2);
 
             // Nasabah Lunas
-            $nasabahLunasResult = Pembiayaan::where('period_month', $prevMonthStr)
-                ->where('period_year', $prevYear)
-                ->whereIn('nokontrak', $kontrakHilang)
-                ->whereRaw('angs_ke >= jw')
-                ->where('jw', '>', 0)
-                ->where('osmdlc', '<=', 2000000)
+            $nasabahLunasResult = $this->buildMissingContractsQuery($prevMonthStr, (int)$prevYear, $monthStr, (int)$year)
+                ->whereRaw('prev.angs_ke >= prev.jw')
+                ->where('prev.jw', '>', 0)
+                ->where('prev.osmdlc', '<=', 2000000)
                 ->where(function ($q) use ($year, $month) {
-                    $q->whereYear('tgleff', '!=', $year)
-                        ->orWhereMonth('tgleff', '!=', (int) $month);
+                    $q->whereYear('prev.tgleff', '!=', $year)
+                        ->orWhereMonth('prev.tgleff', '!=', (int) $month);
                 })
-                ->selectRaw('COUNT(*) as jumlah, SUM(mdlawal) as nominal')
+                ->selectRaw('COUNT(*) as jumlah, COALESCE(SUM(prev.mdlawal), 0) as nominal')
                 ->first();
 
             $nasabahLunasData[] = $nasabahLunasResult->jumlah ?? 0;
