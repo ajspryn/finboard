@@ -4,10 +4,13 @@ namespace App\Listeners;
 
 use App\Events\FinancialDataUpdated;
 use App\Models\FinancialHighlight;
+use App\Services\FinancialCacheService;
 use Illuminate\Support\Facades\Log;
 
 class RecalculateFinancialHighlights
 {
+     public function __construct(private readonly FinancialCacheService $cacheService) {}
+
      /**
       * Handle the event.
       */
@@ -60,6 +63,8 @@ class RecalculateFinancialHighlights
 
                          $highlight->save();
 
+                         $this->cacheService->invalidateDashboardRenderCache();
+
                          Log::info("Updated FinancialHighlight for period {$periodMonth}/{$periodYear}");
                     } else {
                          // Create new record – seed manually-entered fields from the previous month
@@ -93,6 +98,8 @@ class RecalculateFinancialHighlights
                          }
 
                          $highlight->save();
+
+                         $this->cacheService->invalidateDashboardRenderCache();
 
                          Log::info("Created new FinancialHighlight for period {$periodMonth}/{$periodYear}");
                     }
