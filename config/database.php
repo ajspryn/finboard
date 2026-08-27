@@ -69,6 +69,9 @@ return [
                 $pdoMysqlAttrSslCa => env('MYSQL_ATTR_SSL_CA'),
                 $pdoMysqlAttrInitCommand => "SET SESSION sort_buffer_size=8388608, SESSION tmp_table_size=8388608, SESSION max_heap_table_size=8388608",
             ]) : [],
+            'dump' => [
+                'add_extra_option' => '--ssl-mode=DISABLED',
+            ],
         ],
 
         'mariadb' => [
