@@ -24,6 +24,16 @@ function formatNominal($amount) {
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
+    #map .leaflet-tile-pane {
+        filter: grayscale(1) saturate(0) contrast(0.45) brightness(1.2);
+    }
+
+    .card-header small.text-muted.d-block,
+    .segment-table-meta {
+        display: none !important;
+    }
+</style>
+<style>
     .card {
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
@@ -897,6 +907,8 @@ function formatNominal($amount) {
             $date = new DateTime($updatedAt);
             return $date->format('d M Y H:i');
         }
+
+        $dashboardLastUpdated = collect($lastUpdated ?? [])->filter()->sortDesc()->first();
     @endphp
 
 
@@ -959,6 +971,14 @@ function formatNominal($amount) {
                             <i class="ti ti-calendar me-1"></i>
                             Range: <strong>{{ strtoupper($activeRange) }}</strong>
                         </small>
+                        <small class="text-muted d-block">
+                            <i class="ti ti-calendar me-1"></i>
+                            Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
+                        </small>
+                        <small class="text-muted d-block">
+                            <i class="ti ti-clock me-1"></i>
+                            Data terupdate: {{ formatLastUpdated($dashboardLastUpdated) }}
+                        </small>
                     </div>
                     <div class="btn-group btn-group-sm" role="group" aria-label="Filter waktu dashboard">
                         <button type="button" class="btn btn-outline-primary {{ $activeRange === '1d' ? 'active' : '' }}" onclick="setDashboardRange('1d')">1D</button>
@@ -1001,14 +1021,6 @@ function formatNominal($amount) {
                             Financial Highlights
                         </h4>
                         <small class="text-muted">Indikator Kinerja Keuangan Terbaru</small>
-                        <small class="text-muted d-block">
-                            <i class="ti ti-calendar me-1"></i>
-                            Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
-                        </small>
-                        <small class="text-muted d-block">
-                            <i class="ti ti-clock me-1"></i>
-                            Data terupdate: {{ formatLastUpdated($lastUpdated['financial_highlight'] ?? null) }}
-                        </small>
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         <!-- Comparison Type Toggle -->
@@ -1056,14 +1068,6 @@ function formatNominal($amount) {
                     <div class="card-title mb-0">
                         <h5 class="mb-0 text-info">💰 Funding</h5>
                         <small class="text-muted">Dana Pihak Ketiga</small>
-                        <small class="text-muted d-block">
-                            <i class="ti ti-calendar me-1"></i>
-                            Data per {{ formatPeriod($startDay ?? null, $endDay ?? null, $filterMonth, $filterYear) }}
-                        </small>
-                        <small class="text-muted d-block">
-                            <i class="ti ti-clock me-1"></i>
-                            Data terupdate: {{ formatLastUpdated($lastUpdated['tabungan'] ?? null) }}
-                        </small>
                     </div>
                     <div class="dropdown">
                         <span class="badge {{ $funding['growth'] >= 0 ? 'bg-success' : 'bg-danger' }}">
@@ -4425,10 +4429,10 @@ function initializeMap() {
     // Create map dengan fokus pada Jawa Barat
     const map = L.map('map', {
         center: [-6.6, 106.8], // Pusat Jawa Barat (Bandung)
-        zoom: 9,
+        zoom: 10,
         zoomControl: true,
         attributionControl: true,
-        dragging: false,
+        dragging: true,
         scrollWheelZoom: false,
         touchZoom: false,
         doubleClickZoom: false,
@@ -4439,43 +4443,12 @@ function initializeMap() {
     });
     window.kecamatanMap = map;
 
-    // OpenStreetMap tidak memerlukan API key.
+    // OpenStreetMap tidak memerlukan API key dan tetap dibuat flat agar marker mudah dibaca.
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
+        maxZoom: 19,
+        className: 'map-flat-tiles'
     }).addTo(map);
-
-    const initialMapView = { center: [-6.6, 106.8], zoom: 9 };
-    const mapNavigation = L.control({ position: 'topleft' });
-    mapNavigation.onAdd = function () {
-        const container = L.DomUtil.create('div', 'leaflet-bar');
-        container.innerHTML = `
-            <button type="button" class="leaflet-control-pan" data-pan="up" title="Geser peta ke atas" aria-label="Geser peta ke atas"><i class="ti ti-arrow-up"></i></button>
-            <div class="d-flex">
-                <button type="button" class="leaflet-control-pan" data-pan="left" title="Geser peta ke kiri" aria-label="Geser peta ke kiri"><i class="ti ti-arrow-left"></i></button>
-                <button type="button" class="leaflet-control-pan" data-pan="home" title="Kembali ke posisi awal" aria-label="Kembali ke posisi awal"><i class="ti ti-home"></i></button>
-                <button type="button" class="leaflet-control-pan" data-pan="right" title="Geser peta ke kanan" aria-label="Geser peta ke kanan"><i class="ti ti-arrow-right"></i></button>
-            </div>
-            <button type="button" class="leaflet-control-pan" data-pan="down" title="Geser peta ke bawah" aria-label="Geser peta ke bawah"><i class="ti ti-arrow-down"></i></button>
-        `;
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.disableScrollPropagation(container);
-        container.querySelectorAll('[data-pan]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const direction = button.dataset.pan;
-                const offsets = { up: [0, -120], down: [0, 120], left: [-120, 0], right: [120, 0] };
-                if (direction === 'home') {
-                    map.setView(initialMapView.center, initialMapView.zoom);
-                    return;
-                }
-                map.panBy(offsets[direction]);
-            });
-        });
-
-        return container;
-    };
-    mapNavigation.addTo(map);
 
     // Data kecamatan dari blade
     const kecamatanData = @json($kecamatanData);

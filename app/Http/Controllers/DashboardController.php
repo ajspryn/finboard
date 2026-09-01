@@ -431,7 +431,7 @@ class DashboardController extends Controller
                 $segmentTableGroupBy
             );
 
-            $kecamatanSegment = $this->normalizeKecamatanSegment($request->input('kecamatan_segment'));
+        $kecamatanSegment = $this->normalizeKecamatanSegment($request->input('kecamatan_segment'));
 
         // Semua agregasi utama lending diringkas ke 1 query untuk menekan waktu load awal.
         $lendingSummary = (clone $query)
