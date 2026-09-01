@@ -479,14 +479,15 @@
         range: '{{ $range }}',
         start_day: '{{ $startDay }}',
         end_day:   '{{ $endDay }}',
-        group_by: '{{ request('group_by', 'segmentasi') }}'
+        group_by: '{{ request('group_by', 'segmentasi') }}',
+        kecamatan_segment: '{{ request('kecamatan_segment', '') }}'
     };
 
     // ── Bangun query params dari URL saat ini ────────────────────────
     function buildRenderUrl() {
         var src    = new URLSearchParams(window.location.search);
         var params = new URLSearchParams();
-        ['month','year','range','start_day','end_day','group_by'].forEach(function (k) {
+        ['month','year','range','start_day','end_day','group_by','kecamatan_segment'].forEach(function (k) {
             var v = src.get(k) || _bladeDefaults[k] || '';
             if (v) params.set(k, v);
         });

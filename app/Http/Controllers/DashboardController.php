@@ -383,6 +383,7 @@ class DashboardController extends Controller
             'start_day' => $startDay,
             'end_day' => $endDay,
             'group_by' => $request->input('group_by', 'segmentasi'),
+            'kecamatan_segment' => $this->normalizeKecamatanSegment($request->input('kecamatan_segment')),
             'version' => $dashboardRenderVersion,
         ]);
 
@@ -429,6 +430,8 @@ class DashboardController extends Controller
                 $dashboardEndDate,
                 $segmentTableGroupBy
             );
+
+            $kecamatanSegment = $this->normalizeKecamatanSegment($request->input('kecamatan_segment'));
 
         // Semua agregasi utama lending diringkas ke 1 query untuk menekan waktu load awal.
         $lendingSummary = (clone $query)
@@ -1291,7 +1294,10 @@ class DashboardController extends Controller
         ];
 
         // Sebaran Nasabah per Kecamatan
-        $kecamatanData = (clone $query)
+        $kecamatanQuery = clone $query;
+        $this->applyKecamatanSegmentFilter($kecamatanQuery, $kecamatanSegment);
+
+        $kecamatanData = $kecamatanQuery
             ->select(
                 'kecamatan',
                 'kota',
@@ -1560,6 +1566,7 @@ class DashboardController extends Controller
             'topProductsChart',
             'portfolioSummary',
             'kecamatanData',
+            'kecamatanSegment',
             'topAOData',
             'aoFundingData',
             'nasabahStatusData',
@@ -3215,6 +3222,7 @@ class DashboardController extends Controller
         $filterMonth = request('month', now()->format('m'));
         $filterYear = request('year', now()->year);
         $range = $this->normalizeDashboardRange(request('range', 'all'));
+        $kecamatanSegment = $this->normalizeKecamatanSegment(request('kecamatan_segment'));
 
         return $this->rememberDashboardJson('kecamatan-detail', [
             'kecamatan' => $kecamatan,
@@ -3223,7 +3231,8 @@ class DashboardController extends Controller
             'month' => $filterMonth,
             'year' => $filterYear,
             'range' => $range,
-        ], function () use ($kecamatan, $startDay, $endDay, $filterMonth, $filterYear, $range) {
+            'kecamatan_segment' => $kecamatanSegment,
+        ], function () use ($kecamatan, $startDay, $endDay, $filterMonth, $filterYear, $range, $kecamatanSegment) {
 
             $query = Pembiayaan::query()
                 ->where('period_month', $filterMonth)
@@ -3234,6 +3243,7 @@ class DashboardController extends Controller
 
             // Filter by kecamatan
             $query->where('kecamatan', $kecamatan);
+            $this->applyKecamatanSegmentFilter($query, $kecamatanSegment);
 
             $details = $query
                 ->select('nokontrak', 'nama', 'osmdlc', 'mdlawal', 'colbaru', 'kdgroupdeb', 'kdaoh', 'nmao', 'kecamatan')
@@ -3264,6 +3274,55 @@ class DashboardController extends Controller
                 'details' => $details
             ];
         }, 20);
+    }
+
+    public function exportKecamatan(Request $request)
+    {
+        $filterMonth = str_pad((string) (int) $request->input('month', now()->format('m')), 2, '0', STR_PAD_LEFT);
+        $filterYear = (string) $request->input('year', now()->year);
+        $range = $this->normalizeDashboardRange($request->input('range', 'all'));
+        $startDay = $request->input('start_day');
+        $endDay = $request->input('end_day');
+        $kecamatanSegment = $this->normalizeKecamatanSegment($request->input('kecamatan_segment'));
+
+        $query = Pembiayaan::query()
+            ->where('period_month', $filterMonth)
+            ->where('period_year', $filterYear);
+
+        [$absoluteStart, $absoluteEnd] = $this->resolveDashboardDateWindow($range, $startDay, $endDay, $filterMonth, $filterYear);
+        $this->applyOptionalDateFilter($query, 'tgleff', $absoluteStart, $absoluteEnd);
+        $this->applyKecamatanSegmentFilter($query, $kecamatanSegment);
+
+        $rows = $query
+            ->selectRaw("COALESCE(NULLIF(TRIM(kecamatan), ''), 'TANPA KECAMATAN') as kecamatan")
+            ->selectRaw("COALESCE(NULLIF(TRIM(kota), ''), '-') as kota")
+            ->selectRaw('COUNT(*) as total_nasabah')
+            ->selectRaw('COALESCE(SUM(osmdlc), 0) as total_outstanding')
+            ->whereNotNull('kecamatan')
+            ->where('kecamatan', '!=', '')
+            ->groupBy('kecamatan', 'kota')
+            ->orderByDesc('total_nasabah')
+            ->get();
+
+        $totalNasabah = $rows->sum('total_nasabah');
+        $filename = sprintf('sebaran-nasabah-kecamatan-%s-%s.csv', $filterYear, $filterMonth);
+
+        return response()->streamDownload(function () use ($rows, $totalNasabah) {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Kecamatan', 'Kota', 'Jumlah Nasabah', 'Total Outstanding', 'Persentase Nasabah']);
+
+            foreach ($rows as $row) {
+                fputcsv($output, [
+                    $row->kecamatan,
+                    $row->kota,
+                    $row->total_nasabah,
+                    $row->total_outstanding,
+                    $totalNasabah > 0 ? round(($row->total_nasabah / $totalNasabah) * 100, 2) : 0,
+                ]);
+            }
+
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function getAODetail($nmao)
@@ -3457,6 +3516,46 @@ class DashboardController extends Controller
             '5' => 'Macet'
         ];
         return $labels[$col] ?? '-';
+    }
+
+    private function normalizeKecamatanSegment(?string $segment): ?string
+    {
+        $segment = strtoupper(trim((string) $segment));
+        $allowedSegments = array_merge(array_keys($this->getSegmentCodes()), ['LAIN-LAIN']);
+
+        return in_array($segment, $allowedSegments, true) ? $segment : null;
+    }
+
+    private function applyKecamatanSegmentFilter($query, ?string $segment): void
+    {
+        if (! $segment) {
+            return;
+        }
+
+        $segmentCodes = $this->getSegmentCodes();
+
+        if ($segment === 'LAIN-LAIN') {
+            $mappedCodes = [];
+            foreach ($segmentCodes as $segments) {
+                foreach ($segments as $segmentTypeCodes) {
+                    $mappedCodes = array_merge($mappedCodes, $segmentTypeCodes);
+                }
+            }
+
+            $query->where(function ($subQuery) use ($mappedCodes) {
+                $subQuery->whereNull('kdgroupdeb')
+                    ->orWhere('kdgroupdeb', '')
+                    ->orWhereNotIn('kdgroupdeb', $mappedCodes);
+            });
+            return;
+        }
+
+        $codes = [];
+        foreach ($segmentCodes[$segment] as $segmentTypeCodes) {
+            $codes = array_merge($codes, $segmentTypeCodes);
+        }
+
+        $query->whereIn('kdgroupdeb', $codes);
     }
 
     private function applySegmentGroupingFilter($query, string $category, string $type, string $groupBy): bool

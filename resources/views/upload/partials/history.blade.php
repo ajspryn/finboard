@@ -101,20 +101,43 @@
                                         <span class="badge bg-secondary">{{ ucfirst($upload['status']) }}</span>
                                     @endif
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" style="min-width: 130px;">
                                     @if($upload['type'] === 'processing' && $upload['total_records'] > 0)
-                                        <div class="d-flex align-items-center justify-content-center">
-                                            <div class="progress flex-grow-1 me-2" style="height: 6px; width: 60px;">
-                                                <div class="progress-bar bg-primary" role="progressbar"
-                                                     style="width: {{ $upload['progress'] }}%">
+                                        @php $pct = $upload['progress'] ?? 0; @endphp
+                                        <div class="px-1">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <small class="text-warning fw-semibold">{{ $pct }}%</small>
+                                                <small class="text-muted" style="font-size:0.72rem;">
+                                                    {{ number_format($upload['processed_records']) }}/{{ number_format($upload['total_records']) }}
+                                                </small>
+                                            </div>
+                                            <div class="progress" style="height: 8px; border-radius: 4px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                                                     role="progressbar"
+                                                     style="width: {{ $pct }}%"
+                                                     aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100">
                                                 </div>
                                             </div>
-                                            <small class="text-muted">
-                                                {{ $upload['processed_records'] }}/{{ $upload['total_records'] }}
-                                            </small>
+                                        </div>
+                                    @elseif($upload['type'] === 'processing' && ($upload['total_records'] ?? 0) == 0)
+                                        <div class="px-1">
+                                            <div class="progress" style="height: 8px; border-radius: 4px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                                                     role="progressbar" style="width: 100%">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-1" style="font-size:0.72rem;">Menghitung baris...</small>
                                         </div>
                                     @elseif($upload['type'] === 'completed')
-                                        <span class="badge bg-success">100%</span>
+                                        <div class="px-1">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <small class="text-success fw-semibold">100%</small>
+                                                <small class="text-muted" style="font-size:0.72rem;">Selesai</small>
+                                            </div>
+                                            <div class="progress" style="height: 8px; border-radius: 4px;">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width:100%"></div>
+                                            </div>
+                                        </div>
                                     @else
                                         <small class="text-muted">-</small>
                                     @endif

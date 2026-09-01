@@ -1792,13 +1792,22 @@ function formatNominal($amount) {
                             Data terupdate: {{ formatLastUpdated($lastUpdated['pembiayaan'] ?? null) }}
                         </small>
                     </div>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-primary" id="btnShowMap" onclick="toggleView('map')">
-                            <i class="ti ti-map"></i> Peta
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnShowTable" onclick="toggleView('table')">
-                            <i class="ti ti-table"></i> Tabel
-                        </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <select class="form-select form-select-sm" aria-label="Filter segmentasi kecamatan" onchange="updateKecamatanSegment(this.value)">
+                            <option value="">Semua Segmentasi</option>
+                            @foreach(array_keys($segmentCodes) as $segment)
+                                <option value="{{ $segment }}" {{ ($kecamatanSegment ?? null) === $segment ? 'selected' : '' }}>{{ $segment }}</option>
+                            @endforeach
+                            <option value="LAIN-LAIN" {{ ($kecamatanSegment ?? null) === 'LAIN-LAIN' ? 'selected' : '' }}>LAIN-LAIN</option>
+                        </select>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-primary" id="btnShowMap" onclick="toggleView('map')">
+                                <i class="ti ti-map"></i> Peta
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnShowTable" onclick="toggleView('table')">
+                                <i class="ti ti-table"></i> Tabel
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -1814,6 +1823,11 @@ function formatNominal($amount) {
 
                     <!-- Table View -->
                     <div id="tableView" style="display: none;">
+                    <div class="d-flex justify-content-end mb-3">
+                        <a href="{{ route('dashboard.kecamatan.export', array_merge(request()->query(), ['kecamatan_segment' => $kecamatanSegment ?? null])) }}" class="btn btn-sm btn-success">
+                            <i class="ti ti-download"></i> Export CSV
+                        </a>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover" id="kecamatanTable">
                             <thead>
@@ -4077,20 +4091,14 @@ function showKecamatanDetail(kecamatan) {
 
     // Get current filter parameters from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const startDay = urlParams.get('start_day');
-    const endDay = urlParams.get('end_day');
-    const month = urlParams.get('month');
-    const year = urlParams.get('year');
-
-    // Build URL with all filter parameters
     let url = `/dashboard/kecamatan-detail/${encodeURIComponent(kecamatan)}`;
-    const params = [];
-    if (startDay) params.push('start_day=' + startDay);
-    if (endDay) params.push('end_day=' + endDay);
-    if (month) params.push('month=' + month);
-    if (year) params.push('year=' + year);
-    if (params.length > 0) {
-        url += '?' + params.join('&');
+    const params = new URLSearchParams();
+    ['start_day', 'end_day', 'month', 'year', 'range', 'kecamatan_segment'].forEach((key) => {
+        const value = urlParams.get(key);
+        if (value) params.set(key, value);
+    });
+    if (params.toString()) {
+        url += '?' + params.toString();
     }
 
     fetch(url)
@@ -4402,6 +4410,16 @@ function toggleView(view) {
     }
 }
 
+function updateKecamatanSegment(segment) {
+    const url = new URL(window.location.href);
+    if (segment) {
+        url.searchParams.set('kecamatan_segment', segment);
+    } else {
+        url.searchParams.delete('kecamatan_segment');
+    }
+    window.location.href = url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '');
+}
+
 // Initialize Leaflet Map
 function initializeMap() {
     // Create map dengan fokus pada Jawa Barat
@@ -4409,18 +4427,55 @@ function initializeMap() {
         center: [-6.6, 106.8], // Pusat Jawa Barat (Bandung)
         zoom: 9,
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
+        dragging: false,
+        scrollWheelZoom: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
         minZoom: 4,
         maxZoom: 15
     });
     window.kecamatanMap = map;
 
-    // Tambahkan tiles peta FLAT (CartoDB Positron - style flat tanpa 3D)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap contributors © CARTO',
-        subdomains: 'abcd',
+    // OpenStreetMap tidak memerlukan API key.
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
     }).addTo(map);
+
+    const initialMapView = { center: [-6.6, 106.8], zoom: 9 };
+    const mapNavigation = L.control({ position: 'topleft' });
+    mapNavigation.onAdd = function () {
+        const container = L.DomUtil.create('div', 'leaflet-bar');
+        container.innerHTML = `
+            <button type="button" class="leaflet-control-pan" data-pan="up" title="Geser peta ke atas" aria-label="Geser peta ke atas"><i class="ti ti-arrow-up"></i></button>
+            <div class="d-flex">
+                <button type="button" class="leaflet-control-pan" data-pan="left" title="Geser peta ke kiri" aria-label="Geser peta ke kiri"><i class="ti ti-arrow-left"></i></button>
+                <button type="button" class="leaflet-control-pan" data-pan="home" title="Kembali ke posisi awal" aria-label="Kembali ke posisi awal"><i class="ti ti-home"></i></button>
+                <button type="button" class="leaflet-control-pan" data-pan="right" title="Geser peta ke kanan" aria-label="Geser peta ke kanan"><i class="ti ti-arrow-right"></i></button>
+            </div>
+            <button type="button" class="leaflet-control-pan" data-pan="down" title="Geser peta ke bawah" aria-label="Geser peta ke bawah"><i class="ti ti-arrow-down"></i></button>
+        `;
+
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableScrollPropagation(container);
+        container.querySelectorAll('[data-pan]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const direction = button.dataset.pan;
+                const offsets = { up: [0, -120], down: [0, 120], left: [-120, 0], right: [120, 0] };
+                if (direction === 'home') {
+                    map.setView(initialMapView.center, initialMapView.zoom);
+                    return;
+                }
+                map.panBy(offsets[direction]);
+            });
+        });
+
+        return container;
+    };
+    mapNavigation.addTo(map);
 
     // Data kecamatan dari blade
     const kecamatanData = @json($kecamatanData);

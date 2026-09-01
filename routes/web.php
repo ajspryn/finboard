@@ -55,6 +55,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/segmentasi-detail/{category}/{type}', [DashboardController::class, 'getSegmentasiDetail'])->name('dashboard.segmentasi.detail');
     Route::get('/dashboard/segmentasi-kol-detail/{category}/{type}/{kol}', [DashboardController::class, 'getSegmentasiKolDetail'])->name('dashboard.segmentasi.kol.detail');
     Route::get('/dashboard/kecamatan-detail/{kecamatan}', [DashboardController::class, 'getKecamatanDetail'])->name('dashboard.kecamatan.detail');
+    Route::get('/dashboard/kecamatan-export', [DashboardController::class, 'exportKecamatan'])->name('dashboard.kecamatan.export');
     Route::get('/dashboard/ao-detail/{nmao}', [DashboardController::class, 'getAODetail'])->name('dashboard.ao.detail');
     Route::get('/dashboard/ao-npf-detail/{nmao}', [DashboardController::class, 'getAONpfDetail'])->name('dashboard.ao.npf.detail');
     Route::get('/dashboard/ao-funding-detail/{kodeaoh}', [DashboardController::class, 'getAOFundingDetail'])->name('dashboard.ao.funding.detail');
